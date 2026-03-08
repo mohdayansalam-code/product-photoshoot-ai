@@ -12,6 +12,9 @@ import AIToolsPage from "./pages/AIToolsPage";
 import AssetsPage from "./pages/AssetsPage";
 import BillingPage from "./pages/BillingPage";
 import SettingsPage from "./pages/SettingsPage";
+import EditorPage from "./pages/EditorPage";
+import ProjectsPage from "./pages/ProjectsPage";
+import ActivityPage from "./pages/ActivityPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
