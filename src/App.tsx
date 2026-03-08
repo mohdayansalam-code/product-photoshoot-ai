@@ -14,6 +14,7 @@ import BillingPage from "./pages/BillingPage";
 import SettingsPage from "./pages/SettingsPage";
 import EditorPage from "./pages/EditorPage";
 import ProjectsPage from "./pages/ProjectsPage";
+import ProductsLibraryPage from "./pages/ProductsLibraryPage";
 import ActivityPage from "./pages/ActivityPage";
 import NotFound from "./pages/NotFound";
 
