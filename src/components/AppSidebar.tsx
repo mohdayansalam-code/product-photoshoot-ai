@@ -3,12 +3,12 @@ import {
   Camera,
   Images,
   Wand2,
+  FolderOpen,
   Coins,
   Settings,
   Sparkles,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +27,7 @@ const navItems = [
   { title: "Generate Photoshoot", url: "/generate", icon: Camera },
   { title: "Generations", url: "/generations", icon: Images },
   { title: "AI Image Tools", url: "/tools", icon: Wand2 },
+  { title: "Assets Library", url: "/assets", icon: FolderOpen },
   { title: "Credits", url: "/credits", icon: Coins },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
@@ -34,7 +35,6 @@ const navItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
@@ -70,7 +70,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-3">
-        <CreditIndicator credits={180} collapsed={collapsed} />
+        <CreditIndicator credits={180} maxCredits={200} collapsed={collapsed} />
       </SidebarFooter>
     </Sidebar>
   );
