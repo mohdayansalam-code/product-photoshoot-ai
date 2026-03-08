@@ -27,6 +27,8 @@ const secondaryActions = [
 
 export default function Index() {
   const lowCredits = CREDITS < 20;
+  const { products } = useProductStore();
+  const recentProducts = products.slice(0, 4);
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
