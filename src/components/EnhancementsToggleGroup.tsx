@@ -20,6 +20,7 @@ export function EnhancementsToggleGroup({ active, onToggle }: EnhancementsToggle
         <div key={e.id} className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-foreground">{e.label}</p>
+            {e.description && <p className="text-xs text-muted-foreground/70 max-w-[220px]">{e.description}</p>}
             <p className="text-xs text-muted-foreground">+{e.credits} credits</p>
           </div>
           <Switch
