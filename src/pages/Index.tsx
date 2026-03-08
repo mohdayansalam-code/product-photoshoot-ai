@@ -24,17 +24,6 @@ const secondaryActions = [
   { label: "AI Tools", icon: Wand2, to: "/ai-tools" },
 ];
 
-const weeklyUsage = [
-  { day: "Mon", credits: 12 },
-  { day: "Tue", credits: 28 },
-  { day: "Wed", credits: 8 },
-  { day: "Thu", credits: 35 },
-  { day: "Fri", credits: 20 },
-  { day: "Sat", credits: 5 },
-  { day: "Sun", credits: 15 },
-];
-
-const recentProducts = SCENES.slice(0, 4);
 
 export default function Index() {
   const lowCredits = CREDITS < 20;
