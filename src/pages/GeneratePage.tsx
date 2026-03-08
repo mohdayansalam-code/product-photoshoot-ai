@@ -2,6 +2,8 @@ import { useState, useCallback } from "react";
 import { Camera, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { ImageUploader } from "@/components/ImageUploader";
 import { SceneSelector } from "@/components/SceneSelector";
 import { ModelSelector } from "@/components/ModelSelector";
@@ -11,10 +13,20 @@ import { GenerationGallery } from "@/components/GenerationGallery";
 import { generateProduct, fetchResults, type Scene } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+const QUICK_TAGS = [
+  "luxury",
+  "studio lighting",
+  "soft shadows",
+  "ecommerce product",
+  "editorial fashion",
+  "macro shot",
+];
+
 export default function GeneratePage() {
   const [productFile, setProductFile] = useState<File | null>(null);
   const [productPreview, setProductPreview] = useState<string | null>(null);
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null);
+  const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState("seedream");
   const [imageCount, setImageCount] = useState(4);
   const [enhancements, setEnhancements] = useState<string[]>([]);
@@ -65,6 +77,32 @@ export default function GeneratePage() {
             <Camera className="h-5 w-5 text-primary" />
             <h1 className="text-lg font-semibold text-foreground">Generate Product Photoshoot</h1>
           </div>
+
+          <section className="space-y-2">
+            <h2 className="text-sm font-medium text-foreground">Describe Your Photoshoot</h2>
+            <motion.div
+              className="rounded-xl border border-border bg-card shadow-soft p-3 space-y-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15 transition-all duration-200"
+            >
+              <Textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder={"Describe your photoshoot idea...\n\nExample:\nLuxury product photography\nsoft studio lighting\nminimal background\npremium ecommerce style"}
+                className="min-h-[100px] border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 resize-none text-sm"
+              />
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_TAGS.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors text-xs"
+                    onClick={() => setPrompt((prev) => prev ? `${prev}, ${tag}` : tag)}
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </motion.div>
+          </section>
 
           <section className="space-y-2">
             <h2 className="text-sm font-medium text-foreground">Upload Product</h2>
