@@ -4,9 +4,9 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { StatsCard } from "@/components/StatsCard";
 import { MOCK_GENERATIONS, SCENES } from "@/lib/api";
+import { useProductStore } from "@/lib/productStore";
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const CREDITS = 180;
 const MAX_CREDITS = 500;
