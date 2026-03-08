@@ -101,45 +101,23 @@ export default function Index() {
         </div>
       </motion.div>
 
-      {/* Usage Chart + Recent Products */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Weekly Usage Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          className="rounded-xl border border-border bg-card shadow-soft p-5"
-        >
-          <h2 className="font-semibold text-foreground mb-4">Weekly Credit Usage</h2>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyUsage}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="day" className="text-xs fill-muted-foreground" tick={{ fill: 'hsl(220 10% 46%)' }} />
-                <YAxis className="text-xs fill-muted-foreground" tick={{ fill: 'hsl(220 10% 46%)' }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(0 0% 100%)',
-                    border: '1px solid hsl(220 13% 91%)',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.75rem',
-                  }}
-                />
-                <Bar dataKey="credits" fill="hsl(217 91% 60%)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Recent Products */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="rounded-xl border border-border bg-card shadow-soft p-5"
-        >
-          <h2 className="font-semibold text-foreground mb-4">Recent Products</h2>
-          <div className="grid grid-cols-2 gap-3">
+      {/* Recent Products */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+        className="rounded-xl border border-border bg-card shadow-soft p-5"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-foreground">Recent Products</h2>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/products">View all <ArrowRight className="h-4 w-4 ml-1" /></Link>
+          </Button>
+        </div>
+        {recentProducts.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">No products yet. Upload your first product.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {recentProducts.map((product) => (
               <motion.div
                 key={product.id}
@@ -147,7 +125,7 @@ export default function Index() {
                 className="group relative rounded-lg overflow-hidden border border-border"
               >
                 <img
-                  src={product.thumbnail}
+                  src={product.imageUrl}
                   alt={product.name}
                   className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105"
                 />
@@ -158,12 +136,15 @@ export default function Index() {
                     </Link>
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground p-2 truncate">{product.name}</p>
+                <div className="p-2">
+                  <p className="text-xs font-medium text-foreground truncate">{product.name}</p>
+                  <p className="text-xs text-muted-foreground">{format(new Date(product.addedAt), "MMM d")}</p>
+                </div>
               </motion.div>
             ))}
           </div>
-        </motion.div>
-      </div>
+        )}
+      </motion.div>
 
       {/* Recent Generations */}
       <div>
