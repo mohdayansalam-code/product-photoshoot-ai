@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -10,15 +11,19 @@ const plans = [
 export default function BillingPage() {
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8">
-      <div>
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-semibold text-foreground">Billing</h1>
         <p className="text-muted-foreground mt-1">Choose the plan that fits your needs</p>
-      </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {plans.map((plan) => (
-          <div
+        {plans.map((plan, i) => (
+          <motion.div
             key={plan.name}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+            whileHover={{ y: -4 }}
             className={`rounded-xl border bg-card p-6 space-y-5 relative ${
               plan.popular ? "border-primary shadow-card ring-1 ring-primary/20" : "border-border shadow-soft"
             }`}
@@ -39,8 +44,7 @@ export default function BillingPage() {
             <ul className="space-y-2.5">
               {plan.features.map((f) => (
                 <li key={f} className="flex items-center gap-2 text-sm text-foreground">
-                  <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                  {f}
+                  <Check className="h-4 w-4 text-primary flex-shrink-0" /> {f}
                 </li>
               ))}
             </ul>
@@ -50,7 +54,7 @@ export default function BillingPage() {
             >
               {plan.popular ? "Upgrade Now" : "Get Started"}
             </Button>
-          </div>
+          </motion.div>
         ))}
       </div>
     </div>

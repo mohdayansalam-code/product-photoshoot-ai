@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Coins, TrendingDown } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
@@ -12,34 +13,53 @@ const usageHistory = [
 export default function CreditsPage() {
   return (
     <div className="p-8 max-w-3xl mx-auto space-y-8">
-      <h1 className="text-2xl font-semibold text-foreground">Credits</h1>
+      <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-2xl font-semibold text-foreground">
+        Credits
+      </motion.h1>
 
-      <div className="rounded-xl border border-border bg-card shadow-card p-6 space-y-4">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        whileHover={{ y: -2 }}
+        className="rounded-xl border border-border bg-card shadow-card p-6 space-y-4"
+      >
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl gradient-primary flex items-center justify-center">
             <Coins className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Current Balance</p>
-            <p className="text-3xl font-bold text-foreground">120 <span className="text-base font-normal text-muted-foreground">credits</span></p>
+            <p className="text-3xl font-bold text-foreground">180 <span className="text-base font-normal text-muted-foreground">credits</span></p>
           </div>
         </div>
         <div className="space-y-1">
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>120 remaining</span>
+            <span>180 remaining</span>
             <span>200 purchased</span>
           </div>
-          <Progress value={60} className="h-2" />
+          <Progress value={90} className="h-2" />
         </div>
-      </div>
+      </motion.div>
 
-      <div className="rounded-xl border border-border bg-card shadow-soft">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="rounded-xl border border-border bg-card shadow-soft"
+      >
         <div className="p-4 border-b border-border">
           <h2 className="font-medium text-foreground">Usage History</h2>
         </div>
         <div className="divide-y divide-border">
           {usageHistory.map((item, i) => (
-            <div key={i} className="flex items-center justify-between p-4">
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 + i * 0.05 }}
+              className="flex items-center justify-between p-4"
+            >
               <div className="flex items-center gap-3">
                 <TrendingDown className={`h-4 w-4 ${item.credits > 0 ? "text-green-500 rotate-180" : "text-destructive"}`} />
                 <div>
@@ -50,10 +70,10 @@ export default function CreditsPage() {
               <span className={`text-sm font-semibold ${item.credits > 0 ? "text-green-600" : "text-foreground"}`}>
                 {item.credits > 0 ? "+" : ""}{item.credits}
               </span>
-            </div>
+            </motion.div>
           ))}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

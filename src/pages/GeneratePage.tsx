@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { Camera, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ImageUploader } from "@/components/ImageUploader";
 import { SceneSelector } from "@/components/SceneSelector";
@@ -22,12 +23,7 @@ export default function GeneratePage() {
 
   const handleUpload = useCallback((file: File | null) => {
     setProductFile(file);
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setProductPreview(url);
-    } else {
-      setProductPreview(null);
-    }
+    setProductPreview(file ? URL.createObjectURL(file) : null);
   }, []);
 
   const handleToggleEnhancement = (id: string) => {
@@ -58,66 +54,68 @@ export default function GeneratePage() {
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)]">
-      {/* Left: Controls */}
       <ScrollArea className="w-[380px] border-r border-border flex-shrink-0">
-        <div className="p-6 space-y-6">
+        <motion.div
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4 }}
+          className="p-6 space-y-6"
+        >
           <div className="flex items-center gap-2">
             <Camera className="h-5 w-5 text-primary" />
             <h1 className="text-lg font-semibold text-foreground">Generate Product Photoshoot</h1>
           </div>
 
-          {/* Upload */}
           <section className="space-y-2">
             <h2 className="text-sm font-medium text-foreground">Upload Product</h2>
             <ImageUploader onUpload={handleUpload} preview={productPreview} />
           </section>
 
-          {/* Scene Presets */}
           <section className="space-y-2">
             <h2 className="text-sm font-medium text-foreground">Scene Presets</h2>
             <SceneSelector selected={selectedScene} onSelect={setSelectedScene} />
             {selectedScene && (
-              <p className="text-xs text-muted-foreground italic mt-1">
-                {selectedScene.scene_prompt}
-              </p>
+              <p className="text-xs text-muted-foreground italic mt-1">{selectedScene.scene_prompt}</p>
             )}
           </section>
 
-          {/* Model */}
           <section className="space-y-2">
             <h2 className="text-sm font-medium text-foreground">AI Model</h2>
             <ModelSelector selected={model} onSelect={setModel} imageCount={imageCount} />
           </section>
 
-          {/* Quantity */}
           <section className="space-y-2">
             <h2 className="text-sm font-medium text-foreground">Image Quantity</h2>
             <ImageQuantitySelector count={imageCount} onChange={setImageCount} />
           </section>
 
-          {/* Enhancements */}
           <section className="space-y-3">
             <h2 className="text-sm font-medium text-foreground">AI Enhancements <span className="text-muted-foreground font-normal">(Optional)</span></h2>
             <EnhancementsToggleGroup active={enhancements} onToggle={handleToggleEnhancement} />
           </section>
 
-          {/* Generate */}
-          <Button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="w-full h-12 gradient-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-          >
-            <Sparkles className="h-4 w-4 mr-2" />
-            Generate Photoshoot
-          </Button>
-        </div>
+          <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
+            <Button
+              onClick={handleGenerate}
+              disabled={loading}
+              className="w-full h-12 gradient-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              {loading ? "Generating..." : "Generate Photoshoot"}
+            </Button>
+          </motion.div>
+        </motion.div>
       </ScrollArea>
 
-      {/* Right: Gallery */}
-      <div className="flex-1 flex flex-col bg-secondary/30 p-6 overflow-auto">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="flex-1 flex flex-col bg-secondary/30 p-6 overflow-auto"
+      >
         <h2 className="text-sm font-medium text-muted-foreground mb-4">Generated Images</h2>
         <GenerationGallery images={generatedImages} loading={loading} />
-      </div>
+      </motion.div>
     </div>
   );
 }
