@@ -26,8 +26,8 @@ const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Generate Photoshoot", url: "/generate", icon: Camera },
   { title: "Generations", url: "/generations", icon: Images },
+  { title: "AI Image Tools", url: "/tools", icon: Wand2 },
   { title: "Credits", url: "/credits", icon: Coins },
-  { title: "Billing", url: "/billing", icon: CreditCard },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

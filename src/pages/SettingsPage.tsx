@@ -23,6 +23,10 @@ export default function SettingsPage() {
             <Label>Email</Label>
             <Input defaultValue="john@example.com" type="email" />
           </div>
+          <div className="space-y-2">
+            <Label>Password</Label>
+            <Input type="password" placeholder="••••••••" />
+          </div>
         </div>
         <Button>Save Changes</Button>
       </div>
