@@ -26,6 +26,7 @@ export default function GeneratePage() {
   const [productFile, setProductFile] = useState<File | null>(null);
   const [productPreview, setProductPreview] = useState<string | null>(null);
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null);
+  const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState("seedream");
   const [imageCount, setImageCount] = useState(4);
   const [enhancements, setEnhancements] = useState<string[]>([]);
