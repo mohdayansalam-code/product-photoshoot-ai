@@ -1,8 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { Wand2, Eraser, Square, ZoomIn, ArrowUpFromLine, Upload, Download, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Slider } from "@/components/ui/slider";
 
 interface Tool {
   id: string;
@@ -24,6 +25,7 @@ export default function AIToolsPage() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [resultReady, setResultReady] = useState(false);
+  const [sliderValue, setSliderValue] = useState([50]);
 
   const handleUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -35,6 +37,7 @@ export default function AIToolsPage() {
     await new Promise((r) => setTimeout(r, 2000));
     setProcessing(false);
     setResultReady(true);
+    setSliderValue([50]);
   };
 
   const handleClose = () => { setActiveTool(null); setUploadedImage(null); setResultReady(false); setProcessing(false); };
@@ -95,29 +98,46 @@ export default function AIToolsPage() {
             </label>
           ) : (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Before</p>
-                  <div className="rounded-lg border border-border overflow-hidden aspect-square bg-secondary/30">
+              {!resultReady ? (
+                <div className="rounded-lg border border-border overflow-hidden aspect-video bg-secondary/30 flex items-center justify-center">
+                  {processing ? (
+                    <div className="text-center">
+                      <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">Processing…</p>
+                    </div>
+                  ) : (
                     <img src={uploadedImage} alt="Original" className="w-full h-full object-cover" />
-                  </div>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">After</p>
-                  <div className="rounded-lg border border-border overflow-hidden aspect-square bg-secondary/30 flex items-center justify-center">
-                    {processing ? (
-                      <div className="text-center">
-                        <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                        <p className="text-sm text-muted-foreground">Processing…</p>
+              ) : (
+                /* Before / After Comparison Slider */
+                <div className="space-y-3">
+                  <div className="relative rounded-lg border border-border overflow-hidden aspect-video select-none">
+                    {/* After (full) */}
+                    <img src={uploadedImage} alt="After" className="absolute inset-0 w-full h-full object-cover brightness-110 contrast-105" />
+                    {/* Before (clipped) */}
+                    <div
+                      className="absolute inset-0 overflow-hidden"
+                      style={{ width: `${sliderValue[0]}%` }}
+                    >
+                      <img src={uploadedImage} alt="Before" className="w-full h-full object-cover" style={{ width: `${10000 / sliderValue[0]}%`, maxWidth: "none" }} />
+                    </div>
+                    {/* Divider line */}
+                    <div
+                      className="absolute top-0 bottom-0 w-0.5 bg-primary-foreground/80 shadow-lg z-10"
+                      style={{ left: `${sliderValue[0]}%` }}
+                    >
+                      <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-8 w-8 rounded-full bg-card border-2 border-primary flex items-center justify-center shadow-md">
+                        <ArrowRight className="h-3 w-3 text-primary rotate-180" />
                       </div>
-                    ) : resultReady ? (
-                      <img src={uploadedImage} alt="Result" className="w-full h-full object-cover opacity-90" />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Click process to start</p>
-                    )}
+                    </div>
+                    {/* Labels */}
+                    <span className="absolute top-3 left-3 text-xs font-medium bg-card/80 backdrop-blur-sm px-2 py-0.5 rounded-md text-foreground z-10">Before</span>
+                    <span className="absolute top-3 right-3 text-xs font-medium bg-card/80 backdrop-blur-sm px-2 py-0.5 rounded-md text-foreground z-10">After</span>
                   </div>
+                  <Slider value={sliderValue} onValueChange={setSliderValue} min={5} max={95} step={1} className="w-full" />
                 </div>
-              </div>
+              )}
               <div className="flex gap-3">
                 {!resultReady ? (
                   <Button onClick={handleProcess} disabled={processing} className="flex-1 gradient-primary text-primary-foreground">

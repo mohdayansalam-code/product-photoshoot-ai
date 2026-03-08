@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, Trash2, Pencil, FolderOpen } from "lucide-react";
+import { Download, Trash2, Pencil, FolderOpen, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SCENES } from "@/lib/api";
 
@@ -25,7 +25,6 @@ export default function AssetsPage() {
         <p className="text-sm text-muted-foreground">Manage your product images and generated assets</p>
       </motion.div>
 
-      {/* Tabs */}
       <div className="flex gap-1 bg-secondary rounded-lg p-1 w-fit">
         {tabs.map((tab) => (
           <button
@@ -47,7 +46,6 @@ export default function AssetsPage() {
         ))}
       </div>
 
-      {/* Grid */}
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
@@ -66,16 +64,19 @@ export default function AssetsPage() {
               whileHover={{ y: -3 }}
               className="group rounded-xl border border-border bg-card overflow-hidden shadow-soft"
             >
-              <div className="relative aspect-square">
-                <img src={asset.src} alt={asset.name} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                  <Button size="icon" variant="secondary" className="h-8 w-8 bg-card/90 backdrop-blur-sm">
-                    <Download className="h-3.5 w-3.5" />
+              <div className="relative aspect-square overflow-hidden">
+                <img src={asset.src} alt={asset.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/40 transition-all duration-300 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                  <Button size="icon" variant="secondary" className="h-8 w-8 bg-card/90 backdrop-blur-sm" title="Use in Photoshoot">
+                    <Camera className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="icon" variant="secondary" className="h-8 w-8 bg-card/90 backdrop-blur-sm">
+                  <Button size="icon" variant="secondary" className="h-8 w-8 bg-card/90 backdrop-blur-sm" title="Edit">
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="icon" variant="secondary" className="h-8 w-8 bg-card/90 backdrop-blur-sm text-destructive">
+                  <Button size="icon" variant="secondary" className="h-8 w-8 bg-card/90 backdrop-blur-sm" title="Download">
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="icon" variant="secondary" className="h-8 w-8 bg-card/90 backdrop-blur-sm text-destructive" title="Delete">
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>

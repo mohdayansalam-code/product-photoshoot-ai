@@ -152,7 +152,7 @@ export default function GeneratePage() {
         className="flex-1 flex flex-col bg-secondary/30 p-6 overflow-auto"
       >
         <h2 className="text-sm font-medium text-muted-foreground mb-4">Generated Images</h2>
-        <GenerationGallery images={generatedImages} loading={loading} />
+        <GenerationGallery images={generatedImages} loading={loading} imageCount={imageCount} />
       </motion.div>
     </div>
   );
