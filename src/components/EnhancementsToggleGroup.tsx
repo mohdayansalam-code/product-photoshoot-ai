@@ -1,10 +1,11 @@
 import { Switch } from "@/components/ui/switch";
 
-const ENHANCEMENTS = [
+export const ENHANCEMENTS = [
   { id: "remove_bg", label: "Remove Background", credits: 2 },
   { id: "white_bg", label: "White Background", credits: 1 },
   { id: "super_res", label: "Super Resolution", credits: 3 },
   { id: "upscale_v4", label: "Upscale v4", credits: 4 },
+  { id: "lock_style", label: "Lock Style", credits: 2, description: "Consistent lighting, environment & composition for campaign-style shoots" },
 ];
 
 interface EnhancementsToggleGroupProps {
