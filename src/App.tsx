@@ -14,6 +14,7 @@ import BillingPage from "./pages/BillingPage";
 import SettingsPage from "./pages/SettingsPage";
 import EditorPage from "./pages/EditorPage";
 import ProjectsPage from "./pages/ProjectsPage";
+import ProductsLibraryPage from "./pages/ProductsLibraryPage";
 import ActivityPage from "./pages/ActivityPage";
 import NotFound from "./pages/NotFound";
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/generations" element={<GenerationsPage />} />
             <Route path="/tools" element={<AIToolsPage />} />
             <Route path="/editor" element={<EditorPage />} />
+            <Route path="/products" element={<ProductsLibraryPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/activity" element={<ActivityPage />} />
             <Route path="/assets" element={<AssetsPage />} />

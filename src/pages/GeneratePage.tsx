@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Camera, Sparkles } from "lucide-react";
+import { Camera, Sparkles, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +11,9 @@ import { ImageQuantitySelector } from "@/components/ImageQuantitySelector";
 import { EnhancementsToggleGroup } from "@/components/EnhancementsToggleGroup";
 import { GenerationGallery } from "@/components/GenerationGallery";
 import { generateProduct, fetchResults, type Scene } from "@/lib/api";
+import { useProductStore } from "@/lib/productStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 const QUICK_TAGS = [
   "luxury",
@@ -23,6 +25,8 @@ const QUICK_TAGS = [
 ];
 
 export default function GeneratePage() {
+  const { products } = useProductStore();
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [productFile, setProductFile] = useState<File | null>(null);
   const [productPreview, setProductPreview] = useState<string | null>(null);
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null);
@@ -105,8 +109,34 @@ export default function GeneratePage() {
           </section>
 
           <section className="space-y-2">
-            <h2 className="text-sm font-medium text-foreground">Upload Product</h2>
-            <ImageUploader onUpload={handleUpload} preview={productPreview} />
+            <h2 className="text-sm font-medium text-foreground">Select Product</h2>
+            <ImageUploader onUpload={(file) => { handleUpload(file); setSelectedProductId(null); }} preview={!selectedProductId ? productPreview : null} />
+            {products.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">Or choose from library</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {products.slice(0, 8).map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => { setSelectedProductId(p.id); setProductFile(null); setProductPreview(null); }}
+                      className={cn(
+                        "relative rounded-lg border overflow-hidden aspect-square transition-all",
+                        selectedProductId === p.id
+                          ? "border-primary ring-2 ring-primary/20"
+                          : "border-border hover:border-primary/40"
+                      )}
+                    >
+                      <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                      {selectedProductId === p.id && (
+                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                          <Check className="h-4 w-4 text-primary-foreground drop-shadow" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="space-y-2">
