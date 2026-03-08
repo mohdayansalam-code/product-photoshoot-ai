@@ -81,9 +81,7 @@ export default function GeneratePage() {
           <section className="space-y-2">
             <h2 className="text-sm font-medium text-foreground">Describe Your Photoshoot</h2>
             <motion.div
-              className="rounded-xl border border-border bg-card shadow-soft p-3 space-y-3"
-              whileFocusWithin={{ borderColor: "hsl(var(--primary))", boxShadow: "0 0 0 2px hsl(var(--primary) / 0.15)" }}
-              transition={{ duration: 0.2 }}
+              className="rounded-xl border border-border bg-card shadow-soft p-3 space-y-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15 transition-all duration-200"
             >
               <Textarea
                 value={prompt}
