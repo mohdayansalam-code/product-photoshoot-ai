@@ -2,8 +2,8 @@ import {
   LayoutDashboard,
   Camera,
   Images,
+  Wand2,
   Coins,
-  CreditCard,
   Settings,
   Sparkles,
 } from "lucide-react";
