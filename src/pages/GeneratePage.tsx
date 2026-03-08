@@ -79,6 +79,34 @@ export default function GeneratePage() {
           </div>
 
           <section className="space-y-2">
+            <h2 className="text-sm font-medium text-foreground">Describe Your Photoshoot</h2>
+            <motion.div
+              className="rounded-xl border border-border bg-card shadow-soft p-3 space-y-3"
+              whileFocusWithin={{ borderColor: "hsl(var(--primary))", boxShadow: "0 0 0 2px hsl(var(--primary) / 0.15)" }}
+              transition={{ duration: 0.2 }}
+            >
+              <Textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder={"Describe your photoshoot idea...\n\nExample:\nLuxury product photography\nsoft studio lighting\nminimal background\npremium ecommerce style"}
+                className="min-h-[100px] border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 resize-none text-sm"
+              />
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_TAGS.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors text-xs"
+                    onClick={() => setPrompt((prev) => prev ? `${prev}, ${tag}` : tag)}
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </motion.div>
+          </section>
+
+          <section className="space-y-2">
             <h2 className="text-sm font-medium text-foreground">Upload Product</h2>
             <ImageUploader onUpload={handleUpload} preview={productPreview} />
           </section>
