@@ -2,6 +2,8 @@ import { useState, useCallback } from "react";
 import { Camera, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { ImageUploader } from "@/components/ImageUploader";
 import { SceneSelector } from "@/components/SceneSelector";
 import { ModelSelector } from "@/components/ModelSelector";
@@ -10,6 +12,15 @@ import { EnhancementsToggleGroup } from "@/components/EnhancementsToggleGroup";
 import { GenerationGallery } from "@/components/GenerationGallery";
 import { generateProduct, fetchResults, type Scene } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
+const QUICK_TAGS = [
+  "luxury",
+  "studio lighting",
+  "soft shadows",
+  "ecommerce product",
+  "editorial fashion",
+  "macro shot",
+];
 
 export default function GeneratePage() {
   const [productFile, setProductFile] = useState<File | null>(null);
