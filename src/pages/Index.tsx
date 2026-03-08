@@ -1,32 +1,65 @@
-import { Camera, Coins, Images, ArrowRight, HardDrive, Upload, Pencil, Wand2, Download, Maximize, Eraser } from "lucide-react";
+import { Camera, Coins, Images, ArrowRight, HardDrive, Upload, Pencil, Wand2, Download, Maximize, Eraser, FolderOpen, AlertTriangle, Sparkles, Package } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { StatsCard } from "@/components/StatsCard";
-import { MOCK_GENERATIONS } from "@/lib/api";
+import { MOCK_GENERATIONS, SCENES } from "@/lib/api";
 import { format } from "date-fns";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+
+const CREDITS = 180;
+const MAX_CREDITS = 500;
 
 const stats = [
-  { label: "Credits Remaining", value: "180", icon: Coins },
+  { label: "Credits Remaining", value: String(CREDITS), icon: Coins },
   { label: "Images Generated", value: "240", icon: Images },
   { label: "Active Projects", value: "12", icon: Camera },
   { label: "Storage Used", value: "2.4 GB", icon: HardDrive },
 ];
 
-const quickActions = [
-  { label: "Create Photoshoot", icon: Camera, to: "/generate", gradient: true },
+const secondaryActions = [
   { label: "Upload Product", icon: Upload, to: "/generate" },
   { label: "Open Image Editor", icon: Pencil, to: "/editor" },
   { label: "AI Tools", icon: Wand2, to: "/ai-tools" },
 ];
 
+const weeklyUsage = [
+  { day: "Mon", credits: 12 },
+  { day: "Tue", credits: 28 },
+  { day: "Wed", credits: 8 },
+  { day: "Thu", credits: 35 },
+  { day: "Fri", credits: 20 },
+  { day: "Sat", credits: 5 },
+  { day: "Sun", credits: 15 },
+];
+
+const recentProducts = SCENES.slice(0, 4);
+
 export default function Index() {
+  const lowCredits = CREDITS < 20;
+
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">Welcome back — here's your activity overview</p>
       </motion.div>
+
+      {/* Credit Warning */}
+      {lowCredits && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          <Alert className="border-destructive/40 bg-destructive/5">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <AlertDescription className="flex items-center justify-between">
+              <span className="text-sm text-foreground">Running low on credits. Upgrade to continue generating images.</span>
+              <Button size="sm" variant="destructive" asChild>
+                <Link to="/credits">Upgrade Plan</Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </motion.div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -35,35 +68,111 @@ export default function Index() {
         ))}
       </div>
 
-      {/* Quick Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="grid grid-cols-2 sm:grid-cols-4 gap-4"
-      >
-        {quickActions.map((action, i) => (
-          <motion.div
-            key={action.label}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.32 + i * 0.06 }}
-            whileHover={{ y: -3, boxShadow: "0 8px 30px -8px hsl(220 20% 10% / 0.12)" }}
+      {/* Quick Actions — Primary CTA + Secondary */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="space-y-4">
+        <motion.div
+          whileHover={{ y: -4, boxShadow: "0 12px 40px -8px hsl(217 91% 60% / 0.3)" }}
+          transition={{ type: "spring", stiffness: 300 }}
+        >
+          <Link
+            to="/generate"
+            className="flex items-center gap-4 rounded-xl p-6 gradient-primary text-primary-foreground shadow-lg transition-all"
           >
-            <Link
-              to={action.to}
-              className={`flex flex-col items-center gap-3 rounded-xl border border-border p-5 transition-colors ${
-                action.gradient
-                  ? "gradient-primary text-primary-foreground"
-                  : "bg-card text-foreground hover:border-primary/30"
-              }`}
+            <div className="h-12 w-12 rounded-xl bg-primary-foreground/20 flex items-center justify-center">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div className="flex-1">
+              <p className="text-lg font-semibold">Create Photoshoot</p>
+              <p className="text-sm opacity-80">Generate stunning AI product photos in seconds</p>
+            </div>
+            <ArrowRight className="h-5 w-5 opacity-70" />
+          </Link>
+        </motion.div>
+
+        <div className="grid grid-cols-3 gap-4">
+          {secondaryActions.map((action, i) => (
+            <motion.div
+              key={action.label}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.36 + i * 0.06 }}
+              whileHover={{ y: -3, boxShadow: "0 8px 30px -8px hsl(220 20% 10% / 0.12)" }}
             >
-              <action.icon className="h-6 w-6" />
-              <span className="text-sm font-medium">{action.label}</span>
-            </Link>
-          </motion.div>
-        ))}
+              <Link
+                to={action.to}
+                className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-5 transition-colors hover:border-primary/30"
+              >
+                <action.icon className="h-6 w-6 text-foreground" />
+                <span className="text-sm font-medium text-foreground">{action.label}</span>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
       </motion.div>
+
+      {/* Usage Chart + Recent Products */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Weekly Usage Chart */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="rounded-xl border border-border bg-card shadow-soft p-5"
+        >
+          <h2 className="font-semibold text-foreground mb-4">Weekly Credit Usage</h2>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={weeklyUsage}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="day" className="text-xs fill-muted-foreground" tick={{ fill: 'hsl(220 10% 46%)' }} />
+                <YAxis className="text-xs fill-muted-foreground" tick={{ fill: 'hsl(220 10% 46%)' }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(0 0% 100%)',
+                    border: '1px solid hsl(220 13% 91%)',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.75rem',
+                  }}
+                />
+                <Bar dataKey="credits" fill="hsl(217 91% 60%)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        {/* Recent Products */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="rounded-xl border border-border bg-card shadow-soft p-5"
+        >
+          <h2 className="font-semibold text-foreground mb-4">Recent Products</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {recentProducts.map((product) => (
+              <motion.div
+                key={product.id}
+                whileHover={{ y: -2 }}
+                className="group relative rounded-lg overflow-hidden border border-border"
+              >
+                <img
+                  src={product.thumbnail}
+                  alt={product.name}
+                  className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/50 transition-all duration-300 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100">
+                  <Button size="sm" className="gradient-primary text-primary-foreground text-xs" asChild>
+                    <Link to="/generate">
+                      <Camera className="h-3 w-3 mr-1" /> Generate Photoshoot
+                    </Link>
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground p-2 truncate">{product.name}</p>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
 
       {/* Recent Generations */}
       <div>
@@ -81,16 +190,29 @@ export default function Index() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 + idx * 0.1 }}
               whileHover={{ y: -2 }}
-              className="rounded-xl border border-border bg-card shadow-soft p-5 space-y-4 cursor-default"
+              className="group/card rounded-xl border border-border bg-card shadow-soft p-5 space-y-4 cursor-pointer hover:border-primary/20 transition-colors"
             >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium text-foreground">{gen.scene}</p>
                   <p className="text-sm text-muted-foreground">{gen.model} · {format(new Date(gen.created_at), "MMM d, yyyy h:mm a")}</p>
                 </div>
-                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-accent text-accent-foreground">
-                  {gen.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  <div className="hidden group-hover/card:flex items-center gap-1.5 transition-all">
+                    <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+                      <Link to="/projects"><FolderOpen className="h-3 w-3 mr-1" /> Open Project</Link>
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs">
+                      <Download className="h-3 w-3 mr-1" /> Download
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+                      <Link to="/editor"><Pencil className="h-3 w-3 mr-1" /> Edit</Link>
+                    </Button>
+                  </div>
+                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-accent text-accent-foreground">
+                    {gen.status}
+                  </span>
+                </div>
               </div>
               <div className="grid grid-cols-4 gap-3">
                 {gen.images.map((img, i) => (
