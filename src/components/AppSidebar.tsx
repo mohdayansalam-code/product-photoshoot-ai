@@ -3,10 +3,13 @@ import {
   Camera,
   Images,
   Wand2,
+  Pencil,
   FolderOpen,
   Coins,
   Settings,
   Sparkles,
+  FolderKanban,
+  Activity,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
