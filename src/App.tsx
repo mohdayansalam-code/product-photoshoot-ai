@@ -31,6 +31,9 @@ const App = () => (
             <Route path="/generate" element={<GeneratePage />} />
             <Route path="/generations" element={<GenerationsPage />} />
             <Route path="/tools" element={<AIToolsPage />} />
+            <Route path="/editor" element={<EditorPage />} />
+            <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/activity" element={<ActivityPage />} />
             <Route path="/assets" element={<AssetsPage />} />
             <Route path="/credits" element={<CreditsPage />} />
             <Route path="/billing" element={<BillingPage />} />
