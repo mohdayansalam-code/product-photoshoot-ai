@@ -31,6 +31,7 @@ const navItems = [
   { title: "Generations", url: "/generations", icon: Images },
   { title: "AI Image Tools", url: "/tools", icon: Wand2 },
   { title: "AI Image Editor", url: "/editor", icon: Pencil },
+  { title: "Products", url: "/products", icon: Package },
   { title: "Projects", url: "/projects", icon: FolderKanban },
   { title: "Activity", url: "/activity", icon: Activity },
   { title: "Assets Library", url: "/assets", icon: FolderOpen },
