@@ -35,6 +35,15 @@ export default function ProjectsPage() {
         </Button>
       </motion.div>
 
+      {PROJECTS.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="h-16 w-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
+            <FolderOpen className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <p className="font-semibold text-foreground">No projects yet</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-sm">Create a new project to organize your photoshoots and assets.</p>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {PROJECTS.map((project, i) => (
           <motion.div
@@ -80,6 +89,7 @@ export default function ProjectsPage() {
           </motion.div>
         ))}
       </div>
+      )}
     </div>
   );
 }

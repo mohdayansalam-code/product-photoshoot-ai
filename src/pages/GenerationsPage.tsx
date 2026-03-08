@@ -2,9 +2,24 @@ import { motion } from "framer-motion";
 import { MOCK_GENERATIONS } from "@/lib/api";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Download, Eye } from "lucide-react";
+import { Download, Eye, Images } from "lucide-react";
 
 export default function GenerationsPage() {
+  if (MOCK_GENERATIONS.length === 0) {
+    return (
+      <div className="p-8 max-w-6xl mx-auto">
+        <h1 className="text-2xl font-semibold text-foreground mb-2">Generations</h1>
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="h-16 w-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
+            <Images className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <p className="font-semibold text-foreground">No generations yet</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-sm">Create your first photoshoot to see generated images here.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-6">
       <motion.h1

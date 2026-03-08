@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { Camera, Sparkles, Check } from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import { Camera, Sparkles, Check, Coins } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,9 +8,9 @@ import { ImageUploader } from "@/components/ImageUploader";
 import { SceneSelector } from "@/components/SceneSelector";
 import { ModelSelector } from "@/components/ModelSelector";
 import { ImageQuantitySelector } from "@/components/ImageQuantitySelector";
-import { EnhancementsToggleGroup } from "@/components/EnhancementsToggleGroup";
+import { EnhancementsToggleGroup, ENHANCEMENTS } from "@/components/EnhancementsToggleGroup";
 import { GenerationGallery } from "@/components/GenerationGallery";
-import { generateProduct, fetchResults, type Scene } from "@/lib/api";
+import { generateProduct, fetchResults, MODELS, type Scene } from "@/lib/api";
 import { useProductStore } from "@/lib/productStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,16 @@ export default function GeneratePage() {
       prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id]
     );
   };
+
+  const creditEstimate = useMemo(() => {
+    const selectedModel = MODELS.find((m) => m.id === model);
+    const modelCost = (selectedModel?.credits_per_image ?? 0) * imageCount;
+    const enhancementCost = enhancements.reduce((sum, id) => {
+      const e = ENHANCEMENTS.find((en) => en.id === id);
+      return sum + (e?.credits ?? 0) * imageCount;
+    }, 0);
+    return { modelName: selectedModel?.name ?? model, modelCost, enhancementCost, total: modelCost + enhancementCost };
+  }, [model, imageCount, enhancements]);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -162,6 +172,34 @@ export default function GeneratePage() {
             <EnhancementsToggleGroup active={enhancements} onToggle={handleToggleEnhancement} />
           </section>
 
+          {/* Estimated Credit Cost */}
+          <section className="rounded-xl border border-border bg-card shadow-soft p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Coins className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-medium text-foreground">Estimated Credit Cost</h2>
+            </div>
+            <div className="space-y-1.5 text-xs text-muted-foreground">
+              <div className="flex justify-between">
+                <span>Model ({creditEstimate.modelName})</span>
+                <span className="text-foreground font-medium">{creditEstimate.modelCost} credits</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Image quantity</span>
+                <span className="text-foreground font-medium">×{imageCount}</span>
+              </div>
+              {enhancements.length > 0 && (
+                <div className="flex justify-between">
+                  <span>Enhancements ({enhancements.length})</span>
+                  <span className="text-foreground font-medium">{creditEstimate.enhancementCost} credits</span>
+                </div>
+              )}
+              <div className="border-t border-border pt-1.5 flex justify-between text-sm font-semibold text-foreground">
+                <span>Total</span>
+                <span>{creditEstimate.total} credits</span>
+              </div>
+            </div>
+          </section>
+
           <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
             <Button
               onClick={handleGenerate}
@@ -169,7 +207,7 @@ export default function GeneratePage() {
               className="w-full h-12 gradient-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
             >
               <Sparkles className="h-4 w-4 mr-2" />
-              {loading ? "Generating..." : "Generate Photoshoot"}
+              {loading ? "Generating..." : `Generate Photoshoot · ${creditEstimate.total} credits`}
             </Button>
           </motion.div>
         </motion.div>
