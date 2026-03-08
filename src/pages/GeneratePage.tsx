@@ -25,6 +25,8 @@ const QUICK_TAGS = [
 ];
 
 export default function GeneratePage() {
+  const { products } = useProductStore();
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [productFile, setProductFile] = useState<File | null>(null);
   const [productPreview, setProductPreview] = useState<string | null>(null);
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null);
