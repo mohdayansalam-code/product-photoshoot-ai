@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Camera, Sparkles } from "lucide-react";
+import { Camera, Sparkles, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +11,9 @@ import { ImageQuantitySelector } from "@/components/ImageQuantitySelector";
 import { EnhancementsToggleGroup } from "@/components/EnhancementsToggleGroup";
 import { GenerationGallery } from "@/components/GenerationGallery";
 import { generateProduct, fetchResults, type Scene } from "@/lib/api";
+import { useProductStore } from "@/lib/productStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 const QUICK_TAGS = [
   "luxury",
