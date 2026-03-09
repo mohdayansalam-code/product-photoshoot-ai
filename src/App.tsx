@@ -29,21 +29,26 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/landing" element={<LandingPage />} />
-          <Route element={<DashboardLayout><Index /></DashboardLayout>} path="/" />
-            <Route path="/generate" element={<GeneratePage />} />
-            <Route path="/generations" element={<GenerationsPage />} />
-            <Route path="/tools" element={<AIToolsPage />} />
-            <Route path="/editor" element={<EditorPage />} />
-            <Route path="/products" element={<ProductsLibraryPage />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/activity" element={<ActivityPage />} />
-            <Route path="/assets" element={<AssetsPage />} />
-            <Route path="/credits" element={<CreditsPage />} />
-            <Route path="/billing" element={<BillingPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </DashboardLayout>
+          <Route path="/*" element={
+            <DashboardLayout>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/generate" element={<GeneratePage />} />
+                <Route path="/generations" element={<GenerationsPage />} />
+                <Route path="/tools" element={<AIToolsPage />} />
+                <Route path="/editor" element={<EditorPage />} />
+                <Route path="/products" element={<ProductsLibraryPage />} />
+                <Route path="/projects" element={<ProjectsPage />} />
+                <Route path="/activity" element={<ActivityPage />} />
+                <Route path="/assets" element={<AssetsPage />} />
+                <Route path="/credits" element={<CreditsPage />} />
+                <Route path="/billing" element={<BillingPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </DashboardLayout>
+          } />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
