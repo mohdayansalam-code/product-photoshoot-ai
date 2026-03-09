@@ -16,6 +16,7 @@ import EditorPage from "./pages/EditorPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import ProductsLibraryPage from "./pages/ProductsLibraryPage";
 import ActivityPage from "./pages/ActivityPage";
+import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
