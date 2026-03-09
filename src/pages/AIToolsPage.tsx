@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { Wand2, Eraser, Square, ZoomIn, ArrowUpFromLine, Upload, Download, ArrowRight } from "lucide-react";
+import { Wand2, Eraser, Square, ZoomIn, ArrowUpFromLine, Upload, Download, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
+import { uploadProduct, callImageTool } from "@/lib/api";
 
 interface Tool {
   id: string;
@@ -14,30 +15,58 @@ interface Tool {
 }
 
 const tools: Tool[] = [
-  { id: "remove-bg", name: "Remove Background", description: "Remove background from product photos instantly. Perfect for ecommerce listings.", icon: Eraser, creditCost: 1 },
+  { id: "remove_bg", name: "Remove Background", description: "Remove background from product photos instantly. Perfect for ecommerce listings.", icon: Eraser, creditCost: 1 },
   { id: "white-bg", name: "White Background", description: "Replace any background with a clean white backdrop. Amazon & marketplace ready.", icon: Square, creditCost: 1 },
-  { id: "super-resolution", name: "Super Resolution", description: "Enhance image quality and resolution up to 4x. Make every detail crisp and clear.", icon: ZoomIn, creditCost: 2 },
+  { id: "upscale", name: "Super Resolution", description: "Enhance image quality and resolution up to 4x. Make every detail crisp and clear.", icon: ZoomIn, creditCost: 2 },
   { id: "upscale-v4", name: "Upscale v4", description: "AI-powered upscaling with detail preservation. Best for print and large format.", icon: ArrowUpFromLine, creditCost: 4 },
 ];
 
 export default function AIToolsPage() {
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedImage, setUploadedImage] = useState<{ url: string, id: string } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [resultReady, setResultReady] = useState(false);
   const [sliderValue, setSliderValue] = useState([50]);
 
-  const handleUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) { setUploadedImage(URL.createObjectURL(file)); setResultReady(false); }
-  }, []);
+    if (file) {
+      setIsUploading(true);
+      try {
+        const { product_id, image_url } = await uploadProduct(file, file.name.split('.')[0]);
+        setUploadedImage({ url: image_url, id: product_id });
+        setResultReady(false);
+      } catch (err) {
+        console.error("Upload failed", err);
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
 
   const handleProcess = async () => {
+    if (!activeTool || !uploadedImage) return;
     setProcessing(true);
-    await new Promise((r) => setTimeout(r, 2000));
-    setProcessing(false);
-    setResultReady(true);
-    setSliderValue([50]);
+
+    try {
+      if (activeTool.id === 'remove_bg' || activeTool.id === 'upscale') {
+        await callImageTool(uploadedImage.url, activeTool.id);
+        alert(`${activeTool.name} job started! Check the Generations page for progress.`);
+      } else {
+        // Mock delay for unsupported ones in this iteration
+        await new Promise((r) => setTimeout(r, 2000));
+        setResultReady(true);
+        setSliderValue([50]);
+      }
+    } catch (err) {
+      console.error(`Failed to process ${activeTool.id}`, err);
+    } finally {
+      setProcessing(false);
+      if (activeTool.id === 'remove_bg' || activeTool.id === 'upscale') {
+        handleClose(); // just close the modal since it polls asynchronously on the backend usually
+      }
+    }
   };
 
   const handleClose = () => { setActiveTool(null); setUploadedImage(null); setResultReady(false); setProcessing(false); };
@@ -89,7 +118,13 @@ export default function AIToolsPage() {
               {activeTool?.name}
             </DialogTitle>
           </DialogHeader>
-          {!uploadedImage ? (
+
+          {isUploading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+              <Loader2 className="h-8 w-8 text-primary animate-spin mb-4" />
+              <p>Uploading image...</p>
+            </div>
+          ) : !uploadedImage ? (
             <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-12 cursor-pointer hover:border-primary/40 transition-colors bg-secondary/30">
               <Upload className="h-8 w-8 text-muted-foreground mb-3" />
               <p className="text-sm font-medium text-foreground">Upload product image</p>
@@ -99,28 +134,21 @@ export default function AIToolsPage() {
           ) : (
             <div className="space-y-4">
               {!resultReady ? (
-                <div className="rounded-lg border border-border overflow-hidden aspect-video bg-secondary/30 flex items-center justify-center">
-                  {processing ? (
-                    <div className="text-center">
-                      <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">Processing…</p>
-                    </div>
-                  ) : (
-                    <img src={uploadedImage} alt="Original" className="w-full h-full object-cover" />
-                  )}
+                <div className="rounded-lg border border-border overflow-hidden aspect-video bg-secondary/30 flex justify-center items-center">
+                  <img src={uploadedImage.url} alt="Original" className={`w-full h-full object-cover transition-opacity ${processing ? 'opacity-50' : 'opacity-100'}`} />
                 </div>
               ) : (
                 /* Before / After Comparison Slider */
                 <div className="space-y-3">
                   <div className="relative rounded-lg border border-border overflow-hidden aspect-video select-none">
                     {/* After (full) */}
-                    <img src={uploadedImage} alt="After" className="absolute inset-0 w-full h-full object-cover brightness-110 contrast-105" />
+                    <img src={uploadedImage.url} alt="After" className="absolute inset-0 w-full h-full object-cover brightness-110 contrast-105" />
                     {/* Before (clipped) */}
                     <div
                       className="absolute inset-0 overflow-hidden"
                       style={{ width: `${sliderValue[0]}%` }}
                     >
-                      <img src={uploadedImage} alt="Before" className="w-full h-full object-cover" style={{ width: `${10000 / sliderValue[0]}%`, maxWidth: "none" }} />
+                      <img src={uploadedImage.url} alt="Before" className="w-full h-full object-cover" style={{ width: `${10000 / sliderValue[0]}%`, maxWidth: "none" }} />
                     </div>
                     {/* Divider line */}
                     <div
@@ -141,16 +169,21 @@ export default function AIToolsPage() {
               <div className="flex gap-3">
                 {!resultReady ? (
                   <Button onClick={handleProcess} disabled={processing} className="flex-1 gradient-primary text-primary-foreground">
-                    <Wand2 className="h-4 w-4 mr-2" />
+                    {processing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wand2 className="h-4 w-4 mr-2" />}
                     {processing ? "Processing…" : `Process (${activeTool?.creditCost} credits)`}
                   </Button>
                 ) : (
                   <>
-                    <Button variant="outline" className="flex-1">
+                    <Button variant="outline" className="flex-1" onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = uploadedImage.url;
+                      link.download = `tool-result.png`;
+                      link.click();
+                    }}>
                       <Download className="h-4 w-4 mr-2" /> Download
                     </Button>
-                    <Button className="flex-1 gradient-primary text-primary-foreground">
-                      <ArrowRight className="h-4 w-4 mr-2" /> Use in Photoshoot
+                    <Button className="flex-1 gradient-primary text-primary-foreground" onClick={() => window.location.href = `/editor?image=${encodeURIComponent(uploadedImage.url)}`}>
+                      <ArrowRight className="h-4 w-4 mr-2" /> Edit Result
                     </Button>
                   </>
                 )}

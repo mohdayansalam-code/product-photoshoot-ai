@@ -1,4 +1,3 @@
-// Mock API layer — replace with real endpoints
 import sceneLuxury from "@/assets/scene-luxury-skincare.jpg";
 import sceneFashion from "@/assets/scene-fashion-editorial.jpg";
 import sceneWhite from "@/assets/scene-white-bg.jpg";
@@ -35,7 +34,9 @@ export const MODELS = [
   { id: "flux", name: "Flux 2 Pro", credits_per_image: 2, badge: "Fast" },
 ];
 
-// Mock functions
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+// Keep FetchScenes mock since it's hardcoded for UI visually.
 export async function fetchScenes(): Promise<Scene[]> {
   await new Promise((r) => setTimeout(r, 300));
   return SCENES;
@@ -48,38 +49,106 @@ export async function generateProduct(payload: {
   image_count: number;
   enhancements: string[];
 }): Promise<{ job_id: string }> {
-  await new Promise((r) => setTimeout(r, 500));
-  return { job_id: `job_${Date.now()}` };
+
+  let base64Image = "";
+  if (payload.product_image) {
+    base64Image = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(payload.product_image as File);
+    });
+  }
+
+  const fetchers = {
+    remove_background: payload.enhancements.includes("remove_bg"),
+    white_background: payload.enhancements.includes("white_bg"),
+    super_resolution: payload.enhancements.includes("super_res"),
+    upscale_v4: payload.enhancements.includes("upscale_v4"),
+  };
+
+  const response = await fetch(`${API_URL}/api/generate-product`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      imageUrl: base64Image,
+      prompt: payload.scene_prompt,
+      model: payload.recommended_model,
+      image_count: payload.image_count,
+      lock_style: true,
+      fetchers
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Generation failed");
+  }
+
+  const data = await response.json();
+  return { job_id: data.generation_id || data.jobId };
 }
 
 export async function fetchResults(jobId: string): Promise<GenerationJob> {
-  await new Promise((r) => setTimeout(r, 2000));
-  // Return mock completed job with placeholder images
+  const response = await fetch(`${API_URL}/api/results?generation_id=${jobId}`);
+  if (!response.ok) throw new Error("Failed to fetch results");
+  const data = await response.json();
   return {
     id: jobId,
-    status: "completed",
-    images: Array(4).fill(null).map((_, i) => SCENES[i % SCENES.length].thumbnail),
-    scene: "Luxury Skincare Studio",
-    model: "Seedream 4.5",
+    status: data.status,
+    images: data.images || [],
+    scene: "Generated Scene",
+    model: "AI Model",
     created_at: new Date().toISOString(),
   };
 }
 
-export const MOCK_GENERATIONS: GenerationJob[] = [
-  {
-    id: "job_1",
-    status: "completed",
-    images: [sceneLuxury, sceneFashion, sceneWhite, sceneInfluencer],
-    scene: "Luxury Skincare Studio",
-    model: "Seedream 4.5",
-    created_at: "2026-03-07T14:30:00Z",
-  },
-  {
-    id: "job_2",
-    status: "completed",
-    images: [sceneJewelry, sceneLuxury],
-    scene: "Jewelry Macro Shot",
-    model: "Gemini 3.1",
-    created_at: "2026-03-06T10:15:00Z",
-  },
-];
+export const MOCK_GENERATIONS: GenerationJob[] = [];
+
+export async function uploadProduct(file: File, name: string): Promise<{ product_id: string, image_url: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('name', name);
+
+  const response = await fetch("/api/products", {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to upload product');
+  }
+
+  const data = await response.json();
+  return { product_id: data.product.id, image_url: data.imageUrl };
+}
+
+export async function fetchProducts(): Promise<any[]> {
+  const response = await fetch("/api/products");
+  if (!response.ok) throw new Error('Failed to fetch products');
+  const data = await response.json();
+  
+  return data.products.map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    imageUrl: p.image_url,
+    addedAt: p.created_at,
+  }));
+}
+
+export async function fetchCredits(): Promise<{ credits: number, maxCredits: number }> {
+  const response = await fetch("/api/credits");
+  if (!response.ok) throw new Error('Failed to fetch credits');
+  const data = await response.json();
+  return { credits: data.credits || 0, maxCredits: data.max_credits || 50 };
+}
+
+export async function callImageTool(imageUrl: string, tool: 'remove_bg' | 'upscale'): Promise<{ job_id: string }> {
+  const response = await fetch("/api/image-tools", {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageUrl, tool }),
+  });
+  if (!response.ok) throw new Error('Failed to start tool');
+  const data = await response.json();
+  return { job_id: data.job_id || data.jobId };
+}

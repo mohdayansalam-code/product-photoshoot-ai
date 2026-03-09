@@ -12,6 +12,7 @@ import {
   Activity,
   Package,
 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
@@ -25,6 +26,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { CreditIndicator } from "@/components/CreditIndicator";
+import { fetchCredits } from "@/lib/api";
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -43,6 +45,19 @@ const navItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
+  const [credits, setCredits] = useState({ credits: 0, maxCredits: 200 });
+
+  useEffect(() => {
+    async function loadCredits() {
+      try {
+        const data = await fetchCredits();
+        setCredits(data);
+      } catch (err) {
+        console.error("Failed to fetch credits", err);
+      }
+    }
+    loadCredits();
+  }, []);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
@@ -78,7 +93,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-3">
-        <CreditIndicator credits={180} maxCredits={200} collapsed={collapsed} />
+        <CreditIndicator credits={credits.credits} maxCredits={credits.maxCredits} collapsed={collapsed} />
       </SidebarFooter>
     </Sidebar>
   );

@@ -1,11 +1,12 @@
-import { useState, useRef } from "react";
-import { Plus, Camera, Pencil, Trash2, Package } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Plus, Camera, Pencil, Trash2, Package, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useProductStore } from "@/lib/productStore";
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
+import { fetchProducts, uploadProduct } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -16,23 +17,62 @@ import {
 } from "@/components/ui/dialog";
 
 export default function ProductsLibraryPage() {
-  const { products, addProduct, removeProduct } = useProductStore();
+  const { products, setProducts, addProduct, removeProduct } = useProductStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPreview, setNewPreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const data = await fetchProducts();
+        setProducts(data);
+      } catch (err) {
+        console.error("Failed to load products:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadProducts();
+  }, [setProducts]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setNewPreview(URL.createObjectURL(file));
+    if (file) {
+      setSelectedFile(file);
+      setNewPreview(URL.createObjectURL(file));
+      if (!newName) {
+        setNewName(file.name.split('.')[0]); // Default name to filename
+      }
+    }
   };
 
-  const handleAdd = () => {
-    if (!newName) return;
-    addProduct({ name: newName, imageUrl: newPreview || "/placeholder.svg" });
-    setNewName("");
-    setNewPreview(null);
-    setDialogOpen(false);
+  const handleAdd = async () => {
+    if (!newName || !selectedFile) return;
+
+    setIsUploading(true);
+    try {
+      const { product_id, image_url } = await uploadProduct(selectedFile, newName);
+      addProduct({
+        id: product_id,
+        name: newName,
+        imageUrl: image_url,
+        addedAt: new Date().toISOString()
+      });
+      setNewName("");
+      setNewPreview(null);
+      setSelectedFile(null);
+      setDialogOpen(false);
+    } catch (err) {
+      console.error("Upload failed", err);
+      // Optional: Show toast error here
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -59,6 +99,7 @@ export default function ProductsLibraryPage() {
                 placeholder="Product name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
+                disabled={isUploading}
               />
               <input
                 ref={fileRef}
@@ -66,13 +107,29 @@ export default function ProductsLibraryPage() {
                 accept="image/*"
                 className="hidden"
                 onChange={handleFileChange}
+                disabled={isUploading}
               />
               {newPreview ? (
-                <img
-                  src={newPreview}
-                  alt=""
-                  className="w-full aspect-square object-cover rounded-lg border border-border"
-                />
+                <div className="relative group">
+                  <img
+                    src={newPreview}
+                    alt=""
+                    className={`w-full aspect-square object-cover rounded-lg border border-border ${isUploading ? 'opacity-50' : ''}`}
+                  />
+                  {!isUploading && (
+                    <button
+                      onClick={() => {
+                        setNewPreview(null);
+                        setSelectedFile(null);
+                        setNewName("");
+                        if (fileRef.current) fileRef.current.value = "";
+                      }}
+                      className="absolute top-2 right-2 bg-destructive text-destructive-foreground p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               ) : (
                 <button
                   onClick={() => fileRef.current?.click()}
@@ -84,15 +141,19 @@ export default function ProductsLibraryPage() {
               )}
             </div>
             <DialogFooter>
-              <Button onClick={handleAdd} disabled={!newName} className="gradient-primary text-primary-foreground">
-                Add Product
+              <Button onClick={handleAdd} disabled={!newName || !selectedFile || isUploading} className="gradient-primary text-primary-foreground">
+                {isUploading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Uploading...</> : "Add Product"}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-      {products.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="h-8 w-8 text-primary animate-spin" />
+        </div>
+      ) : products.length === 0 ? (
         <div className="text-center py-20 text-muted-foreground">
           <Package className="h-12 w-12 mx-auto mb-3 opacity-40" />
           <p>No products yet. Upload your first product to get started.</p>

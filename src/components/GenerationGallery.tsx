@@ -66,6 +66,34 @@ export function GenerationGallery({ images, loading, imageCount = 4 }: Generatio
     );
   }
 
+  const handleDownload = async (url: string, index: number) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `generation-${index + 1}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to download image", err);
+    }
+  };
+
+  const handleTool = async (url: string, tool: 'upscale' | 'remove_bg') => {
+    try {
+      // For now we'll just alert since the polling isn't fully set up for individual image tools in this mock,
+      // but in a real scenario you would call callImageTool(url, tool) and poll the job.
+      import('@/lib/api').then(({ callImageTool }) => callImageTool(url, tool));
+      alert(`${tool === 'upscale' ? 'Upscaling' : 'Removing background'} started. This will take a moment.`);
+    } catch (err) {
+      console.error(`Failed to start ${tool}`, err);
+    }
+  };
+
   return (
     <div className="grid grid-cols-2 gap-4 p-1">
       {images.map((img, i) => (
@@ -77,18 +105,20 @@ export function GenerationGallery({ images, loading, imageCount = 4 }: Generatio
           className="group relative rounded-xl overflow-hidden border border-border shadow-soft bg-card"
         >
           <img src={img} alt={`Generated ${i + 1}`} className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105" />
-          <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/40 transition-all duration-300 flex items-end justify-center pb-3 opacity-0 group-hover:opacity-100">
-            <div className="flex gap-1.5">
-              {[
-                { icon: Download, label: "Download" },
-                { icon: Maximize, label: "Upscale" },
-                { icon: Eraser, label: "Remove BG" },
-                { icon: Pencil, label: "Edit" },
-              ].map(({ icon: Icon, label }) => (
-                <Button key={label} size="sm" variant="secondary" className="h-8 text-xs gap-1 bg-card/90 backdrop-blur-sm hover:bg-card">
-                  <Icon className="h-3 w-3" /> {label}
-                </Button>
-              ))}
+          <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/40 transition-all duration-300 flex items-end justify-center pb-3 opacity-0 group-hover:opacity-100 p-2">
+            <div className="flex flex-wrap justify-center gap-1.5 w-full">
+              <Button size="sm" variant="secondary" className="h-8 text-xs gap-1 bg-card/90 backdrop-blur-sm hover:bg-card" onClick={() => handleDownload(img, i)}>
+                <Download className="h-3 w-3" /> Download
+              </Button>
+              <Button size="sm" variant="secondary" className="h-8 text-xs gap-1 bg-card/90 backdrop-blur-sm hover:bg-card" onClick={() => handleTool(img, 'upscale')}>
+                <Maximize className="h-3 w-3" /> Upscale
+              </Button>
+              <Button size="sm" variant="secondary" className="h-8 text-xs gap-1 bg-card/90 backdrop-blur-sm hover:bg-card" onClick={() => handleTool(img, 'remove_bg')}>
+                <Eraser className="h-3 w-3" /> Remove BG
+              </Button>
+              <Button size="sm" variant="secondary" className="h-8 text-xs gap-1 bg-card/90 backdrop-blur-sm hover:bg-card" onClick={() => window.location.href = `/editor?image=${encodeURIComponent(img)}`}>
+                <Pencil className="h-3 w-3" /> Edit
+              </Button>
             </div>
           </div>
         </motion.div>

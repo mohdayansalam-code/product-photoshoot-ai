@@ -69,11 +69,29 @@ export default function GeneratePage() {
         image_count: imageCount,
         enhancements,
       });
-      const result = await fetchResults(job_id);
-      setGeneratedImages(result.images.slice(0, imageCount));
-    } catch {
-      // handle error
-    } finally {
+
+      // Poll for results
+      const pollInterval = setInterval(async () => {
+        try {
+          const result = await fetchResults(job_id);
+
+          if (result.images && result.images.length > 0) {
+            setGeneratedImages(result.images.slice(0, imageCount));
+          }
+
+          if (result.status === "completed" || result.status === "failed") {
+            clearInterval(pollInterval);
+            setLoading(false);
+          }
+        } catch (err) {
+          console.error("Polling error:", err);
+          clearInterval(pollInterval);
+          setLoading(false);
+        }
+      }, 3000);
+
+    } catch (err) {
+      console.error(err);
       setLoading(false);
     }
   };
