@@ -27,9 +27,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <DashboardLayout>
-          <Routes>
-            <Route path="/" element={<Index />} />
+        <Routes>
+          <Route path="/landing" element={<LandingPage />} />
+          <Route element={<DashboardLayout><Index /></DashboardLayout>} path="/" />
             <Route path="/generate" element={<GeneratePage />} />
             <Route path="/generations" element={<GenerationsPage />} />
             <Route path="/tools" element={<AIToolsPage />} />
