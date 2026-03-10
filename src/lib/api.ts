@@ -29,6 +29,7 @@ export const SCENES: Scene[] = [
 
 export const MODELS = [
   { id: "", name: "Auto (Smart Routing)", credits_per_image: 0, badge: "Recommended" },
+  { id: "seedream-5-lite", name: "Seedream 5 Lite", credits_per_image: 3, badge: "Balanced" },
   { id: "seedream-4.5", name: "Seedream 4.5", credits_per_image: 2.5, badge: "Popular" },
   { id: "gemini-3.1", name: "Gemini 3.1", credits_per_image: 5, badge: "Premium" },
   { id: "flux-2-pro", name: "Flux 2 Pro", credits_per_image: 2, badge: "Fast" },

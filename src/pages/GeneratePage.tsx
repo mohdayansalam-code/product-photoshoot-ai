@@ -63,7 +63,10 @@ export default function GeneratePage() {
         modelName = "Auto (Gemini)";
       } else if (p.includes("consistent") || p.includes("same product") || p.includes("same scene") || p.includes("product photoshoot")) {
         activeModelCredits = 2.5;
-        modelName = "Auto (Seedream)";
+        modelName = "Auto (Seedream 4.5)";
+      } else if (p.includes("product photography") || p.includes("studio photo") || p.includes("ecommerce product")) {
+        activeModelCredits = 3;
+        modelName = "Auto (Seedream 5 Lite)";
       } else {
         activeModelCredits = 2;
         modelName = "Auto (Flux)";

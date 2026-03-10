@@ -69,7 +69,13 @@ export default function ProjectsPage() {
                   </div>
                   <div className="truncate">
                     <p className="font-medium text-sm text-foreground truncate">{project.prompt || "Generated Photoshoot"}</p>
-                    <p className="text-xs text-muted-foreground truncate">{project.model}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {project.model === "seedream-5-lite" ? "Seedream 5 Lite" :
+                       project.model === "seedream-4.5" ? "Seedream 4.5" :
+                       project.model === "gemini-3.1" ? "Gemini 3.1" :
+                       project.model === "flux-2-pro" ? "Flux 2 Pro" :
+                       project.model}
+                    </p>
                   </div>
                 </div>
               </div>
