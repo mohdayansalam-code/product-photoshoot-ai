@@ -9,20 +9,38 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
 
-        // Handle extended payload fields
-        const product_image = body.product_image || body.imageUrl; // fallback for backwards compat
-        const scene_prompt = body.scene_prompt || body.prompt || body.template;
+        const product_image = body.product_image || body.imageUrl;
+        let finalPrompt = body.prompt || body.scene_prompt || body.template || "";
 
-        const model = body.recommended_model || body.model || process.env.DEFAULT_AI_MODEL || "seedream-4.5";
-        const product_lock = body.product_lock !== undefined ? body.product_lock : (body.lock_style !== undefined ? body.lock_style : true);
-        const resolution = body.recommended_resolution || process.env.DEFAULT_IMAGE_RESOLUTION || "2k";
+        // 1. Scene Helper Shortcuts
+        const scene = body.scene;
+        if (scene === "luxury-skincare-studio") {
+            finalPrompt += ", luxury skincare studio, marble surface, soft beauty lighting, premium product photography";
+        } else if (scene === "amazon-white-background") {
+            finalPrompt += ", pure white seamless background, clean professional ecommerce product photography";
+        } else if (scene === "jewelry-macro-shot") {
+            finalPrompt += ", macro jewelry photography on dark velvet, dramatic spotlight, luxury close-up";
+        }
+
+        // 2. Smart Model Routing
+        let model = body.recommended_model || body.model;
+        if (!model) {
+            const p = finalPrompt.toLowerCase();
+            if (p.includes("different angles") || p.includes("model poses") || p.includes("street photoshoot") || p.includes("fashion shoot") || p.includes("variations")) {
+                model = "gemini-3.1";
+            } else if (p.includes("consistent") || p.includes("same product") || p.includes("same scene") || p.includes("product photoshoot")) {
+                model = "seedream-4.5";
+            } else {
+                model = "flux-2-pro";
+            }
+        }
+
         const fetchers = body.fetchers || {};
-        const seed = body.seed !== undefined ? Number(body.seed) : Math.floor(Math.random() * 1000000000);
         const image_count = Math.min(Math.max(body.image_count ?? 4, 1), 4);
 
-        if (!product_image || !scene_prompt) {
+        if (!product_image || !finalPrompt || finalPrompt.trim() === "") {
             return NextResponse.json(
-                { success: false, error: "Missing product_image or scene_prompt" },
+                { success: false, error: "Missing product_image or prompt" },
                 { status: 400 }
             );
         }
@@ -128,16 +146,7 @@ export async function POST(req: NextRequest) {
 
         logger.info(`Deducted ${credits_cost} credits for job initiation`, { userId });
 
-        const templatePayload = JSON.stringify({
-            scene_prompt,
-            model,
-            resolution,
-            product_lock,
-            fetchers,
-            credits_cost,
-            seed,
-            image_count
-        });
+        logger.info(`Deducted ${credits_cost} credits for job initiation`, { userId });
 
         // Insert pending job into generations table
         const { data: jobData, error: jobError } = await supabaseAdmin
@@ -145,7 +154,7 @@ export async function POST(req: NextRequest) {
             .insert({
                 user_id: userId,
                 image_url: product_image,
-                prompt: scene_prompt,
+                prompt: finalPrompt,
                 model: model,
                 image_count: image_count,
                 fetchers_json: fetchers,

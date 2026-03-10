@@ -76,15 +76,6 @@ async function processPendingJobs() {
                 const fetchers = fetchers_json || {};
                 const seed = Math.floor(Math.random() * 1000000000);
 
-                let promptText = prompt;
-                if (prompt === "lifestyle") {
-                    promptText = "A lifestyle product photo showing the product in a realistic environment with natural lighting and depth of field";
-                } else if (prompt === "ecommerce") {
-                    promptText = "A clean ecommerce product photo of this product on a pure white background, bright studio lighting, high resolution";
-                } else if (!prompt || prompt === "studio") {
-                    promptText = "A professional studio product photo of this product on a clean marble table with soft lighting, ecommerce photography, high detail, white background";
-                }
-
                 // 3. Product Lock System
                 let maskData = undefined;
 
@@ -110,7 +101,7 @@ async function processPendingJobs() {
 
                         for (let i = 0; i < image_count; i++) {
                             const promptBody: any = {
-                                text: promptText,
+                                text: prompt, // Use direct raw prompt
                                 image_url: image_url,
                                 num_images: 1, // Generate singular image sequentially
                                 model: activeModel,
