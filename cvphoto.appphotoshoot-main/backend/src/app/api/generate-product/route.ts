@@ -27,9 +27,9 @@ export async function POST(req: NextRequest) {
         }
 
         // Calculate credits based on proportional model cost
-        let base_model_credits = 12;
+        let base_model_credits = 10;
         if (model === "flux-2-pro") base_model_credits = 8;
-        else if (model === "seedream-4.5") base_model_credits = 12;
+        else if (model === "seedream-4.5") base_model_credits = 10;
         else if (model === "gemini-3.1") base_model_credits = 20;
 
         let generation_credits = (base_model_credits / 4) * image_count;
@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
         if (fetchers.white_background) fetcher_credits += 1;
         if (fetchers.super_resolution) fetcher_credits += 2;
         if (fetchers.upscale_v4) fetcher_credits += 4;
+        if (fetchers.product_fix) fetcher_credits += 2;
+        if (fetchers.face_correction) fetcher_credits += 2;
 
         let credits_cost = generation_credits + fetcher_credits;
 
@@ -103,7 +105,7 @@ export async function POST(req: NextRequest) {
 
         // Check user credits
         const { data: creditsData } = await supabaseAdmin
-            .from("user_credits")
+            .from("credits")
             .select("credits_remaining")
             .eq("user_id", userId)
             .single();
@@ -111,7 +113,7 @@ export async function POST(req: NextRequest) {
         if (!creditsData || creditsData.credits_remaining < credits_cost) {
             return NextResponse.json(
                 { success: false, error: `Insufficient credits. Generation Requires ${credits_cost} credits.` },
-                { status: 403 }
+                { status: 402 }
             );
         }
 
@@ -126,14 +128,17 @@ export async function POST(req: NextRequest) {
             image_count
         });
 
-        // Insert pending job into generation_jobs table
+        // Insert pending job into generations table
         const { data: jobData, error: jobError } = await supabaseAdmin
-            .from("generation_jobs")
+            .from("generations")
             .insert({
                 user_id: userId,
-                input_image: product_image,
-                template: templatePayload,
-                status: "pending"
+                image_url: product_image,
+                prompt: scene_prompt,
+                model: model,
+                image_count: image_count,
+                fetchers_json: fetchers,
+                status: "queued"
             })
             .select("id")
             .single();
@@ -149,9 +154,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             success: true,
             generation_id: jobData.id,
-            jobId: jobData.id, // Keep backward compatibility
-            message: "Generation started successfully",
-            credits_deducted: credits_cost
+            status: "queued"
         });
 
     } catch (error: any) {

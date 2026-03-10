@@ -33,8 +33,8 @@ export async function GET(req: NextRequest) {
         const supabaseAdmin = createAdminClient(supabaseUrl, supabaseKey);
 
         const { data: jobData, error: jobError } = await supabaseAdmin
-            .from("generation_jobs")
-            .select("status, result_images, user_id, template")
+            .from("generations")
+            .select("status, generated_images, user_id")
             .eq("id", job_id)
             .eq("user_id", userId) // explicitly secure access
             .single();
@@ -47,18 +47,9 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const { status, result_images, template } = jobData;
+        const { status, generated_images } = jobData;
 
-        let payload: any = {};
-        if (template && template.startsWith("{")) {
-            try {
-                payload = JSON.parse(template);
-            } catch (e) {
-                // Ignore errors, falling back
-            }
-        }
-
-        if (status === "pending" || status === "running" || status === "processing") {
+        if (status === "queued" || status === "running" || status === "processing") {
             return NextResponse.json({
                 status: "processing"
             });
@@ -67,14 +58,7 @@ export async function GET(req: NextRequest) {
         if (status === "completed") {
             return NextResponse.json({
                 status: "completed",
-                images: result_images || [],
-                image_count: payload.image_count || 4,
-                scene: payload.scene_prompt || template,
-                model: payload.model || "seedream-4.5",
-                resolution: payload.resolution || "2k",
-                seed: payload.seed,
-                product_lock: payload.product_lock !== undefined ? payload.product_lock : true,
-                fetchers: payload.fetchers || {}
+                images: generated_images || []
             });
         }
 

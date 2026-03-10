@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         const supabaseAdmin = createAdminClient(supabaseUrl, supabaseKey);
 
         const { data: creditsData, error } = await supabaseAdmin
-            .from("user_credits")
+            .from("credits")
             .select("credits_remaining")
             .eq("user_id", user.id)
             .single();

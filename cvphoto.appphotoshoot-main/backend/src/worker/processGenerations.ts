@@ -26,9 +26,9 @@ async function processPendingJobs() {
         // To prevent race conditions if multiple workers run, we could use Postgres advisory locks
         // or FOR UPDATE SET status = processing, but we'll use a simple approach for now.
         const { data: jobs, error: fetchError } = await supabaseAdmin
-            .from("generation_jobs")
+            .from("generations")
             .select("*")
-            .eq("status", "pending")
+            .eq("status", "queued")
             .order("created_at", { ascending: true })
             .limit(5);
 
@@ -44,12 +44,12 @@ async function processPendingJobs() {
         console.log(`Found ${jobs.length} pending jobs. Processing...`);
 
         for (const job of jobs) {
-            // 2. Mark them as "running"
+            // 2. Mark them as "processing"
             const { error: updateError } = await supabaseAdmin
-                .from("generation_jobs")
-                .update({ status: "running" })
+                .from("generations")
+                .update({ status: "processing" })
                 .eq("id", job.id)
-                .eq("status", "pending"); // Optimistic concurrency check
+                .eq("status", "queued"); // Optimistic concurrency check
 
             if (updateError) {
                 console.error(`Failed to lock job ${job.id}:`, updateError);
@@ -59,42 +59,23 @@ async function processPendingJobs() {
             console.log(`Processing job ${job.id}...`);
 
             try {
-                // Parse extended metadata from template payload
-                let payload: any = {};
-                if (job.template && job.template.startsWith("{")) {
-                    try {
-                        payload = JSON.parse(job.template);
-                    } catch (e) {
-                        console.error("Failed to parse template payload JSON:", e);
-                    }
-                }
+                // Read explicit columns from 'generations' table
+                const { prompt, model, image_count, image_url, fetchers_json } = job;
 
-                // Fallbacks for backward compatibility
-                const scene_prompt = payload.scene_prompt || payload.prompt || job.template;
-                const model = payload.model || "seedream-4.5";
-                const product_lock = payload.product_lock !== undefined ? payload.product_lock : (payload.lock_style !== undefined ? payload.lock_style : true);
-                const resolution = payload.resolution || "2k";
-                const fetchers = payload.fetchers || {};
-                const credits_cost = payload.credits_cost || 5;
-                const seed = payload.seed || Math.floor(Math.random() * 1000000000);
-                const image_count = payload.image_count || 4;
+                const fetchers = fetchers_json || {};
+                const seed = Math.floor(Math.random() * 1000000000);
 
-                let promptText = scene_prompt;
-                if (scene_prompt === "lifestyle") {
+                let promptText = prompt;
+                if (prompt === "lifestyle") {
                     promptText = "A lifestyle product photo showing the product in a realistic environment with natural lighting and depth of field";
-                } else if (scene_prompt === "ecommerce") {
+                } else if (prompt === "ecommerce") {
                     promptText = "A clean ecommerce product photo of this product on a pure white background, bright studio lighting, high resolution";
-                } else if (!scene_prompt || scene_prompt === "studio") {
+                } else if (!prompt || prompt === "studio") {
                     promptText = "A professional studio product photo of this product on a clean marble table with soft lighting, ecommerce photography, high detail, white background";
                 }
 
                 // 3. Product Lock System
                 let maskData = undefined;
-                if (product_lock) {
-                    console.log(`[Job ${job.id}] Creating product mask for product lock...`);
-                    // Pseudo-function call: const mask = await createProductMask(job.input_image)
-                    maskData = "mock-mask-data-string"; // in reality this would be a base64 mask or URL
-                }
 
                 const astriaEndpoint = `https://api.astria.ai/tunes/690204/prompts`;
 
@@ -119,7 +100,7 @@ async function processPendingJobs() {
                         for (let i = 0; i < image_count; i++) {
                             const promptBody: any = {
                                 text: promptText,
-                                image_url: job.input_image,
+                                image_url: image_url,
                                 num_images: 1, // Generate singular image sequentially
                                 model: activeModel,
                                 seed: seed
@@ -127,10 +108,6 @@ async function processPendingJobs() {
 
                             if (maskData) {
                                 promptBody.mask = maskData;
-                            }
-
-                            if (resolution) {
-                                promptBody.resolution = resolution;
                             }
 
                             const response = await fetch(astriaEndpoint, {
@@ -179,7 +156,7 @@ async function processPendingJobs() {
                     resultImages = [];
                     for (let i = 0; i < image_count; i++) {
                         resultImages.push(
-                            i === 0 ? job.input_image : "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=600&fit=crop"
+                            i === 0 ? image_url : "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=600&fit=crop"
                         );
                     }
 
@@ -212,7 +189,7 @@ async function processPendingJobs() {
                         const arrayBuffer = await imgRes.arrayBuffer();
                         const buffer = Buffer.from(arrayBuffer);
 
-                        const fileName = `${job.user_id}/${job.id}/image_${i}.png`;
+                        const fileName = `${job.user_id}/${Date.now()}_${i}.png`;
                         const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
                             .from("generated-images")
                             .upload(fileName, buffer, {
@@ -235,15 +212,12 @@ async function processPendingJobs() {
                     }
                 }
 
-                // 4. Save result_images
-                // 5. Mark job as "completed"
-                // 6. Update completed_at timestamp
+                // 4. Update status → completed
                 const { error: completeError } = await supabaseAdmin
-                    .from("generation_jobs")
+                    .from("generations")
                     .update({
                         status: "completed",
-                        result_images: uploadedImageUrls,
-                        completed_at: new Date().toISOString()
+                        generated_images: uploadedImageUrls
                     })
                     .eq("id", job.id);
 
@@ -252,26 +226,27 @@ async function processPendingJobs() {
                 } else {
                     console.log(`Job ${job.id} completed successfully.`);
 
-                    const imagesGenerated = uploadedImageUrls.length;
+                    // Recalculate credit cost inside worker since `credits_cost` isn't saved directly
+                    let base_model_credits = 10;
+                    if (model === "flux-2-pro") base_model_credits = 8;
+                    else if (model === "seedream-4.5") base_model_credits = 10;
+                    else if (model === "gemini-3.1") base_model_credits = 20;
 
-                    // Insert into generations table
-                    const { error: insertError } = await supabaseAdmin
-                        .from("generations")
-                        .insert({
-                            user_id: job.user_id,
-                            input_image: job.input_image,
-                            generated_images: uploadedImageUrls,
-                            template: job.template,
-                            credits_used: credits_cost
-                        });
+                    let generation_credits = (base_model_credits / 4) * image_count;
 
-                    if (insertError) {
-                        console.error(`Failed to insert into generations table for job ${job.id}:`, insertError);
-                    }
+                    let fetcher_credits = 0;
+                    if (fetchers.remove_background) fetcher_credits += 1;
+                    if (fetchers.white_background) fetcher_credits += 1;
+                    if (fetchers.super_resolution) fetcher_credits += 2;
+                    if (fetchers.upscale_v4) fetcher_credits += 4;
+                    if (fetchers.product_fix) fetcher_credits += 2;
+                    if (fetchers.face_correction) fetcher_credits += 2;
 
-                    // Deduct credits since generation succeeded
+                    let credits_cost = generation_credits + fetcher_credits;
+
+                    // Deduct credits from user_credits table
                     const { data: creditsData } = await supabaseAdmin
-                        .from("user_credits")
+                        .from("credits")
                         .select("credits_remaining")
                         .eq("user_id", job.user_id)
                         .single();
@@ -279,7 +254,7 @@ async function processPendingJobs() {
                     if (creditsData) {
                         const newCredits = creditsData.credits_remaining - credits_cost;
                         await supabaseAdmin
-                            .from("user_credits")
+                            .from("credits")
                             .update({ credits_remaining: newCredits })
                             .eq("user_id", job.user_id);
                         console.log(`Deducted ${credits_cost} credits for user ${job.user_id}.`);
@@ -291,10 +266,9 @@ async function processPendingJobs() {
 
                 // 4. Add error handling - Mark job as "failed"
                 await supabaseAdmin
-                    .from("generation_jobs")
+                    .from("generations")
                     .update({
-                        status: "failed",
-                        completed_at: new Date().toISOString()
+                        status: "failed"
                     })
                     .eq("id", job.id);
             }
