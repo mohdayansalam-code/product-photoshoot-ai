@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { logger } from "@/utils/logger";
 
 export async function POST(req: NextRequest) {
     try {
@@ -26,6 +27,28 @@ export async function POST(req: NextRequest) {
         const ASTRIA_API_KEY = process.env.ASTRIA_API_KEY;
         const credits_cost = tool === 'upscale_v4' ? 4 : (tool === 'super_resolution' || tool === 'product_fix' || tool === 'face_correction' ? 2 : 1);
 
+        // Rate Limiting Logic
+        const now = new Date();
+        const { data: rlData } = await supabaseAdmin
+            .from("generation_rate_limit")
+            .select("*")
+            .eq("user_id", user.id)
+            .single();
+
+        if (!rlData) {
+            await supabaseAdmin.from("generation_rate_limit").insert({ user_id: user.id, request_count: 1, window_start: now.toISOString() });
+        } else {
+            const timeDiff = now.getTime() - new Date(rlData.window_start).getTime();
+            if (timeDiff < 60000) {
+                if (rlData.request_count >= 10) {
+                    logger.warn("Image Tool rate limit exceeded", { userId: user.id });
+                    return NextResponse.json({ error: "Rate limit exceeded. Please wait." }, { status: 429 });
+                } else await supabaseAdmin.from("generation_rate_limit").update({ request_count: rlData.request_count + 1 }).eq("user_id", user.id);
+            } else {
+                await supabaseAdmin.from("generation_rate_limit").update({ request_count: 1, window_start: now.toISOString() }).eq("user_id", user.id);
+            }
+        }
+
         // 1. Verify credits
         const { data: creditsData } = await supabaseAdmin
             .from("credits")
@@ -34,6 +57,7 @@ export async function POST(req: NextRequest) {
             .single();
 
         if (!creditsData || creditsData.credits_remaining < credits_cost) {
+            logger.warn("Not enough credits for Image Tool", { userId: user.id, cost: credits_cost });
             return NextResponse.json({ error: `Insufficient credits. Requires ${credits_cost}.` }, { status: 402 });
         }
 
@@ -93,22 +117,22 @@ export async function POST(req: NextRequest) {
         const arrayBuffer = await imgRes.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        const fileName = `${user.id}/tools/${Date.now()}.png`;
+        const fileName = `${user.id}/${Date.now()}_tool.png`;
         const { error: uploadError } = await supabaseAdmin.storage
             .from("generated-images")
-            .upload(fileName, buffer, {
+            .upload(`generated/${fileName}`, buffer, {
                 contentType: "image/png",
                 upsert: true,
             });
 
         if (uploadError) {
-            console.error("Upload failed", uploadError);
+            logger.error("Image Tool upload failed", { error: uploadError });
             return NextResponse.json({ error: "Failed to upload result." }, { status: 500 });
         }
 
         const { data: urlData } = supabaseAdmin.storage
             .from("generated-images")
-            .getPublicUrl(fileName);
+            .getPublicUrl(`generated/${fileName}`);
 
         // 4. Deduct credits
         await supabaseAdmin
@@ -116,13 +140,15 @@ export async function POST(req: NextRequest) {
             .update({ credits_remaining: creditsData.credits_remaining - credits_cost })
             .eq("user_id", user.id);
 
+        logger.generation("completed", user.id, "sync-tool", "completed", { tool, url: urlData.publicUrl });
+
         return NextResponse.json({
             success: true,
             image_url: urlData.publicUrl,
         });
 
     } catch (error: any) {
-        console.error("Image Tools API Error:", error);
+        logger.error("Image Tools API Error", { error: error.message });
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }

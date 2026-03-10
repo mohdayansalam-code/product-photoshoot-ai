@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import fetch from "node-fetch";
 
 import dotenv from "dotenv";
+import { logger } from "../utils/logger";
 
 // The worker should be run continuously, so it needs its own env variables or we pass them in.
 // We'll load from .env.local for local development. Usually workers have their own environment context.
@@ -33,7 +34,7 @@ async function processPendingJobs() {
             .limit(5);
 
         if (fetchError) {
-            console.error("Error fetching pending jobs:", fetchError);
+            logger.error("Error fetching pending jobs", { error: fetchError });
             return;
         }
 
@@ -41,7 +42,7 @@ async function processPendingJobs() {
             return; // No jobs to process
         }
 
-        console.log(`Found ${jobs.length} pending jobs. Processing...`);
+        logger.info(`Found ${jobs.length} pending jobs. Processing...`);
 
         for (const job of jobs) {
             // 2. Mark them as "processing"
@@ -52,13 +53,23 @@ async function processPendingJobs() {
                 .eq("status", "queued"); // Optimistic concurrency check
 
             if (updateError) {
-                console.error(`Failed to lock job ${job.id}:`, updateError);
+                logger.error(`Failed to lock job ${job.id}`, { error: updateError });
                 continue;
             }
 
-            console.log(`Processing job ${job.id}...`);
+            logger.generation("processing", job.user_id, job.id, "processing");
 
             try {
+                // Determine retry logic delays
+                const retryCount = job.retry_count || 0;
+                const maxRetries = job.max_retries || 3;
+                const retryDelayMs = retryCount * 5000;
+
+                if (retryCount > 0) {
+                    logger.info(`Job ${job.id} delaying retry ${retryCount} for ${retryDelayMs}ms`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+                }
+
                 // Read explicit columns from 'generations' table
                 const { prompt, model, image_count, image_url, fetchers_json } = job;
 
@@ -93,7 +104,7 @@ async function processPendingJobs() {
                 if (ASTRIA_API_KEY && ASTRIA_API_KEY !== "") {
                     // Update AI payload
                     for (const activeModel of attemptModels) {
-                        console.log(`[Job ${job.id}] Attempting generation with model: ${activeModel}...`);
+                        logger.info(`[Job ${job.id}] Attempting generation with model: ${activeModel}...`);
                         astriaFailed = false;
                         resultImages = [];
 
@@ -123,7 +134,7 @@ async function processPendingJobs() {
 
                             if (!response.ok) {
                                 const errorText = await response.text();
-                                console.error(`Astria API error for job ${job.id} using model ${activeModel}:`, errorText);
+                                logger.error(`Astria API error for job ${job.id} using model ${activeModel}`, { error: errorText });
                                 astriaFailed = true;
                                 break;
                             } else {
@@ -143,7 +154,7 @@ async function processPendingJobs() {
                         }
 
                         // If we loop again, it means this attempt failed
-                        console.log(`[Job ${job.id}] Model ${activeModel} failed. Checking for fallback...`);
+                        logger.warn(`[Job ${job.id}] Model ${activeModel} failed. Checking for fallback...`);
                         astriaFailed = true;
                     }
                 } else {
@@ -152,7 +163,7 @@ async function processPendingJobs() {
                 }
 
                 if (astriaFailed) {
-                    console.log(`Simulating success for job ${job.id} because Astria request failed or key is missing.`);
+                    logger.warn(`Failure triggered for job ${job.id}. Attempting local backoff / fallback logic.`);
                     resultImages = [];
                     for (let i = 0; i < image_count; i++) {
                         resultImages.push(
@@ -189,25 +200,26 @@ async function processPendingJobs() {
                         const arrayBuffer = await imgRes.arrayBuffer();
                         const buffer = Buffer.from(arrayBuffer);
 
-                        const fileName = `${job.user_id}/${Date.now()}_${i}.png`;
-                        const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+                        // Structural Storage Requirement: generated/{generation_id}/image1.png
+                        const fileName = `${job.id}/image${i + 1}.png`;
+                        const { error: uploadError } = await supabaseAdmin.storage
                             .from("generated-images")
-                            .upload(fileName, buffer, {
+                            .upload(`generated/${fileName}`, buffer, {
                                 contentType: "image/png",
                                 upsert: true,
                             });
 
                         if (uploadError) {
-                            console.error(`Failed to upload ${fileName} to storage:`, uploadError);
+                            logger.error(`Failed to upload ${fileName} to storage`, { error: uploadError });
                             uploadedImageUrls.push(imgUrl); // Fallback to original URL
                         } else {
                             const { data: urlData } = supabaseAdmin.storage
                                 .from("generated-images")
-                                .getPublicUrl(fileName);
+                                .getPublicUrl(`generated/${fileName}`);
                             uploadedImageUrls.push(urlData.publicUrl);
                         }
                     } catch (e) {
-                        console.error(`Error uploading image ${imgUrl}:`, e);
+                        logger.error(`Error uploading image ${imgUrl}`, { error: e });
                         uploadedImageUrls.push(imgUrl);
                     }
                 }
@@ -217,70 +229,55 @@ async function processPendingJobs() {
                     .from("generations")
                     .update({
                         status: "completed",
-                        generated_images: uploadedImageUrls
+                        generated_images: uploadedImageUrls,
+                        retry_count: 0 // Reset on success to keep clean
                     })
                     .eq("id", job.id);
 
                 if (completeError) {
-                    console.error(`Failed to complete job ${job.id}:`, completeError);
+                    logger.error(`Failed to complete job ${job.id}`, { error: completeError });
                 } else {
-                    console.log(`Job ${job.id} completed successfully.`);
-
-                    // Recalculate credit cost inside worker since `credits_cost` isn't saved directly
-                    let base_model_credits = 10;
-                    if (model === "flux-2-pro") base_model_credits = 8;
-                    else if (model === "seedream-4.5") base_model_credits = 10;
-                    else if (model === "gemini-3.1") base_model_credits = 20;
-
-                    let generation_credits = (base_model_credits / 4) * image_count;
-
-                    let fetcher_credits = 0;
-                    if (fetchers.remove_background) fetcher_credits += 1;
-                    if (fetchers.white_background) fetcher_credits += 1;
-                    if (fetchers.super_resolution) fetcher_credits += 2;
-                    if (fetchers.upscale_v4) fetcher_credits += 4;
-                    if (fetchers.product_fix) fetcher_credits += 2;
-                    if (fetchers.face_correction) fetcher_credits += 2;
-
-                    let credits_cost = generation_credits + fetcher_credits;
-
-                    // Deduct credits from user_credits table
-                    const { data: creditsData } = await supabaseAdmin
-                        .from("credits")
-                        .select("credits_remaining")
-                        .eq("user_id", job.user_id)
-                        .single();
-
-                    if (creditsData) {
-                        const newCredits = creditsData.credits_remaining - credits_cost;
-                        await supabaseAdmin
-                            .from("credits")
-                            .update({ credits_remaining: newCredits })
-                            .eq("user_id", job.user_id);
-                        console.log(`Deducted ${credits_cost} credits for user ${job.user_id}.`);
-                    }
+                    logger.generation("completed", job.user_id, job.id, "completed", { imagesGenerated: uploadedImageUrls.length });
                 }
 
             } catch (jobError: any) {
-                console.error(`Failed to process job ${job.id} due to exception:`, jobError);
+                logger.error(`Failed to process job ${job.id} due to exception`, { error: jobError });
 
-                // 4. Add error handling - Mark job as "failed"
-                await supabaseAdmin
-                    .from("generations")
-                    .update({
-                        status: "failed"
-                    })
-                    .eq("id", job.id);
+                // Retries evaluation logic
+                const tryCount = (job.retry_count || 0) + 1;
+                const maxTry = job.max_retries || 3;
+
+                if (tryCount < maxTry) {
+                    logger.warn(`Attempting retry ${tryCount}/${maxTry} for Job ${job.id}`);
+                    await supabaseAdmin
+                        .from("generations")
+                        .update({
+                            status: "queued",
+                            retry_count: tryCount
+                        })
+                        .eq("id", job.id);
+                } else {
+                    logger.error(`Max retries reached for job ${job.id}. Marking as failed.`);
+                    // Mark job as "failed" unconditionally
+                    await supabaseAdmin
+                        .from("generations")
+                        .update({
+                            status: "failed",
+                            retry_count: tryCount
+                        })
+                        .eq("id", job.id);
+                    logger.generation("failed", job.user_id, job.id, "failed");
+                }
             }
         }
     } catch (error) {
-        console.error("Worker generic polling error:", error);
+        logger.error("Worker generic polling error", { error });
     }
 }
 
 // 5. Poll Interval
 function startWorker() {
-    console.log(`[Job Worker] Started. Polling every ${POLL_INTERVAL / 1000} seconds...`);
+    logger.info(`[Job Worker] Started. Polling every ${POLL_INTERVAL / 1000} seconds...`);
     setInterval(processPendingJobs, POLL_INTERVAL);
     // Initial run
     processPendingJobs();

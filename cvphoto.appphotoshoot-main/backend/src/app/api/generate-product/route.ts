@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { logger } from "@/utils/logger";
 
 const ASTRIA_API_KEY = process.env.ASTRIA_API_KEY;
 
@@ -81,6 +82,7 @@ export async function POST(req: NextRequest) {
 
             if (timeDiff < 60000) { // less than 1 minute
                 if (rlData.request_count >= 10) {
+                    logger.warn("Rate limit exceeded", { userId });
                     return NextResponse.json(
                         { success: false, error: "Rate limit exceeded. Please wait." },
                         { status: 429 }
@@ -111,11 +113,20 @@ export async function POST(req: NextRequest) {
             .single();
 
         if (!creditsData || creditsData.credits_remaining < credits_cost) {
+            logger.warn("Not enough credits", { userId, cost: credits_cost });
             return NextResponse.json(
                 { success: false, error: `Insufficient credits. Generation Requires ${credits_cost} credits.` },
                 { status: 402 }
             );
         }
+
+        // Deduct credits PRE-GENERATION intentionally
+        await supabaseAdmin
+            .from("credits")
+            .update({ credits_remaining: creditsData.credits_remaining - credits_cost })
+            .eq("user_id", userId);
+
+        logger.info(`Deducted ${credits_cost} credits for job initiation`, { userId });
 
         const templatePayload = JSON.stringify({
             scene_prompt,
@@ -144,12 +155,20 @@ export async function POST(req: NextRequest) {
             .single();
 
         if (jobError || !jobData) {
-            console.error("Failed to enqueue generation job:", jobError);
+            logger.error("Failed to enqueue generation job", { error: jobError });
+            // Rollback credits on catastrophic insertion failure
+            await supabaseAdmin
+                .from("credits")
+                .update({ credits_remaining: creditsData.credits_remaining })
+                .eq("user_id", userId);
+
             return NextResponse.json(
                 { success: false, error: "Failed to enqueue generation job" },
                 { status: 500 }
             );
         }
+
+        logger.generation("started", userId, jobData.id, "queued", { credits_deducted: credits_cost });
 
         return NextResponse.json({
             success: true,
@@ -158,7 +177,7 @@ export async function POST(req: NextRequest) {
         });
 
     } catch (error: any) {
-        console.error("Generate product error:", error);
+        logger.error("Generate product route crash", { error: error.message });
         return NextResponse.json(
             { success: false, error: error.message || "Failed to generate product images" },
             { status: 500 }

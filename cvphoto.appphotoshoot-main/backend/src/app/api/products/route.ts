@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/utils/supabase/server";
+import { logger } from "@/utils/logger";
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,24 +29,37 @@ export async function POST(req: NextRequest) {
             name = file.name;
         }
 
-        // Generate unique filename
-        const timestamp = Date.now();
-        const uniqueFilename = `${user.id}/${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+        // Generate placeholder Product row first to fetch Product ID
+        const { data: placeholder, error: insertError } = await supabaseAdmin
+            .from("products")
+            .insert({ user_id: user.id, name: name, image_url: "" })
+            .select("id")
+            .single();
+
+        if (insertError || !placeholder) {
+            logger.error("Failed to generate Product ID placeholder", { error: insertError });
+            return NextResponse.json({ error: "Failed to allocate product ID" }, { status: 500 });
+        }
+
+        const productId = placeholder.id;
+        const targetFilename = `products/${user.id}/${productId}.png`;
 
         // Convert file to buffer for Supabase upload
         const arrayBuffer = await file.arrayBuffer();
         const buffer = new Uint8Array(arrayBuffer);
 
         // Upload to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        const { error: uploadError } = await supabaseAdmin.storage
             .from("product-images")
-            .upload(uniqueFilename, buffer, {
-                contentType: file.type,
-                upsert: false,
+            .upload(targetFilename, buffer, {
+                contentType: file.type || "image/png",
+                upsert: true,
             });
 
         if (uploadError) {
-            console.error("Supabase Upload Error:", uploadError);
+            logger.error("Supabase Upload Error", { error: uploadError });
+            // Cleanup placeholder
+            await supabaseAdmin.from("products").delete().eq("id", productId);
             return NextResponse.json(
                 { error: "Failed to upload image to storage" },
                 { status: 500 }
@@ -55,23 +69,20 @@ export async function POST(req: NextRequest) {
         // Get Public URL
         const {
             data: { publicUrl },
-        } = supabaseAdmin.storage.from("product-images").getPublicUrl(uniqueFilename);
+        } = supabaseAdmin.storage.from("product-images").getPublicUrl(targetFilename);
 
-        // Insert into products table
+        // Update exact product row with the final publicUrl 
         const { data: productData, error: productError } = await supabaseAdmin
             .from("products")
-            .insert({
-                user_id: user.id,
-                image_url: publicUrl,
-                name: name
-            })
+            .update({ image_url: publicUrl })
+            .eq("id", productId)
             .select()
             .single();
 
         if (productError) {
-            console.error("Products Insert Error:", productError);
+            logger.error("Products Update Error", { error: productError });
             return NextResponse.json(
-                { error: "Failed to save product record" },
+                { error: "Failed to update product record" },
                 { status: 500 }
             );
         }
@@ -81,8 +92,8 @@ export async function POST(req: NextRequest) {
             imageUrl: publicUrl,
             product: productData,
         });
-    } catch (error) {
-        console.error("Upload API Error:", error);
+    } catch (error: any) {
+        logger.error("Upload API Error", { error: error.message });
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }

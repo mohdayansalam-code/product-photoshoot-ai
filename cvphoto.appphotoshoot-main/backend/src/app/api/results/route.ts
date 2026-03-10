@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
         const { data: jobData, error: jobError } = await supabaseAdmin
             .from("generations")
-            .select("status, generated_images, user_id")
+            .select("status, generated_images, user_id, created_at")
             .eq("id", job_id)
             .eq("user_id", userId) // explicitly secure access
             .single();
@@ -47,24 +47,30 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const { status, generated_images } = jobData;
+        const { status, generated_images, created_at } = jobData;
 
         if (status === "queued" || status === "running" || status === "processing") {
             return NextResponse.json({
-                status: "processing"
+                generation_id: job_id,
+                status: "processing",
+                created_at
             });
         }
 
         if (status === "completed") {
             return NextResponse.json({
+                generation_id: job_id,
                 status: "completed",
-                images: generated_images || []
+                image_urls: generated_images || [],
+                created_at
             });
         }
 
         if (status === "failed") {
             return NextResponse.json({
-                status: "failed"
+                generation_id: job_id,
+                status: "failed",
+                created_at
             });
         }
 
