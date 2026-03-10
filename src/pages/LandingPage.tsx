@@ -105,7 +105,7 @@ export default function LandingPage() {
           </motion.p>
           <motion.div variants={fadeUp} custom={3} className="flex flex-wrap gap-4">
             <Button asChild size="lg" className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-8 text-base h-12">
-              <Link to="/generate"><Camera className="h-5 w-5 mr-2" /> Generate Photos</Link>
+              <Link to="/dashboard/generate"><Camera className="h-5 w-5 mr-2" /> Generate Photos</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-full border-slate-200 hover:bg-slate-50 px-8 text-base h-12">
               <a href="#features">See Examples <ArrowRight className="h-4 w-4 ml-2" /></a>
@@ -159,11 +159,10 @@ export default function LandingPage() {
                 <button
                   key={tab.label}
                   onClick={() => setActiveTab(i)}
-                  className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all text-left ${
-                    activeTab === i
+                  className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all text-left ${activeTab === i
                       ? "bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-500/25"
                       : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-100"
-                  }`}
+                    }`}
                 >
                   <tab.icon className="h-4 w-4 shrink-0" />
                   {tab.label}
@@ -312,7 +311,7 @@ export default function LandingPage() {
             <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight mb-4">Start Creating AI Product Photos Today</h2>
             <p className="text-blue-100 text-lg mb-8">No design skills required</p>
             <Button asChild size="lg" className="rounded-full bg-white text-blue-600 hover:bg-blue-50 shadow-lg px-10 text-base h-13 font-bold">
-              <Link to="/generate">Generate Photos Now <ArrowRight className="h-5 w-5 ml-2" /></Link>
+              <Link to="/dashboard/generate">Generate Photos Now <ArrowRight className="h-5 w-5 ml-2" /></Link>
             </Button>
           </motion.div>
         </div>

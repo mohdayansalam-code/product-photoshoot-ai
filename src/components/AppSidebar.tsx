@@ -29,17 +29,17 @@ import { CreditIndicator } from "@/components/CreditIndicator";
 import { fetchCredits } from "@/lib/api";
 
 const navItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Generate Photoshoot", url: "/generate", icon: Camera },
-  { title: "Generations", url: "/generations", icon: Images },
-  { title: "AI Image Tools", url: "/tools", icon: Wand2 },
-  { title: "AI Image Editor", url: "/editor", icon: Pencil },
-  { title: "Products", url: "/products", icon: Package },
-  { title: "Projects", url: "/projects", icon: FolderKanban },
-  { title: "Activity", url: "/activity", icon: Activity },
-  { title: "Assets Library", url: "/assets", icon: FolderOpen },
-  { title: "Credits", url: "/credits", icon: Coins },
-  { title: "Settings", url: "/settings", icon: Settings },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Generate Photoshoot", url: "/dashboard/generate", icon: Camera },
+  { title: "Generations", url: "/dashboard/generations", icon: Images },
+  { title: "AI Image Tools", url: "/dashboard/tools", icon: Wand2 },
+  { title: "AI Image Editor", url: "/dashboard/editor", icon: Pencil },
+  { title: "Products", url: "/dashboard/products", icon: Package },
+  { title: "Projects", url: "/dashboard/projects", icon: FolderKanban },
+  { title: "Activity", url: "/dashboard/activity", icon: Activity },
+  { title: "Assets Library", url: "/dashboard/assets", icon: FolderOpen },
+  { title: "Credits", url: "/dashboard/credits", icon: Coins },
+  { title: "Settings", url: "/dashboard/settings", icon: Settings },
 ];
 
 export function AppSidebar() {

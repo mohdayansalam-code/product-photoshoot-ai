@@ -19,9 +19,9 @@ const stats = [
 ];
 
 const secondaryActions = [
-  { label: "Upload Product", icon: Upload, to: "/generate" },
-  { label: "Open Image Editor", icon: Pencil, to: "/editor" },
-  { label: "AI Tools", icon: Wand2, to: "/ai-tools" },
+  { label: "Upload Product", icon: Upload, to: "/dashboard/generate" },
+  { label: "Open Image Editor", icon: Pencil, to: "/dashboard/editor" },
+  { label: "AI Tools", icon: Wand2, to: "/dashboard/tools" },
 ];
 
 
@@ -45,7 +45,7 @@ export default function Index() {
             <AlertDescription className="flex items-center justify-between">
               <span className="text-sm text-foreground">Running low on credits. Upgrade to continue generating images.</span>
               <Button size="sm" variant="destructive" asChild>
-                <Link to="/credits">Upgrade Plan</Link>
+                <Link to="/dashboard/credits">Upgrade Plan</Link>
               </Button>
             </AlertDescription>
           </Alert>
@@ -66,7 +66,7 @@ export default function Index() {
           transition={{ type: "spring", stiffness: 300 }}
         >
           <Link
-            to="/generate"
+            to="/dashboard/generate"
             className="flex items-center gap-4 rounded-xl p-6 gradient-primary text-primary-foreground shadow-lg transition-all"
           >
             <div className="h-12 w-12 rounded-xl bg-primary-foreground/20 flex items-center justify-center">
@@ -111,7 +111,7 @@ export default function Index() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-foreground">Recent Products</h2>
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/products">View all <ArrowRight className="h-4 w-4 ml-1" /></Link>
+            <Link to="/dashboard/products">View all <ArrowRight className="h-4 w-4 ml-1" /></Link>
           </Button>
         </div>
         {recentProducts.length === 0 ? (
@@ -131,7 +131,7 @@ export default function Index() {
                 />
                 <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/50 transition-all duration-300 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100">
                   <Button size="sm" className="gradient-primary text-primary-foreground text-xs" asChild>
-                    <Link to="/generate">
+                    <Link to="/dashboard/generate">
                       <Camera className="h-3 w-3 mr-1" /> Generate Photoshoot
                     </Link>
                   </Button>
@@ -151,7 +151,7 @@ export default function Index() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-foreground">Recent Generations</h2>
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/generations">View all <ArrowRight className="h-4 w-4 ml-1" /></Link>
+            <Link to="/dashboard/generations">View all <ArrowRight className="h-4 w-4 ml-1" /></Link>
           </Button>
         </div>
         <div className="space-y-5">
@@ -172,13 +172,13 @@ export default function Index() {
                 <div className="flex items-center gap-2">
                   <div className="hidden group-hover/card:flex items-center gap-1.5 transition-all">
                     <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                      <Link to="/projects"><FolderOpen className="h-3 w-3 mr-1" /> Open Project</Link>
+                      <Link to="/dashboard/projects"><FolderOpen className="h-3 w-3 mr-1" /> Open Project</Link>
                     </Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs">
                       <Download className="h-3 w-3 mr-1" /> Download
                     </Button>
                     <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                      <Link to="/editor"><Pencil className="h-3 w-3 mr-1" /> Edit</Link>
+                      <Link to="/dashboard/editor"><Pencil className="h-3 w-3 mr-1" /> Edit</Link>
                     </Button>
                   </div>
                   <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-accent text-accent-foreground">

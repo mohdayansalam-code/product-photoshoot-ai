@@ -178,7 +178,7 @@ export default function ProductsLibraryPage() {
                   />
                   <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/50 transition-all duration-300 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                     <Button size="sm" className="gradient-primary text-primary-foreground text-xs" asChild>
-                      <Link to="/generate">
+                      <Link to="/dashboard/generate">
                         <Camera className="h-3 w-3 mr-1" /> Generate
                       </Link>
                     </Button>

@@ -3,6 +3,7 @@ import sceneFashion from "@/assets/scene-fashion-editorial.jpg";
 import sceneWhite from "@/assets/scene-white-bg.jpg";
 import sceneInfluencer from "@/assets/scene-influencer.jpg";
 import sceneJewelry from "@/assets/scene-jewelry.jpg";
+import { supabase } from "@/lib/supabase";
 
 export interface Scene {
   id: string;
@@ -66,9 +67,14 @@ export async function generateProduct(payload: {
     upscale_v4: payload.enhancements.includes("upscale_v4"),
   };
 
+  const { data: { session } } = await supabase.auth.getSession();
+
   const response = await fetch(`${API_URL}/api/generate-product`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${session?.access_token}`
+    },
     body: JSON.stringify({
       imageUrl: base64Image,
       prompt: payload.scene_prompt,
@@ -89,7 +95,12 @@ export async function generateProduct(payload: {
 }
 
 export async function fetchResults(jobId: string): Promise<GenerationJob> {
-  const response = await fetch(`${API_URL}/api/results?generation_id=${jobId}`);
+  const { data: { session } } = await supabase.auth.getSession();
+  const response = await fetch(`${API_URL}/api/results?generation_id=${jobId}`, {
+    headers: {
+      "Authorization": `Bearer ${session?.access_token}`
+    }
+  });
   if (!response.ok) throw new Error("Failed to fetch results");
   const data = await response.json();
   return {
@@ -105,12 +116,16 @@ export async function fetchResults(jobId: string): Promise<GenerationJob> {
 export const MOCK_GENERATIONS: GenerationJob[] = [];
 
 export async function uploadProduct(file: File, name: string): Promise<{ product_id: string, image_url: string }> {
+  const { data: { session } } = await supabase.auth.getSession();
   const formData = new FormData();
   formData.append('file', file);
   formData.append('name', name);
 
-  const response = await fetch("/api/products", {
+  const response = await fetch(`${API_URL}/api/products`, {
     method: 'POST',
+    headers: {
+      "Authorization": `Bearer ${session?.access_token}`
+    },
     body: formData,
   });
 
@@ -123,10 +138,15 @@ export async function uploadProduct(file: File, name: string): Promise<{ product
 }
 
 export async function fetchProducts(): Promise<any[]> {
-  const response = await fetch("/api/products");
+  const { data: { session } } = await supabase.auth.getSession();
+  const response = await fetch(`${API_URL}/api/products`, {
+    headers: {
+      "Authorization": `Bearer ${session?.access_token}`
+    }
+  });
   if (!response.ok) throw new Error('Failed to fetch products');
   const data = await response.json();
-  
+
   return data.products.map((p: any) => ({
     id: p.id,
     name: p.name,
@@ -136,16 +156,25 @@ export async function fetchProducts(): Promise<any[]> {
 }
 
 export async function fetchCredits(): Promise<{ credits: number, maxCredits: number }> {
-  const response = await fetch("/api/credits");
+  const { data: { session } } = await supabase.auth.getSession();
+  const response = await fetch(`${API_URL}/api/credits`, {
+    headers: {
+      "Authorization": `Bearer ${session?.access_token}`
+    }
+  });
   if (!response.ok) throw new Error('Failed to fetch credits');
   const data = await response.json();
   return { credits: data.credits || 0, maxCredits: data.max_credits || 50 };
 }
 
 export async function callImageTool(imageUrl: string, tool: 'remove_bg' | 'upscale'): Promise<{ job_id: string }> {
-  const response = await fetch("/api/image-tools", {
+  const { data: { session } } = await supabase.auth.getSession();
+  const response = await fetch(`${API_URL}/api/image-tools`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session?.access_token}`
+    },
     body: JSON.stringify({ imageUrl, tool }),
   });
   if (!response.ok) throw new Error('Failed to start tool');
