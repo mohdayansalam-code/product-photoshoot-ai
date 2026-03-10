@@ -1,24 +1,24 @@
-import { FolderOpen, Image, Calendar, MoreHorizontal, Plus } from "lucide-react";
+import { FolderOpen, Image, Calendar, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-
-const PROJECTS = [
-  { id: 1, name: "Summer Collection", images: 24, scene: "Fashion Editorial", date: "Mar 6, 2026", status: "completed" },
-  { id: 2, name: "Skincare Line Launch", images: 16, scene: "Luxury Skincare", date: "Mar 5, 2026", status: "completed" },
-  { id: 3, name: "Jewelry Lookbook", images: 32, scene: "Jewelry Macro", date: "Mar 4, 2026", status: "in_progress" },
-  { id: 4, name: "Electronics Promo", images: 8, scene: "White Background", date: "Mar 3, 2026", status: "completed" },
-  { id: 5, name: "Home Decor Spring", images: 12, scene: "Influencer Lifestyle", date: "Mar 2, 2026", status: "draft" },
-  { id: 6, name: "Sneaker Drop", images: 20, scene: "Fashion Editorial", date: "Mar 1, 2026", status: "completed" },
-];
-
-const statusColors: Record<string, string> = {
-  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  in_progress: "bg-primary/10 text-primary",
-  draft: "bg-secondary text-muted-foreground",
-};
+import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useState } from "react";
+import { getGenerations } from "@/lib/api";
 
 export default function ProjectsPage() {
+  const [generations, setGenerations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getGenerations().then(data => {
+      setGenerations(data);
+    }).catch(err => {
+      console.error(err);
+    }).finally(() => {
+      setLoading(false);
+    });
+  }, []);
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <motion.div
@@ -27,68 +27,70 @@ export default function ProjectsPage() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Projects</h1>
-          <p className="text-sm text-muted-foreground">Manage your photoshoot projects</p>
+          <h1 className="text-xl font-semibold text-foreground">Generation History</h1>
+          <p className="text-sm text-muted-foreground">View your past AI photoshoots</p>
         </div>
-        <Button className="gradient-primary text-primary-foreground font-medium text-sm gap-2">
-          <Plus className="h-4 w-4" /> New Project
+        <Button onClick={() => window.location.href = '/dashboard/generate'} className="gradient-primary text-primary-foreground font-medium text-sm gap-2">
+          <Plus className="h-4 w-4" /> New Photoshoot
         </Button>
       </motion.div>
 
-      {PROJECTS.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <Skeleton key={i} className="h-64 rounded-xl w-full" />
+          ))}
+        </div>
+      ) : generations.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="h-16 w-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
             <FolderOpen className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="font-semibold text-foreground">No projects yet</p>
-          <p className="text-sm text-muted-foreground mt-1 max-w-sm">Create a new project to organize your photoshoots and assets.</p>
+          <p className="font-semibold text-foreground">No generations yet</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-sm">Create your first AI photoshoot to see it here.</p>
+          <Button onClick={() => window.location.href = '/dashboard/generate'} variant="outline" className="mt-4">Generate Photos</Button>
         </div>
       ) : (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {PROJECTS.map((project, i) => (
-          <motion.div
-            key={project.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.06 }}
-            whileHover={{ y: -3, boxShadow: "0 8px 30px -8px hsl(220 20% 10% / 0.12)" }}
-            className="rounded-xl border border-border bg-card p-4 space-y-3 cursor-pointer transition-colors"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center">
-                  <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm text-foreground">{project.name}</p>
-                  <p className="text-xs text-muted-foreground">{project.scene}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {generations.map((project, i) => (
+            <motion.div
+              key={project.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              whileHover={{ y: -3, boxShadow: "0 8px 30px -8px hsl(220 20% 10% / 0.12)" }}
+              className="rounded-xl border border-border bg-card p-4 space-y-3 cursor-pointer transition-colors flex flex-col justify-between"
+              onClick={() => window.location.href = `/dashboard/generate`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2 max-w-[80%]">
+                  <div className="h-9 w-9 shrink-0 rounded-lg bg-secondary flex items-center justify-center">
+                    <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="truncate">
+                    <p className="font-medium text-sm text-foreground truncate">{project.prompt || "Generated Photoshoot"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{project.model}</p>
+                  </div>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7">
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </Button>
-            </div>
 
-            <div className="grid grid-cols-3 gap-1.5">
-              {[0, 1, 2].map((j) => (
-                <div key={j} className="aspect-square rounded-lg bg-secondary overflow-hidden">
-                  <img src="/placeholder.svg" alt="" className="w-full h-full object-cover" />
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><Image className="h-3 w-3" /> {project.images}</span>
-                <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {project.date}</span>
+              <div className="grid grid-cols-3 gap-1.5 h-24">
+                {(project.image_urls || []).slice(0, 3).map((url: string, j: number) => (
+                  <div key={j} className="aspect-square rounded-lg bg-secondary overflow-hidden">
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                  </div>
+                ))}
               </div>
-              <Badge variant="secondary" className={`text-[10px] ${statusColors[project.status]}`}>
-                {project.status.replace("_", " ")}
-              </Badge>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/50">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1"><Image className="h-3 w-3" /> {(project.image_urls || []).length}</span>
+                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {new Date(project.created_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
       )}
     </div>
   );

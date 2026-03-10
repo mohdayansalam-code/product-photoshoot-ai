@@ -38,7 +38,9 @@ export function ModelSelector({ selected, onSelect, imageCount }: ModelSelectorP
         </SelectContent>
       </Select>
       <p className="text-xs text-muted-foreground">
-        {currentModel?.name} → <span className="font-medium text-primary">{cost} credits</span> / {imageCount} images
+        {currentModel?.name} → <span className="font-medium text-primary">
+          {selected === "" ? "Dynamic Cost" : `${cost} credits`}
+        </span> / {imageCount} images
       </p>
     </div>
   );

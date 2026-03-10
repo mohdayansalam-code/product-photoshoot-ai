@@ -22,17 +22,16 @@ export interface GenerationJob {
 }
 
 export const SCENES: Scene[] = [
-  { id: "1", name: "Luxury Skincare Studio", scene_prompt: "Luxury skincare studio with marble surface, soft golden lighting, elegant minimalist backdrop", thumbnail: sceneLuxury },
-  { id: "2", name: "Fashion Editorial", scene_prompt: "Fashion editorial setup with dramatic lighting, fabric drapes, magazine-style composition", thumbnail: sceneFashion },
-  { id: "3", name: "Amazon White Background", scene_prompt: "Pure white seamless background, clean professional ecommerce product photography", thumbnail: sceneWhite },
-  { id: "4", name: "Influencer Lifestyle", scene_prompt: "Lifestyle flat lay with natural light, cozy aesthetic, plants and warm tones", thumbnail: sceneInfluencer },
-  { id: "5", name: "Jewelry Macro Shot", scene_prompt: "Macro jewelry photography on dark velvet, dramatic spotlight, luxury close-up", thumbnail: sceneJewelry },
+  { id: "luxury-skincare-studio", name: "Luxury Skincare Studio", scene_prompt: "luxury-skincare-studio", thumbnail: sceneLuxury },
+  { id: "amazon-white-background", name: "Amazon White Background", scene_prompt: "amazon-white-background", thumbnail: sceneWhite },
+  { id: "jewelry-macro-shot", name: "Jewelry Macro Shot", scene_prompt: "jewelry-macro-shot", thumbnail: sceneJewelry },
 ];
 
 export const MODELS = [
-  { id: "seedream", name: "Seedream 4.5", credits_per_image: 2.5, badge: "Popular" },
-  { id: "gemini", name: "Gemini 3.1", credits_per_image: 5, badge: "Premium" },
-  { id: "flux", name: "Flux 2 Pro", credits_per_image: 2, badge: "Fast" },
+  { id: "", name: "Auto (Smart Routing)", credits_per_image: 0, badge: "Recommended" },
+  { id: "seedream-4.5", name: "Seedream 4.5", credits_per_image: 2.5, badge: "Popular" },
+  { id: "gemini-3.1", name: "Gemini 3.1", credits_per_image: 5, badge: "Premium" },
+  { id: "flux-2-pro", name: "Flux 2 Pro", credits_per_image: 2, badge: "Fast" },
 ];
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -45,14 +44,15 @@ export async function fetchScenes(): Promise<Scene[]> {
 
 export async function generateProduct(payload: {
   product_image: File | null;
-  scene_prompt: string;
-  recommended_model: string;
+  product_url?: string;
+  prompt: string;
+  scene?: string;
   image_count: number;
   enhancements: string[];
 }): Promise<{ job_id: string }> {
 
-  let base64Image = "";
-  if (payload.product_image) {
+  let base64Image = payload.product_url || "";
+  if (payload.product_image && !payload.product_url) {
     base64Image = await new Promise((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
@@ -76,11 +76,10 @@ export async function generateProduct(payload: {
       "Authorization": `Bearer ${session?.access_token}`
     },
     body: JSON.stringify({
-      imageUrl: base64Image,
-      prompt: payload.scene_prompt,
-      model: payload.recommended_model,
+      product_image: base64Image,
+      prompt: payload.prompt,
+      scene: payload.scene,
       image_count: payload.image_count,
-      lock_style: true,
       fetchers
     }),
   });
@@ -104,13 +103,42 @@ export async function fetchResults(jobId: string): Promise<GenerationJob> {
   if (!response.ok) throw new Error("Failed to fetch results");
   const data = await response.json();
   return {
-    id: jobId,
+    id: data.generation_id || jobId,
     status: data.status,
-    images: data.images || [],
-    scene: "Generated Scene",
-    model: "AI Model",
-    created_at: new Date().toISOString(),
+    images: data.image_urls || data.images || [],
+    scene: data.prompt || "Generated Photoshoot",
+    model: data.model || "AI Model",
+    created_at: data.created_at || new Date().toISOString(),
   };
+}
+
+export async function getGenerations(): Promise<any[]> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const response = await fetch(`${API_URL}/api/generations`, {
+    headers: {
+      "Authorization": `Bearer ${session?.access_token}`
+    }
+  });
+  if (!response.ok) throw new Error("Failed to fetch generations history");
+  return await response.json();
+}
+
+export async function generateVariations(generation_id: string, image_url: string): Promise<{ job_id: string }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const response = await fetch(`${API_URL}/api/generate-variations`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${session?.access_token}`
+    },
+    body: JSON.stringify({ generation_id, image_url }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || "Failed to generate variations");
+  }
+  const data = await response.json();
+  return { job_id: data.generation_id };
 }
 
 export const MOCK_GENERATIONS: GenerationJob[] = [];

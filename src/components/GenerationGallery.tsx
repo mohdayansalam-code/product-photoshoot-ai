@@ -9,9 +9,10 @@ interface GenerationGalleryProps {
   images: string[];
   loading: boolean;
   imageCount?: number;
+  jobId?: string;
 }
 
-export function GenerationGallery({ images, loading, imageCount = 4 }: GenerationGalleryProps) {
+export function GenerationGallery({ images, loading, imageCount = 4, jobId }: GenerationGalleryProps) {
   const [progress, setProgress] = useState(0);
   const [generatedCount, setGeneratedCount] = useState(0);
 
@@ -94,6 +95,23 @@ export function GenerationGallery({ images, loading, imageCount = 4 }: Generatio
     }
   };
 
+  const [varyingImage, setVaryingImage] = useState<string | null>(null);
+
+  const handleVariations = async (url: string) => {
+    if (!jobId) { alert("Source generation ID missing! Ensure you ran a native photoshoot first."); return; }
+    try {
+      setVaryingImage(url);
+      const { generateVariations } = await import('@/lib/api');
+      await generateVariations(jobId, url);
+      alert("Variations generation started! Check your History or incoming Webhook connections.");
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Failed to start variations");
+    } finally {
+      setVaryingImage(null);
+    }
+  };
+
   return (
     <div className="grid grid-cols-2 gap-4 p-1">
       {images.map((img, i) => (
@@ -118,6 +136,9 @@ export function GenerationGallery({ images, loading, imageCount = 4 }: Generatio
               </Button>
               <Button size="sm" variant="secondary" className="h-8 text-xs gap-1 bg-card/90 backdrop-blur-sm hover:bg-card" onClick={() => window.location.href = `/editor?image=${encodeURIComponent(img)}`}>
                 <Pencil className="h-3 w-3" /> Edit
+              </Button>
+              <Button disabled={varyingImage === img} size="sm" variant="secondary" className="h-8 text-xs gap-1 bg-card/90 backdrop-blur-sm hover:bg-card" onClick={() => handleVariations(img)}>
+                {varyingImage === img ? <Loader2 className="h-3 w-3 animate-spin" /> : <Copy className="h-3 w-3" />} Variations
               </Button>
             </div>
           </div>

@@ -31,11 +31,12 @@ export default function GeneratePage() {
   const [productPreview, setProductPreview] = useState<string | null>(null);
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null);
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState("seedream");
+  const [model, setModel] = useState("");
   const [imageCount, setImageCount] = useState(4);
   const [enhancements, setEnhancements] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [jobId, setJobId] = useState<string | null>(null);
 
   const handleUpload = useCallback((file: File | null) => {
     setProductFile(file);
@@ -50,13 +51,35 @@ export default function GeneratePage() {
 
   const creditEstimate = useMemo(() => {
     const selectedModel = MODELS.find((m) => m.id === model);
-    const modelCost = (selectedModel?.credits_per_image ?? 0) * imageCount;
+
+    // Evaluate smart routing implicitly 
+    let activeModelCredits = 0;
+    let modelName = "Auto (Smart Routing)";
+
+    if (model === "") {
+      const p = prompt.toLowerCase();
+      if (p.includes("different angles") || p.includes("model poses") || p.includes("street photoshoot") || p.includes("fashion shoot") || p.includes("variations")) {
+        activeModelCredits = 5;
+        modelName = "Auto (Gemini)";
+      } else if (p.includes("consistent") || p.includes("same product") || p.includes("same scene") || p.includes("product photoshoot")) {
+        activeModelCredits = 2.5;
+        modelName = "Auto (Seedream)";
+      } else {
+        activeModelCredits = 2;
+        modelName = "Auto (Flux)";
+      }
+    } else {
+      activeModelCredits = selectedModel?.credits_per_image ?? 0;
+      modelName = selectedModel?.name ?? model;
+    }
+
+    const modelCost = activeModelCredits * imageCount;
     const enhancementCost = enhancements.reduce((sum, id) => {
       const e = ENHANCEMENTS.find((en) => en.id === id);
       return sum + (e?.credits ?? 0) * imageCount;
     }, 0);
-    return { modelName: selectedModel?.name ?? model, modelCost, enhancementCost, total: modelCost + enhancementCost };
-  }, [model, imageCount, enhancements]);
+    return { modelName, modelCost, enhancementCost, total: modelCost + enhancementCost };
+  }, [model, imageCount, enhancements, prompt]);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -64,11 +87,12 @@ export default function GeneratePage() {
     try {
       const { job_id } = await generateProduct({
         product_image: productFile,
-        scene_prompt: selectedScene?.scene_prompt || "",
-        recommended_model: model,
+        prompt: prompt,
+        scene: selectedScene?.scene_prompt,
         image_count: imageCount,
         enhancements,
       });
+      setJobId(job_id);
 
       // Poll for results
       const pollInterval = setInterval(async () => {
@@ -238,7 +262,7 @@ export default function GeneratePage() {
         className="flex-1 flex flex-col bg-secondary/30 p-6 overflow-auto"
       >
         <h2 className="text-sm font-medium text-muted-foreground mb-4">Generated Images</h2>
-        <GenerationGallery images={generatedImages} loading={loading} imageCount={imageCount} />
+        <GenerationGallery images={generatedImages} loading={loading} imageCount={imageCount} jobId={jobId || undefined} />
       </motion.div>
     </div>
   );
