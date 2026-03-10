@@ -30,6 +30,8 @@ export async function POST(req: NextRequest) {
                 model = "gemini-3.1";
             } else if (p.includes("consistent") || p.includes("same product") || p.includes("same scene") || p.includes("product photoshoot")) {
                 model = "seedream-4.5";
+            } else if (p.includes("product photography") || p.includes("studio photo") || p.includes("ecommerce product")) {
+                model = "seedream-5-lite";
             } else {
                 model = "flux-2-pro";
             }
@@ -47,9 +49,15 @@ export async function POST(req: NextRequest) {
 
         // Calculate credits based on proportional model cost
         let base_model_credits = 10;
-        if (model === "flux-2-pro") base_model_credits = 8;
-        else if (model === "seedream-4.5") base_model_credits = 10;
-        else if (model === "gemini-3.1") base_model_credits = 20;
+        const MODEL_CREDITS: Record<string, number> = {
+            "flux-2-pro": 8,
+            "seedream-5-lite": 12,
+            "seedream-4.5": 10,
+            "gemini-3.1": 20
+        };
+        if (MODEL_CREDITS[model]) {
+            base_model_credits = MODEL_CREDITS[model];
+        }
 
         let generation_credits = (base_model_credits / 4) * image_count;
 

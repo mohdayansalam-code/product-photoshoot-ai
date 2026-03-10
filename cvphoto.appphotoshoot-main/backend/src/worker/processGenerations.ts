@@ -86,7 +86,7 @@ async function processPendingJobs() {
                 let astriaFailed = true;
 
                 const modelsToTry = [model];
-                if (model === "seedream-4.5") modelsToTry.push("flux-2-pro");
+                if (model === "seedream-4.5" || model === "seedream-5-lite") modelsToTry.push("flux-2-pro");
                 if (model === "flux-2-pro" || modelsToTry.includes("flux-2-pro")) modelsToTry.push("gemini-3.1");
 
                 // Restrict to max 2 tries (1 initial + 1 fallback)
