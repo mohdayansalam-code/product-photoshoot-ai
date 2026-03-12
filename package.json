@@ -1,0 +1,7 @@
+{
+  "name": "photoai-top-level",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix cvphoto.appphotoshoot-main"
+  }
+}
