@@ -31,7 +31,7 @@ export default function GeneratePage() {
   const [productPreview, setProductPreview] = useState<string | null>(null);
   const [selectedScene, setSelectedScene] = useState<Scene | null>(null);
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState("");
+  const [model, setModel] = useState("auto");
   const [imageCount, setImageCount] = useState(4);
   const [enhancements, setEnhancements] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,7 +56,7 @@ export default function GeneratePage() {
     let activeModelCredits = 0;
     let modelName = "Auto (Smart Routing)";
 
-    if (model === "") {
+    if (model === "auto") {
       const p = prompt.toLowerCase();
       if (p.includes("different angles") || p.includes("model poses") || p.includes("street photoshoot") || p.includes("fashion shoot") || p.includes("variations")) {
         activeModelCredits = 5;
@@ -91,6 +91,7 @@ export default function GeneratePage() {
       const { job_id } = await generateProduct({
         product_image: productFile,
         prompt: prompt,
+        model: model !== "auto" ? model : undefined,
         scene: selectedScene?.scene_prompt,
         image_count: imageCount,
         enhancements,

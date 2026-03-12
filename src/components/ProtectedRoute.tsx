@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/lib/authStore";
 import { Loader2 } from "lucide-react";
 
@@ -13,18 +13,16 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         }
     }, [initialized, initialize]);
 
-    useEffect(() => {
-        if (initialized && !session) {
-            navigate("/auth", { replace: true });
-        }
-    }, [initialized, session, navigate]);
-
-    if (!initialized || (initialized && !session)) {
+    if (!initialized) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
+    }
+
+    if (!session) {
+        return <Navigate to="/auth" replace />;
     }
 
     return <>{children}</>;

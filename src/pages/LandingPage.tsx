@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, type Easing } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import {
   Camera, Sparkles, ArrowRight, Play, Mail, Eraser, Maximize,
@@ -64,6 +65,15 @@ const FOOTER_LINKS = ["Home", "Features", "Pricing", "Docs", "Contact"];
 
 export default function LandingPage() {
   const [activeTab, setActiveTab] = useState(0);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        window.location.replace("/dashboard");
+      }
+    });
+  }, []);
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans overflow-x-hidden">
@@ -83,7 +93,7 @@ export default function LandingPage() {
             <a href="#demo" className="hover:text-slate-900 transition-colors">Demo</a>
           </div>
           <Button asChild className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-6">
-            <Link to="/">Open Dashboard</Link>
+            <Link to="/dashboard">Open Dashboard</Link>
           </Button>
         </div>
       </nav>
@@ -96,7 +106,7 @@ export default function LandingPage() {
               <Sparkles className="h-4 w-4" /> AI-Powered Product Photography
             </span>
           </motion.div>
-          <motion.h1 variants={fadeUp} custom={1} className="text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight">
+          <motion.h1 variants={fadeUp} custom={1} className="text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight text-slate-900">
             Generate Stunning AI Product Photos{" "}
             <span className="bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent">Instantly</span>
           </motion.h1>
@@ -146,7 +156,7 @@ export default function LandingPage() {
       <section id="features" className="bg-slate-50/50 py-24">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-16">
-            <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight">
+            <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
               Smart & Fast{" "}
               <span className="bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent">AI Generation</span>
             </h2>
@@ -195,7 +205,7 @@ export default function LandingPage() {
       <section id="for-whom" className="py-24">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-16">
-            <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight">
+            <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
               Built{" "}
               <span className="bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent">For</span>
             </h2>
@@ -230,7 +240,7 @@ export default function LandingPage() {
       <section id="tools" className="bg-slate-50/50 py-24">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-16">
-            <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight">
+            <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
               Platform{" "}
               <span className="bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent">Overview</span>
             </h2>
@@ -274,7 +284,7 @@ export default function LandingPage() {
       <section id="demo" className="py-24">
         <div className="max-w-4xl mx-auto px-6">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} className="text-center mb-12">
-            <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight">
+            <h2 className="text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
               See AI Photoshoots{" "}
               <span className="bg-gradient-to-r from-blue-500 to-blue-700 bg-clip-text text-transparent">in Action</span>
             </h2>

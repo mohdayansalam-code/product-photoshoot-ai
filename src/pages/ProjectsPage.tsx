@@ -27,8 +27,8 @@ export default function ProjectsPage() {
         className="flex items-center justify-between"
       >
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Generation History</h1>
-          <p className="text-sm text-muted-foreground">View your past AI photoshoots</p>
+          <h1 className="text-xl font-semibold text-foreground">Projects</h1>
+          <p className="text-sm text-muted-foreground">Manage your past projects and assets</p>
         </div>
         <Button onClick={() => window.location.href = '/dashboard/generate'} className="gradient-primary text-primary-foreground font-medium text-sm gap-2">
           <Plus className="h-4 w-4" /> New Photoshoot

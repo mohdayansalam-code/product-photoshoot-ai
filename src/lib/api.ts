@@ -28,7 +28,7 @@ export const SCENES: Scene[] = [
 ];
 
 export const MODELS = [
-  { id: "", name: "Auto (Smart Routing)", credits_per_image: 0, badge: "Recommended" },
+  { id: "auto", name: "Auto (Smart Routing)", credits_per_image: 0, badge: "Recommended" },
   { id: "seedream-5-lite", name: "Seedream 5 Lite", credits_per_image: 3, badge: "Balanced" },
   { id: "seedream-4.5", name: "Seedream 4.5", credits_per_image: 2.5, badge: "Popular" },
   { id: "gemini-3.1", name: "Gemini 3.1", credits_per_image: 5, badge: "Premium" },
@@ -48,6 +48,7 @@ export async function generateProduct(payload: {
   product_url?: string;
   prompt: string;
   scene?: string;
+  model?: string;
   image_count: number;
   enhancements: string[];
 }): Promise<{ job_id: string }> {
@@ -80,6 +81,7 @@ export async function generateProduct(payload: {
       product_image: base64Image,
       prompt: payload.prompt,
       scene: payload.scene,
+      model: payload.model,
       image_count: payload.image_count,
       fetchers
     }),

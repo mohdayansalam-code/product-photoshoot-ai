@@ -21,7 +21,9 @@ import ProductsLibraryPage from "./pages/ProductsLibraryPage";
 import ActivityPage from "./pages/ActivityPage";
 import LandingPage from "./pages/LandingPage";
 import AuthPage from "./pages/AuthPage";
+import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
+import DevServerCheck from "./components/DevServerCheck";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +42,7 @@ const AppContent = () => {
       <Route path="/" element={session ? <Navigate to="/dashboard" replace /> : <Navigate to="/landing" replace />} />
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/auth" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
 
       {/* Protected App Pages */}
       <Route path="/dashboard/*" element={
@@ -70,6 +73,7 @@ const AppContent = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
+      <DevServerCheck />
       <Toaster />
       <Sonner />
       <BrowserRouter>

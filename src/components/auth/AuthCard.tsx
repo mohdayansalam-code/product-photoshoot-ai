@@ -7,12 +7,37 @@ import { Separator } from "@/components/ui/separator";
 import { Camera, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { AUTH_REDIRECT } from "@/lib/authRedirect";
+import { useAuthStore } from "@/lib/authStore";
 
 export function AuthCard() {
   const [email, setEmail] = useState("");
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const setSession = useAuthStore((state) => state.setSession);
+
+  const handleDevLogin = () => {
+    if (import.meta.env.MODE !== "development") return;
+
+    const mockUser = {
+      id: "dev-user-001",
+      email: "dev@photoai.local"
+    };
+
+    const mockSession = {
+      user: mockUser,
+      access_token: "dev-token"
+    };
+
+    localStorage.setItem(
+      "photoai-dev-session",
+      JSON.stringify(mockSession)
+    );
+
+    navigate("/dashboard");
+  };
 
   const handleGoogleLogin = async () => {
     try {
@@ -35,29 +60,33 @@ export function AuthCard() {
     }
   };
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
 
     try {
       setIsLoadingEmail(true);
+
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`
+          emailRedirectTo: AUTH_REDIRECT,
+          shouldCreateUser: true
         }
       });
+      
       if (error) throw error;
-
+      
       toast({
-        title: "Check your email",
-        description: "We've sent you a magic link to securely sign in.",
+        title: "Magic link sent!",
+        description: "Check your email for the login link.",
       });
+      
       setEmail("");
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to send magic link",
+        description: error.message || "Authentication failed",
         variant: "destructive"
       });
     } finally {
@@ -125,7 +154,7 @@ export function AuthCard() {
 
         {/* Email form */}
         <form
-          onSubmit={handleEmailLogin}
+          onSubmit={handleEmailAuth}
           className="space-y-4"
         >
           <Input
@@ -143,20 +172,29 @@ export function AuthCard() {
             className="w-full rounded-xl py-6 text-sm font-semibold gradient-primary hover:opacity-90"
           >
             {isLoadingEmail ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
-            Continue with email
+            Send Magic Link
           </Button>
         </form>
 
-        {/* Footer link */}
-        <p className="text-center text-sm text-[hsl(215,20%,50%)]">
-          New here?{" "}
-          <Link
-            to="/auth"
-            className="font-medium text-primary hover:underline"
-          >
-            Create an account
-          </Link>
-        </p>
+        {/* Dev Login Bypass */}
+        {import.meta.env.DEV && (
+          <div className="pt-4 mt-6">
+            <div className="text-center text-xs text-yellow-500 mb-2">
+              DEV MODE
+            </div>
+            <Button
+              onClick={handleDevLogin}
+              variant="outline"
+              className="w-full border border-yellow-500 text-yellow-400 rounded-lg py-3 hover:bg-yellow-500/10 transition"
+            >
+              Dev Login (Bypass OTP)
+            </Button>
+            <div className="text-center text-xs text-muted-foreground mt-3">
+              Development login only
+            </div>
+          </div>
+        )}
+
       </motion.div>
     </div>
   );
