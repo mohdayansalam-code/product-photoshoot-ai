@@ -1,7 +1,7 @@
 import Image from "next/image";
 import getUser from "@/action/getUser";
 import { redirect } from "next/navigation";
-import { createTune } from "@/app/api/llm/tune/createTune";
+// import { createTune } from "@/app/api/llm/tune/createTune";
 import { sendEmail } from "@/action/sendEmail";
 
 export default async function Page() {
@@ -17,7 +17,7 @@ export default async function Page() {
       tuneStatus !== "ongoing" &&
       tuneStatus !== "completed"
     ) {
-      await createTune(userData);
+      // await createTune(userData);
       // Send email - Message to users: "Done, please wait...""
       await sendEmail({
         to: email, // Use user's email from userData

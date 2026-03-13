@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
         // Fetch generation history ordered descending
         const { data: generations, error } = await supabaseAdmin
             .from("generations")
-            .select("id, image_url, prompt, model, generated_images, created_at")
+            .select("id, image_url, prompt, model, generated_images, status, image_count, credits_used, created_at")
             .eq("user_id", user.id)
             .order("created_at", { ascending: false });
 
@@ -35,6 +35,9 @@ export async function GET(req: NextRequest) {
             product_image: job.image_url,
             prompt: job.prompt,
             model: job.model,
+            status: job.status,
+            image_count: job.image_count || job.generated_images?.length || 0,
+            credits_used: job.credits_used || 0,
             image_urls: job.generated_images || [],
             created_at: job.created_at
         }));

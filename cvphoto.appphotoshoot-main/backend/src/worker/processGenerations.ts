@@ -48,7 +48,7 @@ async function processPendingJobs() {
             // 2. Mark them as "processing"
             const { error: updateError } = await supabaseAdmin
                 .from("generations")
-                .update({ status: "processing" })
+                .update({ status: "processing", progress: 10 })
                 .eq("id", job.id)
                 .eq("status", "queued"); // Optimistic concurrency check
 
@@ -57,6 +57,7 @@ async function processPendingJobs() {
                 continue;
             }
 
+            console.log("[GENERATION]", job.id, "processing");
             logger.generation("processing", job.user_id, job.id, "processing");
 
             try {
@@ -145,7 +146,7 @@ async function processPendingJobs() {
                         }
 
                         // If we loop again, it means this attempt failed
-                        logger.warn(`[Job ${job.id}] Model ${activeModel} failed. Checking for fallback...`);
+                        console.log("[GENERATION]", job.id, `Model ${activeModel} failed. Checking for fallback...`);
                         astriaFailed = true;
                     }
                 } else {
@@ -154,20 +155,17 @@ async function processPendingJobs() {
                 }
 
                 if (astriaFailed) {
-                    logger.warn(`Failure triggered for job ${job.id}. Attempting local backoff / fallback logic.`);
-                    resultImages = [];
-                    for (let i = 0; i < image_count; i++) {
-                        resultImages.push(
-                            i === 0 ? image_url : "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&h=600&fit=crop"
-                        );
-                    }
-
-                    // We simulate some delay since generation usually takes time
-                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    console.log("[GENERATION]", job.id, "Failure triggered. Throwing error to engage retry logic.");
+                    throw new Error("AI provider temporarily failed to generate images");
                 }
 
+                await supabaseAdmin.from("generations").update({ status: "generating", progress: 60 }).eq("id", job.id);
+                console.log("[GENERATION]", job.id, "generating");
+
                 // 5. Optional Fetchers Logic
-                console.log(`[Job ${job.id}] Applying functional fetchers modifiers...`);
+                await supabaseAdmin.from("generations").update({ status: "enhancing", progress: 85 }).eq("id", job.id);
+                console.log("[GENERATION]", job.id, "enhancing");
+
                 if (fetchers.remove_background) {
                     console.log(`[Job ${job.id}] Running background removal...`);
                 }
@@ -220,18 +218,22 @@ async function processPendingJobs() {
                     .from("generations")
                     .update({
                         status: "completed",
+                        progress: 100,
                         generated_images: uploadedImageUrls,
                         retry_count: 0 // Reset on success to keep clean
                     })
                     .eq("id", job.id);
 
                 if (completeError) {
+                    console.log("[GENERATION]", job.id, "failed");
                     logger.error(`Failed to complete job ${job.id}`, { error: completeError });
                 } else {
+                    console.log("[GENERATION]", job.id, "completed");
                     logger.generation("completed", job.user_id, job.id, "completed", { imagesGenerated: uploadedImageUrls.length });
                 }
 
             } catch (jobError: any) {
+                console.log("[GENERATION]", job.id, "failed");
                 logger.error(`Failed to process job ${job.id} due to exception`, { error: jobError });
 
                 // Retries evaluation logic

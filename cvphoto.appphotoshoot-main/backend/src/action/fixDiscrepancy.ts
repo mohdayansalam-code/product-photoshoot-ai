@@ -83,8 +83,8 @@ export async function fixDiscrepancy(userData: UserData | null) {
         );
 
         // Create new entries in promptsResult format
-        // @ts-expect-error Ignoring type mismatch for Astria API response
-        const newPromptEntries = await Promise.all(uniqueAstriaPrompts.map(async (prompt: Prompt) => {
+        // @ts-ignore - Ignoring type mismatch for Astria API response mapping
+        const newPromptEntries = await Promise.all(uniqueAstriaPrompts.map(async (prompt: any) => {
           // Resolve all image URLs
           const resolvedImages = await Promise.all(prompt.images.map(getFinalImageUrl));
           

@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
         const { data: jobData, error: jobError } = await supabaseAdmin
             .from("generations")
-            .select("status, generated_images, user_id, created_at")
+            .select("status, progress, generated_images, user_id, created_at")
             .eq("id", job_id)
             .eq("user_id", userId) // explicitly secure access
             .single();
@@ -47,20 +47,13 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const { status, generated_images, created_at } = jobData;
-
-        if (status === "queued" || status === "running" || status === "processing") {
-            return NextResponse.json({
-                generation_id: job_id,
-                status: "processing",
-                created_at
-            });
-        }
+        const { status, progress, generated_images, created_at } = jobData;
 
         if (status === "completed") {
             return NextResponse.json({
                 generation_id: job_id,
                 status: "completed",
+                progress: 100,
                 image_urls: generated_images || [],
                 created_at
             });
@@ -70,13 +63,17 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({
                 generation_id: job_id,
                 status: "failed",
+                progress: progress || 0,
                 created_at
             });
         }
 
-        // Default fallback
+        // Return exact progressive status (queued, processing, generating, enhancing)
         return NextResponse.json({
-            status: "processing"
+            generation_id: job_id,
+            status: status || "processing",
+            progress: progress || 0,
+            created_at
         });
 
     } catch (error: any) {

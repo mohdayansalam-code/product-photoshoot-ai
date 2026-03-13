@@ -166,6 +166,7 @@ export async function POST(req: NextRequest) {
                 model: model,
                 image_count: image_count,
                 fetchers_json: fetchers,
+                credits_used: credits_cost,
                 status: "queued"
             })
             .select("id")
