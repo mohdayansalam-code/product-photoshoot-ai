@@ -5,6 +5,13 @@ import sceneInfluencer from "@/assets/scene-influencer.jpg";
 import sceneJewelry from "@/assets/scene-jewelry.jpg";
 import { supabase } from "@/lib/supabase";
 
+export interface DashboardStats {
+  credits: number;
+  images_generated: number;
+  active_projects: number;
+  storage_used: string;
+}
+
 export interface Scene {
   id: string;
   name: string;
@@ -14,7 +21,10 @@ export interface Scene {
 
 export interface GenerationJob {
   id: string;
-  status: "pending" | "processing" | "completed" | "failed";
+  status: "queued" | "processing" | "generating" | "enhancing" | "completed" | "failed";
+  progress?: number;
+  image_count?: number;
+  credits_used?: number;
   images: string[];
   scene: string;
   model: string;
@@ -108,11 +118,30 @@ export async function fetchResults(jobId: string): Promise<GenerationJob> {
   return {
     id: data.generation_id || jobId,
     status: data.status,
+    progress: data.progress || 0,
     images: data.image_urls || data.images || [],
     scene: data.prompt || "Generated Photoshoot",
     model: data.model || "AI Model",
     created_at: data.created_at || new Date().toISOString(),
   };
+}
+
+export async function retryGeneration(generation_id: string): Promise<{ success: boolean }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const response = await fetch(`${API_URL}/api/retry-generation`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${session?.access_token}`
+    },
+    body: JSON.stringify({ generation_id }),
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || "Failed to retry generation");
+  }
+  return await response.json();
 }
 
 export async function getGenerations(): Promise<any[]> {
@@ -144,7 +173,17 @@ export async function generateVariations(generation_id: string, image_url: strin
   return { job_id: data.generation_id };
 }
 
-export const MOCK_GENERATIONS: GenerationJob[] = [];
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const response = await fetch(`${API_URL}/api/dashboard-stats`, {
+    headers: {
+      "Authorization": `Bearer ${session?.access_token}`
+    }
+  });
+  if (!response.ok) throw new Error("Failed to fetch dashboard stats");
+  const data = await response.json();
+  return data.stats;
+}
 
 export async function uploadProduct(file: File, name: string): Promise<{ product_id: string, image_url: string }> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -195,7 +234,7 @@ export async function fetchCredits(): Promise<{ credits: number, maxCredits: num
   });
   if (!response.ok) throw new Error('Failed to fetch credits');
   const data = await response.json();
-  return { credits: data.credits || 0, maxCredits: data.max_credits || 50 };
+  return { credits: data.credits_remaining || 0, maxCredits: data.max_credits || 50 };
 }
 
 export async function callImageTool(imageUrl: string, tool: 'remove_bg' | 'upscale'): Promise<{ job_id: string }> {

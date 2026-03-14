@@ -3,20 +3,11 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { StatsCard } from "@/components/StatsCard";
-import { MOCK_GENERATIONS, SCENES } from "@/lib/api";
-import { useProductStore } from "@/lib/productStore";
 import { format } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getDashboardStats, getGenerations, DashboardStats, fetchProducts } from "@/lib/api";
+import { useEffect, useState } from "react";
 
-const CREDITS = 180;
-const MAX_CREDITS = 500;
-
-const stats = [
-  { label: "Credits Remaining", value: String(CREDITS), icon: Coins },
-  { label: "Images Generated", value: "240", icon: Images },
-  { label: "Active Projects", value: "12", icon: Camera },
-  { label: "Storage Used", value: "2.4 GB", icon: HardDrive },
-];
 
 const secondaryActions = [
   { label: "Upload Product", icon: Upload, to: "/dashboard/generate" },
@@ -25,10 +16,28 @@ const secondaryActions = [
 ];
 
 
+import { useProductStore } from "@/lib/productStore";
+
 export default function Index() {
-  const lowCredits = CREDITS < 20;
-  const { products } = useProductStore();
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [recentGenerations, setRecentGenerations] = useState<any[]>([]);
+  const { products, setProducts } = useProductStore();
+
+  useEffect(() => {
+    getDashboardStats().then(setDashboardStats).catch(console.error);
+    getGenerations().then(data => setRecentGenerations(data.slice(0, 4))).catch(console.error);
+    fetchProducts().then(setProducts).catch(console.error);
+  }, [setProducts]);
+
+  const lowCredits = (dashboardStats?.credits || 0) < 20;
   const recentProducts = products.slice(0, 4);
+
+  const stats = [
+    { label: "Credits Remaining", value: String(dashboardStats?.credits || 0), icon: Coins },
+    { label: "Images Generated", value: String(dashboardStats?.images_generated || 0), icon: Images },
+    { label: "Active Projects", value: String(dashboardStats?.active_projects || 0), icon: Camera },
+    { label: "Storage Used", value: dashboardStats?.storage_used || "0 MB", icon: HardDrive },
+  ];
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
@@ -155,20 +164,24 @@ export default function Index() {
           </Button>
         </div>
         <div className="space-y-5">
-          {MOCK_GENERATIONS.map((gen, idx) => (
-            <motion.div
-              key={gen.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 + idx * 0.1 }}
-              whileHover={{ y: -2 }}
-              className="group/card rounded-xl border border-border bg-card shadow-soft p-5 space-y-4 cursor-pointer hover:border-primary/20 transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-foreground">{gen.scene}</p>
-                  <p className="text-sm text-muted-foreground">{gen.model} · {format(new Date(gen.created_at), "MMM d, yyyy h:mm a")}</p>
-                </div>
+          {recentGenerations.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8 border border-dashed border-border rounded-xl">No generations yet. Create your first photoshoot.</p>
+          ) : (
+            recentGenerations.map((gen, idx) => (
+              <motion.div
+                key={gen.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + idx * 0.1 }}
+                whileHover={{ y: -2 }}
+                className="group/card rounded-xl border border-border bg-card shadow-soft p-5 space-y-4 cursor-pointer hover:border-primary/20 transition-colors"
+                onClick={() => window.location.href = "/dashboard/projects"}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-foreground">{gen.prompt || "Generated Photoshoot"}</p>
+                    <p className="text-sm text-muted-foreground capitalize">{gen.model || "AI Model"} · {format(new Date(gen.created_at), "MMM d, yyyy h:mm a")}</p>
+                  </div>
                 <div className="flex items-center gap-2">
                   <div className="hidden group-hover/card:flex items-center gap-1.5 transition-all">
                     <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
@@ -186,11 +199,16 @@ export default function Index() {
                   </span>
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-3">
-                {gen.images.map((img, i) => (
-                  <div key={i} className="group relative rounded-lg overflow-hidden border border-border">
-                    <motion.img
-                      src={img}
+              <div className="grid grid-cols-4 gap-3 h-32">
+                {gen.status === "failed" ? (
+                  <div className="col-span-4 flex items-center justify-center rounded-lg border border-red-500/20 bg-red-500/5">
+                    <p className="text-xs text-red-500/80">Generation Failed</p>
+                  </div>
+                ) : (gen.image_urls || []).length > 0 ? (
+                  (gen.image_urls || []).slice(0, 4).map((img: string, i: number) => (
+                    <div key={i} className="group relative rounded-lg overflow-hidden bg-secondary">
+                      <motion.img
+                        src={img}
                       alt=""
                       className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105"
                     />
@@ -207,10 +225,15 @@ export default function Index() {
                       ))}
                     </div>
                   </div>
-                ))}
+                ))
+               ) : (
+                  <div className="col-span-4 flex items-center justify-center rounded-lg bg-secondary/30 border border-dashed border-border">
+                    <p className="text-xs text-muted-foreground animate-pulse">Generating imagery...</p>
+                  </div>
+               )}
               </div>
             </motion.div>
-          ))}
+          )))}
         </div>
       </div>
     </div>

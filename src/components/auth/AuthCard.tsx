@@ -18,8 +18,12 @@ export function AuthCard() {
   const navigate = useNavigate();
   const setSession = useAuthStore((state) => state.setSession);
 
+  const isDev = import.meta.env.DEV;
+
   const handleDevLogin = () => {
-    if (import.meta.env.MODE !== "development") return;
+    if (import.meta.env.MODE === "production") {
+      return;
+    }
 
     const mockUser = {
       id: "dev-user-001",
@@ -177,7 +181,7 @@ export function AuthCard() {
         </form>
 
         {/* Dev Login Bypass */}
-        {import.meta.env.DEV && (
+        {isDev && (
           <div className="pt-4 mt-6">
             <div className="text-center text-xs text-yellow-500 mb-2">
               DEV MODE
@@ -190,7 +194,7 @@ export function AuthCard() {
               Dev Login (Bypass OTP)
             </Button>
             <div className="text-center text-xs text-muted-foreground mt-3">
-              Development login only
+              Development testing enabled
             </div>
           </div>
         )}

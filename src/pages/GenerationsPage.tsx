@@ -1,11 +1,18 @@
 import { motion } from "framer-motion";
-import { MOCK_GENERATIONS } from "@/lib/api";
+import { getGenerations } from "@/lib/api";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Download, Eye, Images } from "lucide-react";
 
 export default function GenerationsPage() {
-  if (MOCK_GENERATIONS.length === 0) {
+  const [generations, setGenerations] = useState<any[]>([]);
+
+  useEffect(() => {
+    getGenerations().then(setGenerations).catch(console.error);
+  }, []);
+
+  if (generations.length === 0) {
     return (
       <div className="p-8 max-w-6xl mx-auto">
         <h1 className="text-2xl font-semibold text-foreground mb-2">Generations</h1>
@@ -30,7 +37,7 @@ export default function GenerationsPage() {
         Generations
       </motion.h1>
       <div className="space-y-6">
-        {MOCK_GENERATIONS.map((gen, idx) => (
+        {generations.map((gen, idx) => (
           <motion.div
             key={gen.id}
             initial={{ opacity: 0, y: 16 }}
@@ -41,8 +48,8 @@ export default function GenerationsPage() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-foreground">{gen.scene}</p>
-                <p className="text-sm text-muted-foreground">{gen.model} · {format(new Date(gen.created_at), "MMM d, yyyy h:mm a")}</p>
+                <p className="font-medium text-foreground">{gen.prompt || "Generated Photoshoot"}</p>
+                <p className="text-sm text-muted-foreground capitalize">{gen.model || "AI Model"} · {format(new Date(gen.created_at), "MMM d, yyyy h:mm a")}</p>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-accent text-accent-foreground">
@@ -53,7 +60,7 @@ export default function GenerationsPage() {
               </div>
             </div>
             <div className="grid grid-cols-4 gap-3">
-              {gen.images.map((img, i) => (
+              {(gen.image_urls || []).map((img: string, i: number) => (
                 <motion.img
                   key={i}
                   src={img}

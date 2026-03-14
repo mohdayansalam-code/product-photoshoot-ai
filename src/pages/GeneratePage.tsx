@@ -107,9 +107,19 @@ export default function GeneratePage() {
             setGeneratedImages(result.images.slice(0, imageCount));
           }
 
-          if (result.status === "completed" || result.status === "failed") {
+          if (result.status === "completed") {
             clearInterval(pollInterval);
             setLoading(false);
+          } else if (result.status === "failed") {
+            clearInterval(pollInterval);
+            setLoading(false);
+            import('@/hooks/use-toast').then(({ toast }) => {
+              toast({
+                title: "Generation failed",
+                description: "AI temporarily failed — retry available in History",
+                variant: "destructive"
+              });
+            });
           }
         } catch (err) {
           console.error("Polling error:", err);
@@ -246,7 +256,7 @@ export default function GeneratePage() {
             </div>
           </section>
 
-          <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
+          <motion.div whileHover={loading ? {} : { scale: 1.01 }} whileTap={loading ? {} : { scale: 0.98 }}>
             <Button
               onClick={handleGenerate}
               disabled={loading}
@@ -255,6 +265,16 @@ export default function GeneratePage() {
               <Sparkles className="h-4 w-4 mr-2" />
               {loading ? "Generating..." : `Generate Photoshoot · ${creditEstimate.total} credits`}
             </Button>
+            
+            {loading && (
+              <div className="text-center mt-3 text-xs text-muted-foreground animate-pulse">
+                Estimated time: {
+                  model === "gemini-3.1" || creditEstimate.modelName.includes("Gemini") ? "45" :
+                  model === "seedream-5-lite" || creditEstimate.modelName.includes("Seedream 5") ? "35" :
+                  model === "seedream-4.5" || creditEstimate.modelName.includes("Seedream 4.5") ? "30" : "20"
+                } sec
+              </div>
+            )}
           </motion.div>
         </motion.div>
       </ScrollArea>

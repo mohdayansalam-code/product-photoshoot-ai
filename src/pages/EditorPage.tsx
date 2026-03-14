@@ -15,6 +15,8 @@ import {
   Layers,
   Upload,
   Image as ImageIcon,
+  RefreshCw,
+  Trash,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -53,10 +55,38 @@ export default function EditorPage() {
       toast({ title: "File too large", description: "Maximum file size is 10MB.", variant: "destructive" });
       return;
     }
+
+    if (selectedImage) {
+      URL.revokeObjectURL(selectedImage);
+    }
+
     const url = URL.createObjectURL(file);
     setSelectedFile(file);
     setSelectedImage(url);
     setFileName(file.name);
+    
+    // Reset state on new image preventing tool application to old state
+    setActiveTool(null);
+    setProcessing(false);
+    setProgress(0);
+  };
+
+  const handleReplaceImage = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleRemoveImage = () => {
+    if (confirm("Remove image?")) {
+      if (selectedImage) {
+        URL.revokeObjectURL(selectedImage);
+      }
+      setSelectedFile(null);
+      setSelectedImage(null);
+      setFileName("No image loaded");
+      setActiveTool(null);
+      setProcessing(false);
+      setProgress(0);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -193,10 +223,23 @@ export default function EditorPage() {
               accept="image/png, image/jpeg, image/webp"
               className="hidden"
             />
-            <Button variant="outline" size="sm" onClick={handleImportClick} className="gap-2">
-              <Upload className="h-4 w-4" />
-              Import Image
-            </Button>
+            {!selectedImage ? (
+              <Button size="sm" onClick={handleImportClick} className="gap-2">
+                <Upload className="h-4 w-4" />
+                Import Image
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" onClick={handleReplaceImage} className="gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Replace
+                </Button>
+                <Button variant="destructive" size="sm" onClick={handleRemoveImage} className="gap-2">
+                  <Trash className="h-4 w-4" />
+                  Remove
+                </Button>
+              </div>
+            )}
             <Separator orientation="vertical" className="h-5" />
             <div className="flex items-center gap-2 max-w-[200px]">
               <Layers className="h-4 w-4 text-muted-foreground flex-shrink-0" />

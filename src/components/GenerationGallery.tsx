@@ -10,23 +10,14 @@ interface GenerationGalleryProps {
   loading: boolean;
   imageCount?: number;
   jobId?: string;
+  progress?: number;
+  status?: string;
 }
 
-export function GenerationGallery({ images, loading, imageCount = 4, jobId }: GenerationGalleryProps) {
-  const [progress, setProgress] = useState(0);
-  const [generatedCount, setGeneratedCount] = useState(0);
+export function GenerationGallery({ images, loading, imageCount = 4, jobId, progress = 0, status = "processing" }: GenerationGalleryProps) {
+  const generatedCount = Math.min(Math.floor((progress / 100) * imageCount), imageCount - 1);
 
-  useEffect(() => {
-    if (!loading) { setProgress(0); setGeneratedCount(0); return; }
-    const interval = setInterval(() => {
-      setProgress((p) => {
-        const next = Math.min(p + Math.random() * 12 + 3, 95);
-        setGeneratedCount(Math.min(Math.floor((next / 100) * imageCount), imageCount - 1));
-        return next;
-      });
-    }, 800);
-    return () => clearInterval(interval);
-  }, [loading, imageCount]);
+
 
   if (loading) {
     return (
@@ -39,8 +30,8 @@ export function GenerationGallery({ images, loading, imageCount = 4, jobId }: Ge
           <Loader2 className="h-8 w-8 text-primary-foreground animate-spin" />
         </motion.div>
         <div className="text-center space-y-2">
-          <p className="font-semibold text-foreground">Generating photoshoot...</p>
-          <p className="text-sm text-muted-foreground">{generatedCount} / {imageCount} images generated</p>
+          <p className="font-semibold text-foreground capitalize">{status === "queued" ? "Waiting for AI..." : `${status}...`}</p>
+          <p className="text-sm text-muted-foreground">{generatedCount} / {imageCount} images processed</p>
         </div>
         <div className="w-full max-w-xs space-y-1.5">
           <Progress value={progress} className="h-2" />
