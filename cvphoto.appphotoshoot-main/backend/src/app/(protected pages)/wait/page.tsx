@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 // import { createTune } from "@/app/api/llm/tune/createTune";
 import { sendEmail } from "@/action/sendEmail";
 
+export const dynamic = 'force-dynamic';
+
 export default async function Page() {
   const userData = await getUser();
 

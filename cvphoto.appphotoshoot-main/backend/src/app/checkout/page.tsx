@@ -1,31 +1,32 @@
 'use client';
 import Image from "next/image";
 import Header from "@/components/Header";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from 'react';
 import pricingPlans from "./pricingPlans.json";
-import { useState } from 'react';
 
 export default function CheckoutPage({
   searchParams,
 }: {
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
+  const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState('creditCard');
   const plan = searchParams.plan as string;
 
-  if (
-    !plan ||
-    !["basic", "professional", "executive"].includes(plan.toLowerCase())
-  ) {
-    redirect("/forms");
-  }
-
+  const isValidPlan = plan && ["basic", "professional", "executive"].includes(plan.toLowerCase());
   const selectedPlan = pricingPlans.find(
-    (p) => p.name.toLowerCase() === plan.toLowerCase()
+    (p) => p.name.toLowerCase() === (plan || "").toLowerCase()
   );
 
-  if (!selectedPlan) {
-    redirect("/forms");
+  useEffect(() => {
+    if (!isValidPlan || !selectedPlan) {
+      router.push("/forms");
+    }
+  }, [isValidPlan, selectedPlan, router]);
+
+  if (!isValidPlan || !selectedPlan) {
+    return <div className="min-h-screen bg-mainWhite flex items-center justify-center text-mainBlack">Redirecting...</div>;
   }
 
   const handlePaymentMethodChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,7 +39,7 @@ export default function CheckoutPage({
 
       <main className="max-w-4xl mx-auto mt-8 px-4">
         <div className="max-w-md mx-auto">
-          <h1 className="text-4xl font-bold mb-2 text-center">
+          <h1 className="text-4xl font-bold mb-2 text-center text-mainBlack">
             Secure Checkout
           </h1>
           <p className="text-gray-600 mb-8 text-center">
@@ -50,11 +51,11 @@ export default function CheckoutPage({
         <div className="flex flex-col md:flex-row gap-8">
           {/* Left column */}
           <div className="flex-1">
-            <h2 className="text-xl font-semibold mb-4">
+            <h2 className="text-xl font-semibold mb-4 text-mainBlack">
               Select your preferred payment method
             </h2>
 
-            <div className="border border-mainBlack rounded-lg p-4 mb-4 flex items-center">
+            <div className="border border-mainBlack rounded-lg p-4 mb-4 flex items-center bg-white shadow-sm">
               <input
                 type="radio"
                 id="creditCard"
@@ -64,7 +65,7 @@ export default function CheckoutPage({
                 checked={paymentMethod === 'creditCard'}
                 onChange={handlePaymentMethodChange}
               />
-              <label htmlFor="creditCard" className="flex-grow font-medium">
+              <label htmlFor="creditCard" className="flex-grow font-medium text-mainBlack">
                 Pay with credit card
               </label>
               <div className="flex gap-2">
@@ -182,8 +183,8 @@ export default function CheckoutPage({
                 Order Summary
               </h2>
 
-              <div className="mb-4">
-                <p className="font-medium text-mainBlack">
+              <div className="mb-4 text-mainBlack">
+                <p className="font-medium">
                   1x {selectedPlan.name} Package
                 </p>
                 <ul className="text-sm text-mainBlack/70 ml-5 list-disc">
@@ -205,9 +206,9 @@ export default function CheckoutPage({
                 </span>
               </div>
 
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-semibold text-mainBlack">Discount</span>
-                <span className="text-lg font-bold text-mainBlack">
+              <div className="flex justify-between items-center mb-2 text-mainBlack">
+                <span className="font-semibold">Discount</span>
+                <span className="text-lg font-bold">
                   {Math.round(
                     (1 - selectedPlan.price / selectedPlan.originalPrice) * 100
                   )}
@@ -215,9 +216,9 @@ export default function CheckoutPage({
                 </span>
               </div>
 
-              <div className="flex justify-between items-center mb-4">
-                <span className="font-semibold text-mainBlack">Total</span>
-                <span className="text-2xl font-bold text-mainBlack">
+              <div className="flex justify-between items-center mb-4 text-mainBlack">
+                <span className="font-semibold">Total</span>
+                <span className="text-2xl font-bold">
                   ${selectedPlan.price}.00
                 </span>
               </div>

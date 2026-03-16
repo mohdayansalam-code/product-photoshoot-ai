@@ -52,10 +52,13 @@ export async function signUp(formData: FormData): Promise<never> {
 
   // Initialize user credits securely
   if (signUpData.user?.id) {
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.warn("Skipping admin client creation in build phase (keys missing)");
+    } else {
+      const supabaseAdmin = createAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY
+      );
 
     const { error: creditsError } = await supabaseAdmin
       .from("user_credits")
@@ -65,8 +68,9 @@ export async function signUp(formData: FormData): Promise<never> {
         plan_type: 'starter'
       });
 
-    if (creditsError) {
-      console.error("Error initializing user credits:", creditsError);
+      if (creditsError) {
+        console.error("Error initializing user credits:", creditsError);
+      }
     }
   }
 

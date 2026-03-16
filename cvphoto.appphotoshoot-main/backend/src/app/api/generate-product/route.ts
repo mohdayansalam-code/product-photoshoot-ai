@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";
-
-const ASTRIA_API_KEY = process.env.ASTRIA_API_KEY;
+import { standardResponse, ApiError } from "@/lib/apiError";
+import { config } from "@/config/env";
+import { rateLimiter } from "@/services/rateLimiter";
+import { creditSystem } from "@/services/creditSystem";
 
 export async function POST(req: NextRequest) {
     try {
@@ -12,7 +14,6 @@ export async function POST(req: NextRequest) {
         const product_image = body.product_image || body.imageUrl;
         let finalPrompt = body.prompt || body.scene_prompt || body.template || "";
 
-        // 1. Scene Helper Shortcuts
         const scene = body.scene;
         if (scene === "luxury-skincare-studio") {
             finalPrompt += ", luxury skincare studio, marble surface, soft beauty lighting, premium product photography";
@@ -22,9 +23,8 @@ export async function POST(req: NextRequest) {
             finalPrompt += ", macro jewelry photography on dark velvet, dramatic spotlight, luxury close-up";
         }
 
-        // 2. Smart Model Routing
         let model = body.recommended_model || body.model;
-        if (!model) {
+        if (!model || !config.models.allowed.includes(model)) {
             const p = finalPrompt.toLowerCase();
             if (p.includes("different angles") || p.includes("model poses") || p.includes("street photoshoot") || p.includes("fashion shoot") || p.includes("variations")) {
                 model = "gemini-3.1";
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
             } else if (p.includes("product photography") || p.includes("studio photo") || p.includes("ecommerce product")) {
                 model = "seedream-5-lite";
             } else {
-                model = "flux-2-pro";
+                model = config.models.defaultGeneration;
             }
         }
 
@@ -41,13 +41,9 @@ export async function POST(req: NextRequest) {
         const image_count = Math.min(Math.max(body.image_count ?? 4, 1), 4);
 
         if (!product_image || !finalPrompt || finalPrompt.trim() === "") {
-            return NextResponse.json(
-                { success: false, error: "Missing product_image or prompt" },
-                { status: 400 }
-            );
+            throw new ApiError(400, "Missing product_image or prompt");
         }
 
-        // Calculate credits based on proportional model cost
         let base_model_credits = 10;
         const MODEL_CREDITS: Record<string, number> = {
             "flux-2-pro": 8,
@@ -60,8 +56,8 @@ export async function POST(req: NextRequest) {
         }
 
         let generation_credits = (base_model_credits / 4) * image_count;
-
         let fetcher_credits = 0;
+        
         if (fetchers.remove_background) fetcher_credits += 1;
         if (fetchers.white_background) fetcher_credits += 1;
         if (fetchers.super_resolution) fetcher_credits += 2;
@@ -69,136 +65,57 @@ export async function POST(req: NextRequest) {
         if (fetchers.product_fix) fetcher_credits += 2;
         if (fetchers.face_correction) fetcher_credits += 2;
 
-        let credits_cost = generation_credits + fetcher_credits;
-
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-        const supabaseAdmin = createAdminClient(supabaseUrl, supabaseKey);
+        const credits_cost = generation_credits + fetcher_credits;
 
         const supabase = createServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-        if (!user) {
-            return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+        if (authError || !user) {
+            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
         }
 
-        const userId = user.id;
+        const supabaseAdmin = createAdminClient(config.supabase.url, config.supabase.serviceRoleKey);
+        
+        await rateLimiter.checkLimit(supabaseAdmin, user.id, 10, 60000, "generation");
 
-        // Rate Limiting Logic
-        const { data: rlData } = await supabaseAdmin
-            .from("generation_rate_limit")
-            .select("*")
-            .eq("user_id", userId)
-            .single();
+        // Idempotency: request_id check is integrated into the RPC below for ultimate atomicity.
+        const request_id = body.request_id || req.headers.get("x-request-id");
 
-        const now = new Date();
+        const { data: result, error: rpcError } = await supabaseAdmin.rpc("create_generation_job", {
+            p_user_id: user.id,
+            p_request_id: request_id,
+            p_image_url: product_image,
+            p_prompt: finalPrompt,
+            p_model: model,
+            p_image_count: image_count,
+            p_fetchers_json: fetchers,
+            p_credits_cost: credits_cost
+        });
 
-        if (!rlData) {
-            // No record exists, create one
-            await supabaseAdmin
-                .from("generation_rate_limit")
-                .insert({
-                    user_id: userId,
-                    request_count: 1,
-                    window_start: now.toISOString()
-                });
-        } else {
-            const windowStart = new Date(rlData.window_start);
-            const timeDiff = now.getTime() - windowStart.getTime();
+        if (rpcError) {
+            logger.error("RPC Atomic Job Creation Failed", { error: rpcError });
+            throw new ApiError(500, "Failed to initialize generation safely.");
+        }
 
-            if (timeDiff < 60000) { // less than 1 minute
-                if (rlData.request_count >= 10) {
-                    logger.warn("Rate limit exceeded", { userId });
-                    return NextResponse.json(
-                        { success: false, error: "Rate limit exceeded. Please wait." },
-                        { status: 429 }
-                    );
-                } else {
-                    await supabaseAdmin
-                        .from("generation_rate_limit")
-                        .update({ request_count: rlData.request_count + 1 })
-                        .eq("user_id", userId);
-                }
-            } else {
-                // Window expired, reset
-                await supabaseAdmin
-                    .from("generation_rate_limit")
-                    .update({
-                        request_count: 1,
-                        window_start: now.toISOString()
-                    })
-                    .eq("user_id", userId);
+        if (!result.success) {
+            if (result.error === "INSUFFICIENT_CREDITS") {
+                throw new ApiError(402, "Insufficient credits for this model and quantity.", "INSUFFICIENT_CREDITS");
             }
+            throw new ApiError(500, `DB Error: ${result.error}`);
         }
 
-        // Check user credits
-        const { data: creditsData } = await supabaseAdmin
-            .from("credits")
-            .select("credits_remaining")
-            .eq("user_id", userId)
-            .single();
-
-        if (!creditsData || creditsData.credits_remaining < credits_cost) {
-            logger.warn("Not enough credits", { userId, cost: credits_cost });
-            return NextResponse.json(
-                { success: false, error: `Insufficient credits. Generation Requires ${credits_cost} credits.` },
-                { status: 402 }
-            );
+        if (result.idempotent) {
+            logger.info(`Idempotent hit via RPC for ${request_id}`);
         }
 
-        // Deduct credits PRE-GENERATION intentionally
-        await supabaseAdmin
-            .from("credits")
-            .update({ credits_remaining: creditsData.credits_remaining - credits_cost })
-            .eq("user_id", userId);
+        logger.generation("started", user.id, result.id, "queued", { credits_deducted: credits_cost, idempotent: result.idempotent });
 
-        logger.info(`Deducted ${credits_cost} credits for job initiation`, { userId });
-
-        logger.info(`Deducted ${credits_cost} credits for job initiation`, { userId });
-
-        // Insert pending job into generations table
-        const { data: jobData, error: jobError } = await supabaseAdmin
-            .from("generations")
-            .insert({
-                user_id: userId,
-                image_url: product_image,
-                prompt: finalPrompt,
-                model: model,
-                image_count: image_count,
-                fetchers_json: fetchers,
-                credits_used: credits_cost,
-                status: "queued"
-            })
-            .select("id")
-            .single();
-
-        if (jobError || !jobData) {
-            logger.error("Failed to enqueue generation job", { error: jobError });
-            // Rollback credits on catastrophic insertion failure
-            await supabaseAdmin
-                .from("credits")
-                .update({ credits_remaining: creditsData.credits_remaining })
-                .eq("user_id", userId);
-
-            return NextResponse.json(
-                { success: false, error: "Failed to enqueue generation job" },
-                { status: 500 }
-            );
-        }
-
-        logger.generation("started", userId, jobData.id, "queued", { credits_deducted: credits_cost });
-
-        return NextResponse.json({
-            success: true,
-            generation_id: jobData.id,
+        return standardResponse.success({
+            generation_id: result.id,
             status: "queued"
         });
 
     } catch (error: any) {
-        logger.error("Generate product route crash", { error: error.message });
-        return NextResponse.json(
-            { success: false, error: error.message || "Failed to generate product images" },
-            { status: 500 }
-        );
+        return standardResponse.error(error);
     }
 }

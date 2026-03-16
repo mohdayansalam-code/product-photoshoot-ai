@@ -1,66 +1,92 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { NextRequest } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { logger } from "@/utils/logger";
+import { standardResponse, ApiError } from "@/lib/apiError";
+import { config } from "@/config/env";
+import { rateLimiter } from "@/services/rateLimiter";
 
-const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const MAX_UPLOAD_MB = 5 * 1024 * 1024;
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export async function POST(req: NextRequest) {
     try {
-        const supabase = createServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
-
-        if (!user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
         const formData = await req.formData();
-        const file = formData.get("file") as File | null;
+        const file = formData.get("file") as File;
+        const replaceId = formData.get("replaceId") as string;
 
         if (!file) {
-            return NextResponse.json({ error: "No file provided" }, { status: 400 });
+            throw new ApiError(400, "No file uploaded");
         }
 
-        // Generate unique filename
-        const timestamp = Date.now();
-        const uniqueFilename = `${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+        if (file.size > MAX_UPLOAD_MB) {
+            throw new ApiError(413, "File exceeds 5MB size limit. Please compress and try again.");
+        }
 
-        // Convert file to buffer for Supabase upload
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = new Uint8Array(arrayBuffer);
+        if (!ALLOWED_TYPES.includes(file.type)) {
+            throw new ApiError(415, "Invalid file format. Only JPEG, PNG, and WEBP are allowed.");
+        }
 
-        // Upload to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        const supabase = createServerClient();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
+        }
+
+        const supabaseAdmin = createAdminClient(config.supabase.url, config.supabase.serviceRoleKey);
+        
+        await rateLimiter.checkLimit(supabaseAdmin, user.id, 20, 60000, "upload_product");
+
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+        const fileName = `${user.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+
+        const { error: uploadError } = await supabaseAdmin.storage
             .from("product-images")
-            .upload(uniqueFilename, buffer, {
+            .upload(fileName, buffer, {
                 contentType: file.type,
-                upsert: false,
+                upsert: true,
             });
 
         if (uploadError) {
-            console.error("Supabase Upload Error:", uploadError);
-            return NextResponse.json(
-                { error: "Failed to upload image to storage" },
-                { status: 500 }
-            );
+            logger.error("Upload failed", { error: uploadError });
+            throw new ApiError(500, "Failed to upload image to storage");
         }
 
-        // Get Public URL
-        const {
-            data: { publicUrl },
-        } = supabaseAdmin.storage.from("product-images").getPublicUrl(uniqueFilename);
+        const { data: { publicUrl } } = supabaseAdmin.storage
+            .from("product-images")
+            .getPublicUrl(fileName);
 
-        return NextResponse.json({
-            success: true,
+        if (replaceId) {
+            await supabaseAdmin.from("products").update({ image_url: publicUrl }).eq("id", replaceId).eq("user_id", user.id);
+            logger.info("Replaced product image", { productId: replaceId, userId: user.id });
+            return standardResponse.success({ imageUrl: publicUrl, productId: replaceId });
+        }
+
+        const { data: productData, error: dbError } = await supabaseAdmin
+            .from("products")
+            .insert({
+                user_id: user.id,
+                name: file.name,
+                image_url: publicUrl,
+            })
+            .select("id")
+            .single();
+
+        if (dbError) {
+             logger.error("Upload DB hook failed", { error: dbError });
+             throw new ApiError(500, "Image stored, but failed to link to database");
+        }
+
+        logger.info("New product uploaded", { productId: productData.id, userId: user.id });
+
+        return standardResponse.success({
             imageUrl: publicUrl,
+            productId: productData.id,
         });
-    } catch (error) {
-        console.error("Upload API Error:", error);
-        return NextResponse.json(
-            { error: "Internal server error" },
-            { status: 500 }
-        );
+
+    } catch (error: any) {
+         return standardResponse.error(error);
     }
 }

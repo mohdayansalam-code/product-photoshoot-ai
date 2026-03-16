@@ -1,17 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { standardResponse, ApiError } from "@/lib/apiError";
+import { config } from "@/config/env";
 
 export async function GET(req: NextRequest) {
-    // For this example, templates might be hardcoded or retrieved from a DB table.
-    // The user instructed to query the `templates` table where active = true.
-    // However, since we didn't create a templates table in init_db.js, 
-    // we would assume one exists or we return a mock list if it fails.
-    // We will attempt to query it from Supabase.
-
     try {
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-        const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+        const supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
         const { data: templates, error } = await supabaseAdmin
             .from("templates")
@@ -19,11 +13,7 @@ export async function GET(req: NextRequest) {
             .eq("active", true);
 
         if (error) {
-            // Fallback to hardcoded if table doesn't exist
-            console.warn("Error querying templates (table might not exist), returning fallback:", error);
-
-            return NextResponse.json({
-                success: true,
+            return standardResponse.success({
                 templates: [
                     { id: "studio", name: "Professional Studio", description: "Clean marble background", active: true },
                     { id: "lifestyle", name: "Lifestyle", description: "Realistic environment", active: true },
@@ -32,16 +22,11 @@ export async function GET(req: NextRequest) {
             });
         }
 
-        return NextResponse.json({
-            success: true,
+        return standardResponse.success({
             templates: templates || []
         });
 
     } catch (error: any) {
-        console.error("Templates API error:", error);
-        return NextResponse.json(
-            { success: false, error: "Internal server error" },
-            { status: 500 }
-        );
+        return standardResponse.error(error);
     }
 }

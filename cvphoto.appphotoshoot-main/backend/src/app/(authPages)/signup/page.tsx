@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import React from "react";
 import { createClient } from "@/utils/supabase/server";
 import { PasswordInput, EmailInput, AuthButton } from "@/components/AuthForm";

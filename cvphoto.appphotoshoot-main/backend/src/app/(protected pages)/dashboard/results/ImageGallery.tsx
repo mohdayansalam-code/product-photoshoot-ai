@@ -96,7 +96,7 @@ export default function ImageGallery({
 
   const displayImages =
     promptsResult.length > 0
-      ? promptsResult.map((result) => result.data.prompt.images[0])
+      ? promptsResult.map((result) => result?.data?.prompt?.images?.[0]).filter(Boolean)
       : images;
 
   return (

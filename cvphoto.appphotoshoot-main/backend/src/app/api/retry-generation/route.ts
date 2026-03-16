@@ -1,81 +1,70 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";
+import { standardResponse, ApiError } from "@/lib/apiError";
+import { config } from "@/config/env";
+import { rateLimiter } from "@/services/rateLimiter";
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const generation_id = body.generation_id;
+        const { generation_id } = body;
 
         if (!generation_id) {
-            return NextResponse.json(
-                { success: false, error: "Missing generation_id parameter" },
-                { status: 400 }
-            );
+            throw new ApiError(400, "Missing generation_id");
         }
 
         const supabase = createServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-        if (!user) {
-            return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+        if (authError || !user) {
+            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
         }
 
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-        const supabaseAdmin = createAdminClient(supabaseUrl, supabaseKey);
+        const supabaseAdmin = createAdminClient(config.supabase.url, config.supabase.serviceRoleKey);
 
-        // Fetch generation context
-        const { data: jobData, error: jobError } = await supabaseAdmin
+        await rateLimiter.checkLimit(supabaseAdmin, user.id, 5, 60000, "retry-generation");
+
+        const { data: jobData, error: fetchError } = await supabaseAdmin
             .from("generations")
-            .select("status, user_id, credits_used, retry_count, max_retries")
+            .select("status, user_id")
             .eq("id", generation_id)
             .single();
 
-        if (jobError || !jobData || jobData.user_id !== user.id) {
-            return NextResponse.json({ success: false, error: "Generation not found or access denied" }, { status: 404 });
+        if (fetchError || !jobData) {
+            throw new ApiError(404, "Generation job not found", "NOT_FOUND");
+        }
+        
+        if (jobData.user_id !== user.id) {
+            throw new ApiError(403, "Access denied", "FORBIDDEN");
         }
 
         if (jobData.status !== "failed") {
-            return NextResponse.json({ success: false, error: "Can only retry explicitly failed generations" }, { status: 400 });
+            throw new ApiError(400, "Only failed jobs can be manually retried");
         }
 
-        const retryCount = jobData.retry_count || 0;
-        const maxRetries = jobData.max_retries || 3;
-
-        // If we hit hard bound globally, reset everything to forcefully allow retries over user intervention
-        const boundRetryCount = retryCount >= maxRetries ? 0 : retryCount + 1;
-
-        // Reset the job state
         const { error: updateError } = await supabaseAdmin
             .from("generations")
             .update({
                 status: "queued",
-                progress: 0,
-                retry_count: boundRetryCount
+                error_reason: null, // Clear previous error
             })
             .eq("id", generation_id);
 
         if (updateError) {
-            logger.error(`Manual retry reset failed for job ${generation_id}`, { error: updateError });
-            throw new Error("Failed to reset database parameters");
+            logger.error("Failed to re-queue generation", { error: updateError });
+            throw new ApiError(500, "Failed to resume job");
         }
 
-        console.log("[GENERATION]", generation_id, "manual-retry-queued");
+        logger.info(`Manually retried job: ${generation_id}`, { userId: user.id });
 
-        return NextResponse.json({
-            success: true,
+        return standardResponse.success({
             generation_id: generation_id,
-            status: "queued",
-            progress: 0
+            status: "queued"
         });
 
     } catch (error: any) {
-        logger.error("POST generation retry crash", { error: error.message });
-        return NextResponse.json(
-            { success: false, error: "Internal server error" },
-            { status: 500 }
-        );
+        return standardResponse.error(error);
     }
 }

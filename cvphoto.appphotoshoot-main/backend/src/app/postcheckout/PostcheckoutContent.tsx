@@ -21,7 +21,7 @@ export default function PostcheckoutContent() {
 
           if (result.success) {
             setPaymentStatus("paid");
-            console.log("Payment successful", result);
+
             // Redirect to dashboard after a short delay
             setTimeout(() => router.push("/upload"), 200);
           } else {

@@ -1,44 +1,35 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { standardResponse, ApiError } from "@/lib/apiError";
+import { config } from "@/config/env";
 
 export async function GET(req: NextRequest) {
     try {
         const supabase = createServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-        if (!user) {
-            return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+        if (authError || !user) {
+            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
         }
 
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-        const supabaseAdmin = createAdminClient(supabaseUrl, supabaseKey);
+        const supabaseAdmin = createAdminClient(config.supabase.url, config.supabase.serviceRoleKey);
 
-        const { data: creditsData, error } = await supabaseAdmin
+        const { data: creditsData, error: dbError } = await supabaseAdmin
             .from("credits")
             .select("credits_remaining")
             .eq("user_id", user.id)
             .single();
 
-        if (error || !creditsData) {
-            console.error("Error fetching credits:", error);
-            return NextResponse.json(
-                { success: false, error: "Could not fetch credits" },
-                { status: 500 }
-            );
+        if (dbError || !creditsData) {
+            throw new ApiError(404, "Could not fetch credits record.", "CREDITS_NOT_FOUND");
         }
 
-        return NextResponse.json({
-            success: true,
+        return standardResponse.success({
             credits_remaining: creditsData.credits_remaining
         });
 
     } catch (error: any) {
-        console.error("Credits API Error:", error);
-        return NextResponse.json(
-            { success: false, error: "Internal server error" },
-            { status: 500 }
-        );
+        return standardResponse.error(error);
     }
 }

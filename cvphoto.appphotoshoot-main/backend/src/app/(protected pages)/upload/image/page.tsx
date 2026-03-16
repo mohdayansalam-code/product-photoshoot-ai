@@ -25,7 +25,7 @@ export default function Page() {
       const success = await uploadImages(images);
       setIsUploading(false);
       if (success) {
-        console.log("Images uploaded successfully");
+
         router.push("info");
       } else {
         setShowErrorModal(true);

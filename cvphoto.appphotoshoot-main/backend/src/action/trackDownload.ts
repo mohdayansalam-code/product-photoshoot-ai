@@ -3,14 +3,23 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Initialize Supabase client with admin rights
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+let supabase: any = null;
+if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+    process.env.SUPABASE_SERVICE_ROLE_KEY as string
+  )
+} else {
+  console.warn("Supabase environment variables are missing, trackDownload will not work correctly");
+}
 
 export async function trackDownload(imageUrl: string, userData: any) {
+  if (!supabase) {
+    console.error("Supabase client not initialized in trackDownload");
+    return { success: false, error: "Database client not initialized" };
+  }
   const userId = userData.id;
-  console.log("downloading", imageUrl)
+
 
   // Fetch the latest downloadHistory
   const { data: latestData, error: fetchError } = await supabase

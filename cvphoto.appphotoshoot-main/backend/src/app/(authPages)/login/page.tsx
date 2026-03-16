@@ -6,6 +6,9 @@ import { AuthError } from "@supabase/supabase-js";
 import { PasswordInput, EmailInput, AuthButton } from "@/components/AuthForm";
 import getUser from "@/action/getUser";
 import LeftAuth from "@/components/LeftAuth";
+import { signIn } from "@/action/signin";
+
+export const dynamic = 'force-dynamic';
 
 interface LoginProps {
   searchParams: { message: string };
@@ -42,65 +45,6 @@ export default async function Login({ searchParams }: LoginProps) {
   }
 
   // If no user is found, continue with the login page rendering
-
-  const signIn = async (formData: FormData): Promise<never> => {
-    "use server";
-
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-    const supabase = createClient();
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      console.log(
-        "error name: ",
-        error.name,
-        "error code: ",
-        error.code,
-        "error message: ",
-        error.message
-      );
-
-      let errorMessage = "Could not authenticate user";
-
-      if (error instanceof AuthError) {
-        switch (error.code) {
-          case "invalid_login_credentials":
-            errorMessage = "Invalid email or password. Please try again.";
-            break;
-          case "invalid_email":
-            errorMessage = "Please enter a valid email address.";
-            break;
-          case "too_many_requests":
-            errorMessage = "Too many login attempts. Please try again later.";
-            break;
-          default:
-            errorMessage = error.message;
-        }
-      } else {
-        errorMessage = `Unexpected error: ${error}`;
-      }
-
-      return redirect(`/login?message=${encodeURIComponent(errorMessage)}`);
-    } else {
-      // Fetch user data after successful sign-in using getUser function
-      const userData: any = await getUser();
-      const user = userData[0];
-
-      if (user) {
-        const workStatus = user?.workStatus || "";
-
-        // Use the same function for post-signin redirect
-        return handleRedirectBasedOnWorkStatus(user);
-      }
-      // If we can't get user data, redirect to forms as a fallback
-      return redirect("/forms");
-    }
-  };
 
   return (
     <div className="flex h-screen">

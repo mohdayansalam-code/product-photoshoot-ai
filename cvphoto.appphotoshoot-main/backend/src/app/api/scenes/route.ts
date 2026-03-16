@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { standardResponse } from "@/lib/apiError";
 
 interface Scene {
     id: string;
@@ -53,5 +54,5 @@ const SCENES: Scene[] = [
 ];
 
 export async function GET() {
-    return NextResponse.json({ scenes: SCENES });
+    return standardResponse.success({ scenes: SCENES });
 }

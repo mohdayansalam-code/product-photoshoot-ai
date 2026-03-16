@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { logger } from "@/utils/logger";
+import { standardResponse, ApiError } from "@/lib/apiError";
 
 const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -124,15 +125,10 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        return NextResponse.json({
-            success: true,
+        return standardResponse.success({
             products: products || [],
         });
-    } catch (error) {
-        console.error("Products GET API Error:", error);
-        return NextResponse.json(
-            { error: "Internal server error" },
-            { status: 500 }
-        );
+    } catch (error: any) {
+        return standardResponse.error(error);
     }
 }

@@ -1,16 +1,65 @@
-# CVPHOTO - $2K/m AI Business.
+# PhotoAI SaaS - AI Product Photoshoot
 
-Full codebase with custom FLUX API. Live App on: www.cvphoto.app
+A high-performance SaaS platform for AI-powered product photography, enabling users to generate professional studio-quality photoshoot results using custom AI models. Built with Next.js, Vite, Supabase, and Astria (FLUX).
 
-This repo was forked on 30th of November, 2024 and has all the code from CVPHoto.app. It is being supported and updated by @johnnytran for customers 
-that bought the codebase of CVPhoto.app via clonemysaas.com.
+## Features
 
-Star this repo to be notified with new updates and upcoming features.
+- **Product Photoshoot Generation**: Upload product images and generate AI scenes.
+- **AI Image Tools**: Remove background, upscale, and fix products.
+- **Premium UX**: Comparison sliders and improvement summaries for edits.
+- **Production Stable**: Global retry systems, auth race condition protection, and standardized error handling.
 
-## Get started
+## Local Setup
 
-1. Follow the [Get Started Tutorial](https://www.clonemysaas.com/docs) to clone the repo and run your local server.
+### 1. Prerequisites
+- Node.js 18+
+- Supabase account
+- Astria API key
+- Stripe account (optional for local dev)
 
-PIN code to documentation: JT24
+### 2. Environment Setup
+Copy `.env.example` to `.env` in the root and fill in your credentials.
+```bash
+cp .env.example .env
+```
+Ensure you have the following keys:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `ASTRIA_API_KEY`
 
-Any illegal distribution or bad behaviour will be banned from this repo and you will not receive: 1) Upcoming features. 2) No shoutout from my Twitter account when you launch. 3) Lose access to this repo permanently.
+### 3. Installation
+```bash
+npm install
+cd frontend && npm install
+cd ../backend && npm install
+```
+
+## Run Instructions
+
+### Frontend (Dashboard & Tools)
+```bash
+cd frontend
+npm run dev
+```
+Accessible at `http://localhost:5173`.
+
+### Backend (API Server)
+```bash
+cd backend
+npm run dev
+```
+Runs at `http://localhost:3000`.
+
+### AI Worker (Generation Pipeline)
+Ensure your environment variables are set, then run:
+```bash
+cd backend
+npm run worker
+```
+
+## Deployment
+The project is ready for Vercel or any Node.js hosting platform. Ensure all environment variables are configured in your deployment dashboard.
+
+---
+Supported by @johnnytran for CloneMySaaS.com customers.

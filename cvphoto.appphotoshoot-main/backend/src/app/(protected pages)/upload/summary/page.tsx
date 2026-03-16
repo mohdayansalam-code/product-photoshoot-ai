@@ -5,6 +5,8 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import SubmitButton from "./SubmitButton";
 
+export const dynamic = 'force-dynamic';
+
 // Add this type definition
 type StyleItem = {
   backgroundTitle?: string;
@@ -25,46 +27,11 @@ function getEyeColorClass(color: string) {
   return colorMap[color] || "bg-gray-300";
 }
 
-async function submitPhotos() {
-  "use server";
-
-  const supabase = createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const userId = user?.id;
-
-  if (!userId) {
-    console.error("No authenticated user found");
-    return { error: "User not authenticated" };
-  }
-
-  const { data, error } = await supabase
-    .from("userTable")
-    .update({
-      submissionDate: new Date().toISOString(),
-      workStatus: "ongoing",
-    })
-    .eq("id", userId);
-
-  if (error) {
-    console.error("Error updating user data in Supabase:", error);
-    return { error: "Failed to update user data" };
-  }
-
-  // Log success message
-  console.log(
-    "Successfully updated submissionDate and workStatus in Supabase for user:",
-    userId
-  );
-
-  redirect("/wait"); // Redirect to a thank you page
-}
+import { submitPhotos } from "@/action/submitPhotos";
 
 export default async function Page() {
   const userData = await getUser();
-  //console.log(userData);
+
   const user = userData?.[0]; // Assuming the first user in the array
 
   if (!user) {

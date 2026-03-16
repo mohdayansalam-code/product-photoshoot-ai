@@ -3,7 +3,11 @@
 import sgMail from '@sendgrid/mail';
 import { MailDataRequired } from '@sendgrid/mail';
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY as string);
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY as string);
+} else {
+  console.warn("SENDGRID_API_KEY is missing, sgMail will not be initialized");
+}
 
 interface EmailData {
   to: string;

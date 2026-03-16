@@ -1,23 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { logger } from "@/utils/logger";
+import { standardResponse, ApiError } from "@/lib/apiError";
+import { config } from "@/config/env";
 
 export async function GET(req: NextRequest) {
     try {
         const supabase = createServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-        if (!user) {
-            return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+        if (authError || !user) {
+            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
         }
 
-        const supabaseAdmin = createAdminClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
+        const supabaseAdmin = createAdminClient(config.supabase.url, config.supabase.serviceRoleKey);
 
-        // Fetch generation history ordered descending
         const { data: generations, error } = await supabaseAdmin
             .from("generations")
             .select("id, image_url, prompt, model, generated_images, status, image_count, credits_used, created_at")
@@ -25,11 +22,9 @@ export async function GET(req: NextRequest) {
             .order("created_at", { ascending: false });
 
         if (error) {
-            logger.error("Failed to fetch generations history", { error: error.message });
-            return NextResponse.json({ success: false, error: "Failed to fetch history" }, { status: 500 });
+            throw new ApiError(500, "Failed to fetch history");
         }
 
-        // Map payload exactly to user requirements
         const mappedHistory = generations.map(job => ({
             id: job.id,
             product_image: job.image_url,
@@ -42,13 +37,9 @@ export async function GET(req: NextRequest) {
             created_at: job.created_at
         }));
 
-        return NextResponse.json(mappedHistory);
+        return standardResponse.success(mappedHistory);
 
     } catch (error: any) {
-        logger.error("GET generations router crash", { error: error.message });
-        return NextResponse.json(
-            { success: false, error: "Internal server error" },
-            { status: 500 }
-        );
+        return standardResponse.error(error);
     }
 }

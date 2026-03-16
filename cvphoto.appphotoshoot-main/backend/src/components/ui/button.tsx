@@ -63,9 +63,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
       if (tracker) {
         // Here you would implement your tracking logic
-        //console.log(`Tracked: ${tracker}`);
         track(`${tracker}`);
-        console.log("button click, tracker value:", tracker);
       }
 
       if (href) {

@@ -2,7 +2,9 @@ import Header from "@/components/Header";
 import Link from "next/link";
 import getUser from "@/action/getUser";
 import { redirect } from "next/navigation";
-import { CheckCircle } from "lucide-react"; // Add this import at the top of the file
+import { CheckCircle } from "lucide-react";
+
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: "Your Dashboard | AI Headshot Generator",
@@ -30,7 +32,7 @@ export default async function DashboardPage() {
     redirect("/wait");
   }
 
-  //console.log("userData here:", userData);
+
 
   // Only render the dashboard if workStatus is 'complete'
   return (

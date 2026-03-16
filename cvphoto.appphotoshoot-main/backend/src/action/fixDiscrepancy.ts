@@ -44,7 +44,6 @@ async function getFinalImageUrl(redirectUrl: string): Promise<string> {
 
 export async function fixDiscrepancy(userData: UserData | null) {
   if (!userData) {
-    console.log("No user data available to fix discrepancy");
     return;
   }
 

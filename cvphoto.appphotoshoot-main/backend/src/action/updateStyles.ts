@@ -22,9 +22,7 @@ export async function updateStyles({
   const { data: { user } } = await supabase.auth.getUser();
   const userId = user?.id;
 
-  console.log('Updating styles for user:', userId);
-  console.log('User selected styles:', userSelected);
-  console.log('Preselected styles:', preSelected);
+
 
   if (!userId) {
     console.error("No authenticated user found");
@@ -48,7 +46,7 @@ export async function updateStyles({
     throw new Error("Failed to update user styles");
   }
 
-  console.log('Styles updated successfully:', stylesArray);
+
 
   // Redirect to the next page (adjust as needed)
   redirect('/upload/summary');

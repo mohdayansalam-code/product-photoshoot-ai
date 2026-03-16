@@ -1,7 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";
+import { standardResponse, ApiError } from "@/lib/apiError";
+import { config } from "@/config/env";
+import { rateLimiter } from "@/services/rateLimiter";
+import { creditSystem } from "@/services/creditSystem";
 
 export async function POST(req: NextRequest) {
     try {
@@ -9,143 +13,64 @@ export async function POST(req: NextRequest) {
         const { generation_id, image_url } = body;
 
         if (!generation_id || !image_url) {
-            return NextResponse.json(
-                { success: false, error: "Missing generation_id or image_url" },
-                { status: 400 }
-            );
+            throw new ApiError(400, "Missing generation_id or image_url");
         }
-
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-        const supabaseAdmin = createAdminClient(supabaseUrl, supabaseKey);
 
         const supabase = createServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-        if (!user) {
-            return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+        if (authError || !user) {
+            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
         }
 
-        const userId = user.id;
+        const supabaseAdmin = createAdminClient(config.supabase.url, config.supabase.serviceRoleKey);
 
-        // Rate Limiting Logic (10 calls/min)
-        const { data: rlData } = await supabaseAdmin
-            .from("generation_rate_limit")
-            .select("*")
-            .eq("user_id", userId)
-            .single();
+        await rateLimiter.checkLimit(supabaseAdmin, user.id, 10, 60000, "variations_generation");
 
-        const now = new Date();
-
-        if (!rlData) {
-            await supabaseAdmin.from("generation_rate_limit").insert({
-                user_id: userId,
-                request_count: 1,
-                window_start: now.toISOString()
-            });
-        } else {
-            const timeDiff = now.getTime() - new Date(rlData.window_start).getTime();
-
-            if (timeDiff < 60000) {
-                if (rlData.request_count >= 10) {
-                    logger.warn("Variations Rate limit exceeded", { userId });
-                    return NextResponse.json(
-                        { success: false, error: "Rate limit exceeded. Please wait." },
-                        { status: 429 }
-                    );
-                } else {
-                    await supabaseAdmin.from("generation_rate_limit").update({ request_count: rlData.request_count + 1 }).eq("user_id", userId);
-                }
-            } else {
-                await supabaseAdmin.from("generation_rate_limit").update({
-                    request_count: 1,
-                    window_start: now.toISOString()
-                }).eq("user_id", userId);
-            }
-        }
-
-        // Fetch original generation to replicate prompt
         const { data: originalGen, error: fetchError } = await supabaseAdmin
             .from("generations")
             .select("prompt")
             .eq("id", generation_id)
-            .eq("user_id", userId)
+            .eq("user_id", user.id)
             .single();
 
         if (fetchError || !originalGen) {
-            return NextResponse.json({ success: false, error: "Original generation not found." }, { status: 404 });
+            throw new ApiError(404, "Original generation not found", "NOT_FOUND");
         }
 
-        const model = "gemini-3.1";
+        const model = config.models.defaultVariation;
         const image_count = 4;
-
-        // Gemini costs 20cr for 4 images
         const credits_cost = 20;
+        const request_id = body.request_id || req.headers.get("x-request-id");
 
-        // Check user credits
-        const { data: creditsData } = await supabaseAdmin
-            .from("credits")
-            .select("credits_remaining")
-            .eq("user_id", userId)
-            .single();
+        const { data: result, error: rpcError } = await supabaseAdmin.rpc("create_generation_job", {
+            p_user_id: user.id,
+            p_request_id: request_id,
+            p_image_url: image_url,
+            p_prompt: originalGen.prompt,
+            p_model: model,
+            p_image_count: image_count,
+            p_fetchers_json: {},
+            p_credits_cost: credits_cost
+        });
 
-        if (!creditsData || creditsData.credits_remaining < credits_cost) {
-            logger.warn("Not enough credits for variations", { userId, cost: credits_cost });
-            return NextResponse.json(
-                { success: false, error: `Insufficient credits. Variations require ${credits_cost} credits.` },
-                { status: 402 }
-            );
+        if (rpcError) {
+            logger.error("Variations RPC Failed", { error: rpcError });
+            throw new ApiError(500, "Failed to start variations job safely.");
         }
 
-        // Deduct credits PRE-GENERATION
-        await supabaseAdmin
-            .from("credits")
-            .update({ credits_remaining: creditsData.credits_remaining - credits_cost })
-            .eq("user_id", userId);
-
-        logger.info(`Deducted ${credits_cost} credits for variations`, { userId });
-
-        // Insert pending job into generations table
-        const { data: jobData, error: jobError } = await supabaseAdmin
-            .from("generations")
-            .insert({
-                user_id: userId,
-                image_url: image_url, // Feed image_url as input
-                prompt: originalGen.prompt, // Reuse original prompt
-                model: model, // Lock model to gemini-3.1
-                image_count: image_count,
-                status: "queued"
-            })
-            .select("id")
-            .single();
-
-        if (jobError || !jobData) {
-            logger.error("Failed to enqueue variations job", { error: jobError });
-            // Rollback credits on catastrophic insertion failure
-            await supabaseAdmin
-                .from("credits")
-                .update({ credits_remaining: creditsData.credits_remaining })
-                .eq("user_id", userId);
-
-            return NextResponse.json(
-                { success: false, error: "Failed to enqueue variations job" },
-                { status: 500 }
-            );
+        if (!result.success) {
+            throw new ApiError(500, `Variations Error: ${result.error}`);
         }
 
-        logger.generation("started", userId, jobData.id, "queued", { type: "variations", credits_deducted: credits_cost });
+        logger.generation("started", user.id, result.id, "queued", { type: "variations", credits_deducted: credits_cost, idempotent: result.idempotent });
 
-        return NextResponse.json({
-            success: true,
-            generation_id: jobData.id,
+        return standardResponse.success({
+            generation_id: result.id,
             status: "queued"
         });
 
     } catch (error: any) {
-        logger.error("Generate variations route crash", { error: error.message });
-        return NextResponse.json(
-            { success: false, error: error.message || "Failed to generate variations" },
-            { status: 500 }
-        );
+        return standardResponse.error(error);
     }
 }

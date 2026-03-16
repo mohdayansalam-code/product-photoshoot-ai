@@ -4,12 +4,17 @@ import { createClient } from "@/utils/supabase/server";
 import Stripe from 'stripe';
 
 const stripeKey = process.env.ENVIRONMENT === 'DEVELOPMENT' 
-  ? process.env.STRIPE_TEST_SECRET_KEY! 
-  : process.env.STRIPE_SECRET_KEY!;
+  ? process.env.STRIPE_TEST_SECRET_KEY 
+  : process.env.STRIPE_SECRET_KEY;
 
-const stripe = new Stripe(stripeKey, {
-  apiVersion: '2024-06-20',
-});
+let stripe: Stripe | null = null;
+if (stripeKey) {
+  stripe = new Stripe(stripeKey, {
+    apiVersion: '2024-06-20',
+  });
+} else {
+  console.warn("Stripe API key is missing, stripe client will not be initialized");
+}
 
 export async function verifyPayment(sessionId: string) {
   if (!sessionId) {
@@ -17,14 +22,15 @@ export async function verifyPayment(sessionId: string) {
   }
 
   try {
-    console.log('Retrieving session:', sessionId);
+    if (!stripe) {
+        throw new Error("Stripe client not initialized (missing API key)");
+    }
     const session = await stripe.checkout.sessions.retrieve(sessionId);
-    console.log('Session retrieved:', session);
+
     // Extract planType from metadata
     const planType: string | undefined = session.metadata?.planType;
 
-    // Console log the planType
-    console.log('Plan Type:', planType);
+
 
     if (session.payment_status === 'paid') { 
       // Update user's plan in the database
@@ -33,7 +39,6 @@ export async function verifyPayment(sessionId: string) {
         amount: session.amount_total ?? 0,
         planType: planType ?? 'default' // Pass planType to updatePlan
       });
-      console.log('Payment successful', session.payment_status);
     }
 
     return { 
