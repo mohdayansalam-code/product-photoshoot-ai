@@ -1,0 +1,16 @@
+fix: dashboard API integration and production stability improvements
+
+Frontend:
+- Fixed dashboard-stats response mapping
+- Improved API response parsing
+- Resolved false error state when stats are empty
+- Improved retry UX behavior
+
+Backend:
+- Stabilized API response structure
+- Minor production safety improvements
+
+Infrastructure:
+- Repository cleanup
+- Type safety verification
+- Build validation
