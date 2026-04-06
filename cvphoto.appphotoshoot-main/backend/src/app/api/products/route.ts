@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
-import { createClient as createServerClient } from "@/utils/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";
 import { standardResponse, ApiError } from "@/lib/apiError";
+import { config } from "@/config/env";
 
-const supabaseAdmin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+const supabaseAdmin = createClient(
+    config.supabase.url,
+    config.supabase.serviceRoleKey
 );
 
 export async function POST(req: NextRequest) {
     try {
-        const supabase = createServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const authHeader = req.headers.get("authorization");
+        const token = authHeader?.replace("Bearer ", "");
+        if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
 
-        if (!user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const supabaseAuth = createClient(config.supabase.url, config.supabase.anonKey);
+        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+        if (authError || !user) {
+            return standardResponse.error("Unauthorized", "UNAUTHORIZED");
         }
 
         const formData = await req.formData();
@@ -23,7 +27,7 @@ export async function POST(req: NextRequest) {
         let name = formData.get("name") as string | null;
 
         if (!file) {
-            return NextResponse.json({ error: "No file provided" }, { status: 400 });
+            return standardResponse.error(new ApiError(400, "No file provided", "BAD_REQUEST"), "No file provided");
         }
 
         if (!name) {
@@ -39,7 +43,7 @@ export async function POST(req: NextRequest) {
 
         if (insertError || !placeholder) {
             logger.error("Failed to generate Product ID placeholder", { error: insertError });
-            return NextResponse.json({ error: "Failed to allocate product ID" }, { status: 500 });
+            return standardResponse.error(new ApiError(500, "Failed to allocate product ID", "DB_ERROR"));
         }
 
         const productId = placeholder.id;
@@ -61,10 +65,7 @@ export async function POST(req: NextRequest) {
             logger.error("Supabase Upload Error", { error: uploadError });
             // Cleanup placeholder
             await supabaseAdmin.from("products").delete().eq("id", productId);
-            return NextResponse.json(
-                { error: "Failed to upload image to storage" },
-                { status: 500 }
-            );
+            return standardResponse.error(new ApiError(500, "Failed to upload image to storage", "UPLOAD_ERROR"));
         }
 
         // Get Public URL
@@ -82,33 +83,30 @@ export async function POST(req: NextRequest) {
 
         if (productError) {
             logger.error("Products Update Error", { error: productError });
-            return NextResponse.json(
-                { error: "Failed to update product record" },
-                { status: 500 }
-            );
+            return standardResponse.error(new ApiError(500, "Failed to update product record", "DB_ERROR"));
         }
 
-        return NextResponse.json({
-            success: true,
+        return standardResponse.success({
             imageUrl: publicUrl,
             product: productData,
         });
     } catch (error: any) {
         logger.error("Upload API Error", { error: error.message });
-        return NextResponse.json(
-            { error: "Internal server error" },
-            { status: 500 }
-        );
+        return standardResponse.error(error);
     }
 }
 
 export async function GET(req: NextRequest) {
     try {
-        const supabase = createServerClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const authHeader = req.headers.get("authorization");
+        const token = authHeader?.replace("Bearer ", "");
+        if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
 
-        if (!user) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const supabaseAuth = createClient(config.supabase.url, config.supabase.anonKey);
+        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+        if (authError || !user) {
+            return standardResponse.error(new ApiError(401, "Unauthorized", "UNAUTHORIZED"));
         }
 
         const { data: products, error } = await supabaseAdmin
@@ -119,10 +117,7 @@ export async function GET(req: NextRequest) {
 
         if (error) {
             console.error("Fetch Products Error:", error);
-            return NextResponse.json(
-                { error: "Failed to fetch products" },
-                { status: 500 }
-            );
+            return standardResponse.error(new ApiError(500, "Failed to fetch products", "DB_ERROR"));
         }
 
         return standardResponse.success({
@@ -130,5 +125,65 @@ export async function GET(req: NextRequest) {
         });
     } catch (error: any) {
         return standardResponse.error(error);
+    }
+}
+
+export async function DELETE(req: NextRequest) {
+    try {
+        const authHeader = req.headers.get("authorization");
+        const token = authHeader?.replace("Bearer ", "");
+        if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
+
+        const supabaseAuth = createClient(config.supabase.url, config.supabase.anonKey);
+        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+        if (authError || !user) {
+            return standardResponse.error(new ApiError(401, "Unauthorized", "UNAUTHORIZED"));
+        }
+
+        const url = new URL(req.url);
+        const productId = url.searchParams.get("id");
+
+        if (!productId) {
+            return standardResponse.error(new ApiError(400, "Missing product ID", "BAD_REQUEST"));
+        }
+
+        // Verify ownership
+        const { data: existing, error: fetchError } = await supabaseAdmin
+            .from("products")
+            .select("id")
+            .eq("id", productId)
+            .eq("user_id", user.id)
+            .single();
+
+        if (fetchError || !existing) {
+             return standardResponse.error(new ApiError(404, "Product not found or unauthorized", "NOT_FOUND"));
+        }
+
+        // 1. Storage Cleanup
+        const targetFilename = `products/${user.id}/${productId}.png`;
+        const { error: storageError } = await supabaseAdmin.storage
+             .from("product-images")
+             .remove([targetFilename]);
+
+        if (storageError) {
+             logger.error("Failed to delete storage file", { error: storageError, targetFilename });
+        }
+
+        // 2. DB Cleanup
+        const { error: dbError } = await supabaseAdmin
+            .from("products")
+            .delete()
+            .eq("id", productId)
+            .eq("user_id", user.id);
+
+        if (dbError) {
+             return standardResponse.error(new ApiError(500, "Failed to delete from database", "DB_ERROR"));
+        }
+
+        return standardResponse.success({ deleted: true });
+
+    } catch (error: any) {
+         return standardResponse.error(error);
     }
 }

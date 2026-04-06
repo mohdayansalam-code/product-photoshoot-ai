@@ -23,7 +23,8 @@ export async function verifyPayment(sessionId: string) {
 
   try {
     if (!stripe) {
-        throw new Error("Stripe client not initialized (missing API key)");
+        console.warn("Stripe client not initialized (missing API key)");
+        return { success: false, status: 'missing_key', error: "Stripe integration is disabled" };
     }
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 

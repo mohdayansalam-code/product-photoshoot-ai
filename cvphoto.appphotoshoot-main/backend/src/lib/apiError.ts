@@ -14,10 +14,11 @@ export class ApiError extends Error {
 }
 
 export const standardResponse = {
-    success: (data: any = {}, status: number = 200) => {
+    success: (data: any = null, status: number = 200) => {
         return NextResponse.json({
             success: true,
-            ...data
+            data: data,
+            error: null
         }, { status });
     },
     
@@ -50,6 +51,7 @@ export const standardResponse = {
 
         return NextResponse.json({
             success: false,
+            data: null,
             error: message,
             errorCode
         }, { status: statusCode });

@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";
 import { standardResponse, ApiError } from "@/lib/apiError";
 import { config } from "@/config/env";
@@ -9,6 +8,17 @@ import { creditSystem } from "@/services/creditSystem";
 
 export async function POST(req: NextRequest) {
     try {
+        const authHeader = req.headers.get("authorization");
+        const token = authHeader?.replace("Bearer ", "");
+        if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
+
+        const supabaseAuth = createClient(config.supabase.url, config.supabase.anonKey);
+        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+        if (authError || !user) {
+            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
+        }
+
         const body = await req.json();
 
         const product_image = body.product_image || body.imageUrl;
@@ -40,8 +50,12 @@ export async function POST(req: NextRequest) {
         const fetchers = body.fetchers || {};
         const image_count = Math.min(Math.max(body.image_count ?? 4, 1), 4);
 
-        if (!product_image || !finalPrompt || finalPrompt.trim() === "") {
-            throw new ApiError(400, "Missing product_image or prompt");
+        if (!product_image) {
+            throw new ApiError(400, "Missing product_image");
+        }
+        
+        if (!finalPrompt || finalPrompt.trim() === "") {
+            finalPrompt = "Product photo upload";
         }
 
         let base_model_credits = 10;
@@ -67,14 +81,7 @@ export async function POST(req: NextRequest) {
 
         const credits_cost = generation_credits + fetcher_credits;
 
-        const supabase = createServerClient();
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError || !user) {
-            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
-        }
-
-        const supabaseAdmin = createAdminClient(config.supabase.url, config.supabase.serviceRoleKey);
+        const supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey);
         
         await rateLimiter.checkLimit(supabaseAdmin, user.id, 10, 60000, "generation");
 

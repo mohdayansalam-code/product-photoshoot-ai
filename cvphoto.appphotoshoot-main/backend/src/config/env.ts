@@ -11,8 +11,10 @@ export const requireEnv = (name: string, fallback?: string): string => {
 // Validate critical ENV on startup
 export const config = {
     env: requireEnv("ENVIRONMENT", "development"),
+    nodeEnv: requireEnv("NODE_ENV", "development"),
     supabase: {
         url: requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+        anonKey: requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
         serviceRoleKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
     },
     astria: {
@@ -43,4 +45,5 @@ export const config = {
 if (process.env.NEXT_PHASE !== 'phase-production-build') {
     requireEnv("NEXT_PUBLIC_SUPABASE_URL");
     requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+    requireEnv("NODE_ENV", "development");
 }

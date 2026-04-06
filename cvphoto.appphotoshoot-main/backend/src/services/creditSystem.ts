@@ -51,5 +51,35 @@ export const creditSystem = {
 
          logger.info(`Deducted ${amount} credits securely for ${context}`, { userId });
          return true;
+    },
+
+    /**
+     * Refunds credits automatically on failure.
+     */
+    refundCredits: async (supabaseAdmin: SupabaseClient, userId: string, amount: number, context: string = "generation failure"): Promise<boolean> => {
+        const { data: creditsData } = await supabaseAdmin
+            .from("credits")
+            .select("credits_remaining")
+            .eq("user_id", userId)
+            .single();
+
+        if (!creditsData) return false;
+
+        const currentCredits = creditsData.credits_remaining;
+
+        const { data: result, error: updateError } = await supabaseAdmin
+            .from("credits")
+            .update({ credits_remaining: currentCredits + amount })
+            .eq("user_id", userId)
+            .eq("credits_remaining", currentCredits)
+            .select();
+
+        if (updateError || !result || result.length === 0) {
+            logger.error(`Database error refunding credits for ${userId}`, { error: updateError?.message });
+            return false;
+        }
+
+        logger.info(`Refunded ${amount} credits securely for ${context}`, { userId });
+        return true;
     }
 };

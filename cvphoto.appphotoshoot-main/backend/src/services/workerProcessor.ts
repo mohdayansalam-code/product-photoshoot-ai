@@ -4,6 +4,7 @@ import { logger } from "./logger";
 import { monitoring } from "./monitoring";
 import { retryManager } from "./retryManager";
 import { config } from "../config/env";
+import { creditSystem } from "./creditSystem";
 import { metrics } from "./metrics";
 
 export const workerProcessor = {
@@ -28,7 +29,7 @@ export const workerProcessor = {
             const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
             
             const { data: stuckJobs, error } = await supabaseAdmin
-                .from("generations")
+                .from("generation_jobs")
                 .select("id, retry_count")
                 .eq("status", "processing")
                 .lt("updated_at", tenMinutesAgo);
@@ -46,7 +47,7 @@ export const workerProcessor = {
                     
                     if (retryManager.shouldRetry(job.retry_count || 0)) {
                         await supabaseAdmin
-                            .from("generations")
+                            .from("generation_jobs")
                             .update({ 
                                 status: "queued", 
                                 retry_count: newRetryCount,
@@ -56,7 +57,7 @@ export const workerProcessor = {
                         logger.info(`Recovered stuck job ${job.id} back to queue (Retry: ${newRetryCount})`);
                     } else {
                         await supabaseAdmin
-                            .from("generations")
+                            .from("generation_jobs")
                             .update({ 
                                 status: "failed", 
                                 error_reason: "stuck_job_max_retries",
@@ -95,11 +96,11 @@ export const workerProcessor = {
                 await retryManager.wait(delayMs);
             }
 
-            // Read explicit columns from 'generations' table
+            // Read explicit columns from 'generation_jobs' table
             const { prompt, model, image_count, image_url } = job;
             const seed = Math.floor(Math.random() * 1000000000);
             
-            await supabaseAdmin.from("generations").update({ processing_started_at: new Date().toISOString() }).eq("id", job.id);
+            await supabaseAdmin.from("generation_jobs").update({ processing_started_at: new Date().toISOString() }).eq("id", job.id);
             
             const astriaEndpoint = `https://api.astria.ai/tunes/690204/prompts`;
             let resultImages: string[] = [];
@@ -170,10 +171,10 @@ export const workerProcessor = {
                 throw new Error("AI provider failed to generate images after retries/fallbacks.");
             }
 
-            await supabaseAdmin.from("generations").update({ status: "generating", progress: 60 }).eq("id", job.id);
+            await supabaseAdmin.from("generation_jobs").update({ status: "generating", progress: 60 }).eq("id", job.id);
 
             // Fetchers Logic
-            await supabaseAdmin.from("generations").update({ status: "enhancing", progress: 85 }).eq("id", job.id);
+            await supabaseAdmin.from("generation_jobs").update({ status: "enhancing", progress: 85 }).eq("id", job.id);
 
             const uploadedImageUrls = [];
             for (let i = 0; i < resultImages.length; i++) {
@@ -223,7 +224,7 @@ export const workerProcessor = {
             const durationMs = Date.now() - startTime;
 
             await supabaseAdmin
-                .from("generations")
+                .from("generation_jobs")
                 .update({
                     status: "completed",
                     progress: 100,
@@ -260,7 +261,7 @@ export const workerProcessor = {
             if (failureType === "TEMPORARY" && retryManager.shouldRetry(job.retry_count || 0) && !isTimeout) {
                 logger.warn(`Returning job ${job.id} to queue (Try ${tryCount})`);
                 await supabaseAdmin
-                    .from("generations")
+                    .from("generation_jobs")
                     .update({
                         status: "queued",
                         retry_count: tryCount,
@@ -271,16 +272,21 @@ export const workerProcessor = {
             } else {
                 logger.error(`Job ${job.id} permanently failed: ${errorReason}`);
                 monitoring.logGenerationFailure(job.id, job.user_id, errorReason);
-                
+                let refunded = false;
+                if (!job.credit_refunded && creditsDeducted && job.credits_used) {
+                    refunded = await creditSystem.refundCredits(supabaseAdmin, job.user_id, job.credits_used, `failed generation job ${job.id}`);
+                }
+
                 await supabaseAdmin
-                    .from("generations")
+                    .from("generation_jobs")
                     .update({
                         status: "failed",
                         retry_count: tryCount,
                         error_reason: errorReason,
                         completed_at: new Date().toISOString(),
                         duration_ms: durationMs,
-                        credit_refund_pending: creditsDeducted
+                        credit_refund_pending: false,
+                        credit_refunded: refunded || job.credit_refunded
                     })
                     .eq("id", job.id);
 
@@ -296,6 +302,8 @@ export const workerProcessor = {
                     image_count: job.image_count || 0
                 });
             }
+        } finally {
+            console.log(`Finished job ${job.id}`);
         }
     }
 };

@@ -5,9 +5,9 @@ import { config } from "../config/env";
 
 const supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
-const POLL_INTERVAL = 5000;
-const MAX_WORKER_JOBS = 3;
-const WORKER_ID = `worker_${Math.random().toString(36).substring(2, 9)}_${Date.now().toString().slice(-4)}`;
+const POLL_INTERVAL = Number(process.env.WORKER_POLL_INTERVAL) || 5000;
+const MAX_WORKER_JOBS = Number(process.env.MAX_WORKER_JOBS) || 3;
+const WORKER_ID = process.env.WORKER_ID || `worker_${Math.random().toString(36).substring(2, 9)}_${Date.now().toString().slice(-4)}`;
 
 logger.info(`Worker starting with ID: ${WORKER_ID}`);
 
@@ -16,7 +16,7 @@ async function processPendingJobs() {
         await workerProcessor.recoverStuckJobs(supabaseAdmin);
 
         const { data: jobs, error: fetchError } = await supabaseAdmin
-            .from("generations")
+            .from("generation_jobs")
             .select("*")
             .eq("status", "queued")
             .order("created_at", { ascending: true })
@@ -34,7 +34,7 @@ async function processPendingJobs() {
         for (const job of jobs) {
             // Optimistic lock with worker_id registration
             const { error: updateError } = await supabaseAdmin
-                .from("generations")
+                .from("generation_jobs")
                 .update({ 
                     status: "processing", 
                     progress: 10, 
@@ -60,6 +60,7 @@ async function processPendingJobs() {
 function startHeartbeat() {
     setInterval(() => {
         logger.info(`WORKER_HEALTHY ${new Date().toISOString()}`);
+        console.log("Worker alive:", new Date());
     }, 30000);
 }
 

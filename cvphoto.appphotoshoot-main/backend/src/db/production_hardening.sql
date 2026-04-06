@@ -68,3 +68,9 @@ EXCEPTION WHEN OTHERS THEN
     RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Add credit refunds flag
+ALTER TABLE public.generation_jobs ADD COLUMN IF NOT EXISTS credit_refunded boolean DEFAULT false;
+
+-- Add assets table
+CREATE TABLE IF NOT EXISTS public.assets ( id uuid DEFAULT gen_random_uuid() PRIMARY KEY, user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE, image_url text NOT NULL, created_at timestamp with time zone DEFAULT now(), source text DEFAULT 'editor' );

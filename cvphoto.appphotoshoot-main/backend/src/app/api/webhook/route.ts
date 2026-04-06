@@ -8,10 +8,15 @@ export async function POST(req: NextRequest) {
         // 1. Verify webhook signature
         // Example for stripe: const sig = req.headers.get('stripe-signature');
         // Let's assume a generic secret verification for the assignment
+        if (!process.env.APP_WEBHOOK_SECRET) {
+            throw new Error("Missing APP_WEBHOOK_SECRET");
+        }
+
         const authHeader = req.headers.get('authorization');
-        if (authHeader !== `Bearer ${process.env.WEBHOOK_SECRET || 'secret'}`) {
+        if (authHeader !== `Bearer ${process.env.APP_WEBHOOK_SECRET}`) {
             // In a real environment, you'd use Stripe webhook constructing
             console.warn("Invalid webhook signature attempt");
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         // 2. Parse billing event

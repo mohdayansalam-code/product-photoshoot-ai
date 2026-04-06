@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";
 import { standardResponse, ApiError } from "@/lib/apiError";
 import { config } from "@/config/env";
@@ -9,6 +8,17 @@ import { creditSystem } from "@/services/creditSystem";
 
 export async function POST(req: NextRequest) {
     try {
+        const authHeader = req.headers.get("authorization");
+        const token = authHeader?.replace("Bearer ", "");
+        if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
+
+        const supabaseAuth = createClient(config.supabase.url, config.supabase.anonKey);
+        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+
+        if (authError || !user) {
+            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
+        }
+
         const body = await req.json();
         const { imageUrl, tool } = body;
 
@@ -20,14 +30,7 @@ export async function POST(req: NextRequest) {
              throw new ApiError(403, "Product Fix is currently disabled");
         }
 
-        const supabase = createServerClient();
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError || !user) {
-            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
-        }
-
-        const supabaseAdmin = createAdminClient(config.supabase.url, config.supabase.serviceRoleKey);
+        const supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
         const ASTRIA_API_KEY = config.astria.apiKey;
         let credits_cost = 1;

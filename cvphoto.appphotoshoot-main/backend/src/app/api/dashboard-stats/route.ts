@@ -1,25 +1,36 @@
 import { NextRequest } from "next/server";
-import { createClient as createServerClient } from "@/utils/supabase/server";
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { standardResponse, ApiError } from "@/lib/apiError";
 import { config } from "@/config/env";
 
 export async function GET(req: NextRequest) {
     try {
-        const supabase = createServerClient();
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        const authHeader = req.headers.get("authorization");
+        const token = authHeader?.replace("Bearer ", "");
+        if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
+
+        const supabaseAuth = createClient(config.supabase.url, config.supabase.anonKey);
+        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
 
         if (authError || !user) {
             throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
         }
 
-        const supabaseAdmin = createAdminClient(config.supabase.url, config.supabase.serviceRoleKey);
+        const supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
-        const { data: creditsData } = await supabaseAdmin
+        let { data: creditsData } = await supabaseAdmin
             .from("credits")
             .select("credits_remaining")
             .eq("user_id", user.id)
             .single();
+            
+        if (!creditsData) {
+            await supabaseAdmin.from("credits").insert({
+                user_id: user.id,
+                credits_remaining: 100
+            });
+            creditsData = { credits_remaining: 100 };
+        }
         
         const credits = creditsData?.credits_remaining || 0;
 
