@@ -35,8 +35,6 @@ const navItems = [
   { title: "AI Image Tools", url: "/dashboard/tools", icon: Wand2 },
   { title: "AI Image Editor", url: "/dashboard/editor", icon: Pencil },
   { title: "Products", url: "/dashboard/products", icon: Package },
-  { title: "Projects", url: "/dashboard/projects", icon: FolderKanban },
-  { title: "Activity", url: "/dashboard/activity", icon: Activity },
   { title: "Assets Library", url: "/dashboard/assets", icon: FolderOpen },
   { title: "Credits", url: "/dashboard/credits", icon: Coins },
   { title: "Settings", url: "/dashboard/settings", icon: Settings },

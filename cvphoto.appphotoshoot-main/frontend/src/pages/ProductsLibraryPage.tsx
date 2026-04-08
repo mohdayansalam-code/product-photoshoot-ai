@@ -32,34 +32,23 @@ export default function ProductsLibraryPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const loadProductsData = async (isRetry = false) => {
-    if (isRetry) setRetryingFetch(true);
-    else setIsLoading(true);
-    
-    setErrorFetch(null);
-
+  const loadProductsData = async () => {
+    setIsLoading(true);
     try {
       const data = await fetchProducts();
-      setProducts(data);
-      if (isRetry) {
-        toast({
-          title: "Library updated",
-          description: "Products loaded successfully.",
-        });
-      }
-    } catch (err: any) {
-      console.error("Failed to load products:", err);
-      setErrorFetch("Unable to load products. Please try again.");
+      setProducts(data || []);
+    } catch (e: any) {
+      console.error(e);
+      setProducts([]);
+      setErrorFetch("true");
     } finally {
       setIsLoading(false);
-      setRetryingFetch(false);
     }
   };
-
    
   useEffect(() => {
     loadProductsData();
-  }, [setProducts]);
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -194,25 +183,19 @@ export default function ProductsLibraryPage() {
         </Dialog>
       </div>
 
-      {errorFetch ? (
-        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-12 mt-8">
-          <ErrorState 
-            message="Failed to load products" 
-            onRetry={() => loadProductsData(true)} 
-            retrying={retryingFetch}
-          />
-        </div>
-      ) : isLoading ? (
+      {isLoading ? (
         <GridSkeleton count={8} />
       ) : products.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-border rounded-2xl bg-secondary/20">
           <div className="h-20 w-20 rounded-2xl bg-secondary flex items-center justify-center mb-4">
             <Package className="h-10 w-10 text-muted-foreground opacity-50" />
           </div>
-          <h3 className="text-xl font-semibold text-foreground">Your Product Library is empty</h3>
-          <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
-            Upload your first product image to start creating professional photoshoots in seconds.
-          </p>
+          <h3 className="text-xl font-semibold text-foreground">Upload your first product</h3>
+          <div className="text-sm text-muted-foreground mt-3 max-w-sm mx-auto space-y-1">
+             <p>Use PNG or JPG.</p>
+             <p>Transparent background recommended.</p>
+             <p>Max size 10MB.</p>
+          </div>
           <Button 
             variant="outline" 
             className="mt-6 border-primary/20 hover:border-primary/50 text-primary"

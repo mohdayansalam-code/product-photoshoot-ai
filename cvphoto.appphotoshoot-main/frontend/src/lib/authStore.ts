@@ -13,7 +13,7 @@ interface AuthState {
 
 const hostname = window.location.hostname;
 if (hostname === "127.0.0.1") {
-    console.warn("Use localhost instead of 127.0.0.1 for local development to ensure Magic Link redirects work correctly.");
+    // Handled in UI
 }
 
 export const useAuthStore = create<AuthState>((set) => ({

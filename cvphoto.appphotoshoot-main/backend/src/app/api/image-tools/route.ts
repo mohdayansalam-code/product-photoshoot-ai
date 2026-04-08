@@ -1,3 +1,4 @@
+/** @deprecated Migrating to /api/tools/[tool_name] structure */
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";

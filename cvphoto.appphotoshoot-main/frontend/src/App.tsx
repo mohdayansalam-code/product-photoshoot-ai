@@ -16,9 +16,7 @@ import AssetsPage from "./pages/AssetsPage";
 import BillingPage from "./pages/BillingPage";
 import SettingsPage from "./pages/SettingsPage";
 import EditorPage from "./pages/EditorPage";
-import ProjectsPage from "./pages/ProjectsPage";
 import ProductsLibraryPage from "./pages/ProductsLibraryPage";
-import ActivityPage from "./pages/ActivityPage";
 import LandingPage from "./pages/LandingPage";
 import AuthPage from "./pages/AuthPage";
 import AuthCallback from "./pages/AuthCallback";
@@ -30,8 +28,21 @@ const queryClient = new QueryClient();
 const AppContent = () => {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [globalProgress, setGlobalProgress] = useState(false);
 
   useEffect(() => {
+    let requests = 0;
+    const start = () => { requests++; setGlobalProgress(true); };
+    const end = () => { requests = Math.max(0, requests - 1); if (requests === 0) setGlobalProgress(false); };
+    
+    window.addEventListener("api-start", start);
+    window.addEventListener("api-end", end);
+    
+    const onOffline = () => {
+      import("sonner").then(m => m.toast.error("Connection lost", { description: "Network is offline" }));
+    };
+    window.addEventListener("offline", onOffline);
+
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
@@ -43,6 +54,9 @@ const AppContent = () => {
     });
 
     return () => {
+      window.removeEventListener("api-start", start);
+      window.removeEventListener("api-end", end);
+      window.removeEventListener("offline", onOffline);
       listener.subscription.unsubscribe();
     };
   }, []);
@@ -51,19 +65,27 @@ const AppContent = () => {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
+  const activeSession = session;
+
   return (
-    <Routes>
+    <>
+      {globalProgress && (
+        <div className="fixed top-0 left-0 right-0 h-[3px] bg-primary z-[9999] shadow-md overflow-hidden">
+           <div className="w-full h-full bg-white/30 animate-[pulse_1s_ease-in-out_infinite]" />
+        </div>
+      )}
+      <Routes>
       {/* Public Pages */}
-      <Route path="/" element={session ? <Navigate to="/dashboard" replace /> : <Navigate to="/landing" replace />} />
+      <Route path="/" element={activeSession ? <Navigate to="/dashboard" replace /> : <Navigate to="/landing" replace />} />
       <Route path="/landing" element={<LandingPage />} />
-      <Route path="/auth" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
-      <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+      <Route path="/auth" element={activeSession ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
+      <Route path="/login" element={activeSession ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<Navigate to="/" replace />} />
 
       {/* Protected App Pages */}
       <Route path="/dashboard/*" element={
-        session ? (
+        activeSession ? (
           <ProtectedRoute>
             <DashboardLayout>
               <Routes>
@@ -73,8 +95,6 @@ const AppContent = () => {
                 <Route path="/tools" element={<AIToolsPage />} />
                 <Route path="/editor" element={<EditorPage />} />
                 <Route path="/products" element={<ProductsLibraryPage />} />
-                <Route path="/projects" element={<ProjectsPage />} />
-                <Route path="/activity" element={<ActivityPage />} />
                 <Route path="/assets" element={<AssetsPage />} />
                 <Route path="/credits" element={<CreditsPage />} />
                 <Route path="/billing" element={<BillingPage />} />
@@ -88,6 +108,7 @@ const AppContent = () => {
         )
       } />
     </Routes>
+    </>
   );
 };
 

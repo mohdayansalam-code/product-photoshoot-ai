@@ -18,30 +18,7 @@ export function AuthCard() {
   const navigate = useNavigate();
   const setSession = useAuthStore((state) => state.setSession);
 
-  const isDev = import.meta.env.DEV;
 
-  const handleDevLogin = () => {
-    if (import.meta.env.MODE === "production") {
-      return;
-    }
-
-    const mockUser = {
-      id: "dev-user-001",
-      email: "dev@photoai.local"
-    };
-
-    const mockSession = {
-      user: mockUser,
-      access_token: "dev-token"
-    };
-
-    localStorage.setItem(
-      "photoai-dev-session",
-      JSON.stringify(mockSession)
-    );
-
-    navigate("/dashboard");
-  };
 
   const handleGoogleLogin = async () => {
     try {
@@ -179,25 +156,6 @@ export function AuthCard() {
             Send Magic Link
           </Button>
         </form>
-
-        {/* Dev Login Bypass */}
-        {isDev && (
-          <div className="pt-4 mt-6">
-            <div className="text-center text-xs text-yellow-500 mb-2">
-              DEV MODE
-            </div>
-            <Button
-              onClick={handleDevLogin}
-              variant="outline"
-              className="w-full border border-yellow-500 text-yellow-400 rounded-lg py-3 hover:bg-yellow-500/10 transition"
-            >
-              Dev Login (Bypass OTP)
-            </Button>
-            <div className="text-center text-xs text-muted-foreground mt-3">
-              Development testing enabled
-            </div>
-          </div>
-        )}
 
       </motion.div>
     </div>

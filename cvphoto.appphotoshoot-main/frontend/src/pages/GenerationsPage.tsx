@@ -3,14 +3,79 @@ import { getGenerations } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Download, Eye, Images } from "lucide-react";
+import { Download, Eye, Images, RefreshCw, FolderOpen, Loader2 } from "lucide-react";
+import { retryGeneration, uploadAsset } from "@/lib/api";
+import { toast } from "sonner";
 
 export default function GenerationsPage() {
   const [generations, setGenerations] = useState<any[]>([]);
 
-  useEffect(() => {
+  const [retrying, setRetrying] = useState<Record<string, boolean>>({});
+
+  const fetchGens = () => {
     getGenerations().then(setGenerations).catch(console.error);
+  };
+
+  useEffect(() => {
+    fetchGens();
   }, []);
+
+  const handleRetry = async (id: string) => {
+    setRetrying(prev => ({ ...prev, [id]: true }));
+    try {
+      await retryGeneration(id);
+      toast.success("Retry started. Check back soon.");
+      fetchGens();
+    } catch (error: any) {
+      toast.error("Retry failed. Try again.");
+    } finally {
+      setRetrying(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const downloadImage = async (url: string) => {
+     try {
+       const res = await fetch(url);
+       const blob = await res.blob();
+       const objectUrl = URL.createObjectURL(blob);
+       const link = document.createElement("a");
+       link.href = objectUrl;
+       link.download = `generation-${Date.now()}.png`;
+       link.click();
+       URL.revokeObjectURL(objectUrl);
+     } catch {
+       toast.error("Failed to download");
+     }
+  };
+
+  const handleDownloadAll = async (urls: string[]) => {
+    if (!urls || urls.length === 0) return;
+    toast.success(`Downloading ${urls.length} images...`);
+    for (const url of urls) {
+       await downloadImage(url);
+    }
+  };
+
+  const handleSaveToAssets = async (urls: string[]) => {
+     if (!urls || urls.length === 0) return;
+     toast.success("Saving to assets...");
+     try {
+       for (const url of urls) {
+          const res = await fetch(url);
+          const blob = await res.blob();
+          await uploadAsset(blob);
+       }
+       toast.success("Saved to assets");
+     } catch (err: any) {
+       toast.error("Failed to save to assets: " + err.message);
+     }
+  };
+
+  const getStatusColor = (status: string) => {
+     if (status === "completed") return "bg-green-100 text-green-700 border-green-200";
+     if (status === "failed") return "bg-red-100 text-red-700 border-red-200";
+     return "bg-yellow-100 text-yellow-700 border-yellow-200";
+  };
 
   if (generations.length === 0) {
     return (
@@ -51,12 +116,26 @@ export default function GenerationsPage() {
                 <p className="font-medium text-foreground">{gen.prompt || "Generated Photoshoot"}</p>
                 <p className="text-sm text-muted-foreground capitalize">{gen.model || "AI Model"} · {format(new Date(gen.created_at), "MMM d, yyyy h:mm a")}</p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-accent text-accent-foreground">
-                  {gen.status}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${getStatusColor(gen.status)}`}>
+                  {gen.status === "completed" ? "Completed" : gen.status === "failed" ? "Failed" : "Processing"}
                 </span>
-                <Button variant="outline" size="sm"><Eye className="h-3.5 w-3.5 mr-1" /> View</Button>
-                <Button variant="outline" size="sm"><Download className="h-3.5 w-3.5 mr-1" /> Download</Button>
+                {gen.status === "failed" && (
+                   <Button variant="outline" size="sm" onClick={() => handleRetry(gen.id)} disabled={retrying[gen.id]}>
+                     {retrying[gen.id] ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />} 
+                     Retry
+                   </Button>
+                )}
+                {gen.status === "completed" && (
+                   <>
+                     <Button variant="outline" size="sm" onClick={() => handleSaveToAssets(gen.image_urls)}>
+                       <FolderOpen className="h-3.5 w-3.5 mr-1" /> Save to Assets
+                     </Button>
+                     <Button variant="outline" size="sm" onClick={() => handleDownloadAll(gen.image_urls)}>
+                       <Download className="h-3.5 w-3.5 mr-1" /> Download
+                     </Button>
+                   </>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-4 gap-3">

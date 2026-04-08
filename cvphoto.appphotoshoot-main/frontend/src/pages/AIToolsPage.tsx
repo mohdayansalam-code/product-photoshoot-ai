@@ -1,7 +1,7 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { ErrorState } from "@/components/ErrorState";
 import { motion } from "framer-motion";
-import { Wand2, Eraser, Square, ZoomIn, ArrowUpFromLine, Upload, Download, ArrowRight, Loader2, Wrench } from "lucide-react";
+import { Wand2, Eraser, Square, ZoomIn, ArrowUpFromLine, Upload, Download, ArrowRight, Loader2, Wrench, Smile } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
@@ -16,11 +16,12 @@ interface Tool {
 }
 
 const tools: Tool[] = [
-  { id: "remove_bg", name: "Remove Background", description: "Remove background from product photos instantly. Perfect for ecommerce listings.", icon: Eraser, creditCost: 1 },
-  { id: "white-bg", name: "White Background", description: "Replace any background with a clean white backdrop. Amazon & marketplace ready.", icon: Square, creditCost: 1 },
-  { id: "upscale", name: "Super Resolution", description: "Enhance image quality and resolution up to 4x. Make every detail crisp and clear.", icon: ZoomIn, creditCost: 2 },
-  { id: "upscale-v4", name: "Upscale v4", description: "AI-powered upscaling with detail preservation. Best for print and large format.", icon: ArrowUpFromLine, creditCost: 4 },
-  { id: "product_fix", name: "Product Fix", description: "Fix label distortions, correct packaging defects, and improve text clarity automatically.", icon: Wrench, creditCost: 2 },
+  { id: "remove-background", name: "Remove Background", description: "Remove background from product photos instantly. Perfect for ecommerce listings.", icon: Eraser, creditCost: 1 },
+  { id: "white-background", name: "White Background", description: "Replace any background with a clean white backdrop. Amazon & marketplace ready.", icon: Square, creditCost: 1 },
+  { id: "super-resolution", name: "Super Resolution", description: "Enhance image quality and resolution up to 4x. Make every detail crisp and clear.", icon: ZoomIn, creditCost: 2 },
+  { id: "upscale", name: "Upscale", description: "AI-powered upscaling with detail preservation. Best for print and large format.", icon: ArrowUpFromLine, creditCost: 4 },
+  { id: "product-fix", name: "Product Fix", description: "Fix label clarity, packaging defects and product distortions. Ideal for cosmetics and jewelry.", icon: Wrench, creditCost: 3 },
+  { id: "face-correct", name: "Face Correction", description: "Improve facial details and remove AI artifacts. Ideal for fashion images.", icon: Smile, creditCost: 2 },
 ];
 
 export default function AIToolsPage() {
@@ -45,8 +46,8 @@ export default function AIToolsPage() {
         setUploadedImage({ url: image_url, id: product_id });
         setResultReady(false);
       } catch (err: any) {
-        console.error("Upload failed", err);
-        setErrorState({ type: 'upload', message: "Something went wrong. Please try again." });
+        console.error("Upload failed");
+        setErrorState({ type: 'upload', message: "Upload failed. Retry." });
       } finally {
         setIsUploading(false);
         setIsRetrying(false);
@@ -63,19 +64,12 @@ export default function AIToolsPage() {
     setErrorState(null);
 
     try {
-      if (activeTool.id === 'remove_bg' || activeTool.id === 'upscale' || activeTool.id === 'product_fix') {
         await callImageTool(uploadedImage.url, activeTool.id);
         alert(`${activeTool.name} job started! Check the Generations page for progress.`);
         handleClose();
-      } else {
-        // Mock delay for unsupported ones in this iteration
-        await new Promise((r) => setTimeout(r, 2000));
-        setResultReady(true);
-        setSliderValue([50]);
-      }
     } catch (err: any) {
-      console.error(`Failed to process ${activeTool.id}`, err);
-      setErrorState({ type: 'process', message: "Something went wrong. Please try again." });
+      console.error(`Failed to process ${activeTool.id}`);
+      setErrorState({ type: 'process', message: "Tool failed. Try again." });
     } finally {
       setProcessing(false);
       setIsRetrying(false);
@@ -94,7 +88,7 @@ export default function AIToolsPage() {
         <p className="text-sm text-muted-foreground">Enhance your product images with powerful AI tools</p>
       </motion.div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {tools.map((tool, i) => (
           <motion.div
             key={tool.id}
@@ -150,13 +144,20 @@ export default function AIToolsPage() {
               <Upload className="h-8 w-8 text-muted-foreground mb-3" />
               <p className="text-sm font-medium text-foreground">Upload product image</p>
               <p className="text-xs text-muted-foreground mt-1">Drag & drop or browse</p>
-              <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
+              <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={isUploading || processing} />
             </label>
           ) : (
             <div className="space-y-4">
               {!resultReady ? (
                 <div className="rounded-lg border border-border overflow-hidden aspect-video bg-secondary/30 flex justify-center items-center">
-                  <img src={uploadedImage.url} alt="Original" className={`w-full h-full object-cover transition-opacity ${processing ? 'opacity-50' : 'opacity-100'}`} />
+                   {processing ? (
+                       <div className="flex flex-col items-center gap-3">
+                         <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                         <p className="text-foreground font-medium">Processing image...</p>
+                       </div>
+                   ) : (
+                       <img src={uploadedImage.url} alt="Original" className="w-full h-full object-cover" />
+                   )}
                 </div>
               ) : (
                 /* Before / After Comparison Slider */

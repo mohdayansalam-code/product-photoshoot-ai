@@ -21,7 +21,9 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         );
     }
 
-    if (!session) {
+    const activeSession = session;
+
+    if (!activeSession) {
         return <Navigate to="/auth" replace />;
     }
 

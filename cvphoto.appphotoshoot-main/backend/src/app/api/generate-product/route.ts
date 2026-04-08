@@ -4,6 +4,7 @@ import { logger } from "@/utils/logger";
 import { standardResponse, ApiError } from "@/lib/apiError";
 import { config } from "@/config/env";
 import { rateLimiter } from "@/services/rateLimiter";
+import { buildPrompt } from "@/lib/promptBuilder";
 import { creditSystem } from "@/services/creditSystem";
 
 export async function POST(req: NextRequest) {
@@ -22,9 +23,20 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
 
         const product_image = body.product_image || body.imageUrl;
-        let finalPrompt = body.prompt || body.scene_prompt || body.template || "";
+        const background_image = body.background_image || null;
+        const model_image = body.model_image || null;
+        const user_prompt = body.user_prompt;
+        const generation_type = body.generation_type || "product";
 
         const scene = body.scene;
+
+        let finalPrompt = buildPrompt({
+            userPrompt: user_prompt,
+            generationType: generation_type,
+            hasModel: !!model_image,
+            hasBackground: !!background_image
+        });
+
         if (scene === "luxury-skincare-studio") {
             finalPrompt += ", luxury skincare studio, marble surface, soft beauty lighting, premium product photography";
         } else if (scene === "amazon-white-background") {
@@ -48,14 +60,18 @@ export async function POST(req: NextRequest) {
         }
 
         const fetchers = body.fetchers || {};
+        if (background_image) fetchers.background_image = background_image;
+        if (model_image) fetchers.model_image = model_image;
+        
         const image_count = Math.min(Math.max(body.image_count ?? 4, 1), 4);
 
         if (!product_image) {
             throw new ApiError(400, "Missing product_image");
         }
         
+        
         if (!finalPrompt || finalPrompt.trim() === "") {
-            finalPrompt = "Product photo upload";
+            finalPrompt = "professional product photography";
         }
 
         let base_model_credits = 10;
@@ -84,6 +100,15 @@ export async function POST(req: NextRequest) {
         const supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey);
         
         await rateLimiter.checkLimit(supabaseAdmin, user.id, 10, 60000, "generation");
+
+        // Double Credit Safety Check
+        const { data: userData, error: userError } = await supabaseAdmin.from('users').select('credits').eq('id', user.id).single();
+        if (userError || !userData) {
+            throw new ApiError(500, "Could not verify user credits.");
+        }
+        if (userData.credits < credits_cost) {
+            throw new ApiError(402, "Not enough credits", "INSUFFICIENT_CREDITS");
+        }
 
         // Idempotency: request_id check is integrated into the RPC below for ultimate atomicity.
         const request_id = body.request_id || req.headers.get("x-request-id");

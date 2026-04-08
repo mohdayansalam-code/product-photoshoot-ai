@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [react()],
+  cacheDir: 'node_modules/.vite_build_cache',
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -15,6 +16,5 @@ export default defineConfig({
   },
   build: {
     minify: false,
-    cacheDir: 'node_modules/.vite_build_cache',
   },
 });

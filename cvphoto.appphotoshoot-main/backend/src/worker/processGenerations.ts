@@ -60,7 +60,7 @@ async function processPendingJobs() {
 function startHeartbeat() {
     setInterval(() => {
         logger.info(`WORKER_HEALTHY ${new Date().toISOString()}`);
-        console.log("Worker alive:", new Date());
+        // Worker alive ping
     }, 30000);
 }
 

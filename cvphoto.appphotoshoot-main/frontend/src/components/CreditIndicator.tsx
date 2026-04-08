@@ -67,6 +67,11 @@ export function CreditIndicator({
               <span className="text-[10px] text-muted-foreground">{percentage}%</span>
             </div>
             <Progress value={percentage} className="h-1.3 mt-1.5" />
+            {credits < 15 && (
+               <p className="text-[10px] text-amber-500 mt-2 font-medium leading-tight">
+                 Add credits to continue generating product photos
+               </p>
+            )}
           </div>
         )}
       </div>

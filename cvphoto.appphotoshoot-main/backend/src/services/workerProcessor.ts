@@ -303,7 +303,7 @@ export const workerProcessor = {
                 });
             }
         } finally {
-            console.log(`Finished job ${job.id}`);
+            // Finished job
         }
     }
 };

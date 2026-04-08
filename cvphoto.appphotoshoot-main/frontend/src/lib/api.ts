@@ -45,62 +45,80 @@ export const MODELS = [
   { id: "flux-2-pro", name: "Flux 2 Pro", credits_per_image: 2, badge: "Fast" },
 ];
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_BASE = import.meta.env.VITE_API_URL || (typeof window !== "undefined" && window.location.hostname === "localhost" ? "http://localhost:3000/api" : "/api");
+
+let activeRequests = 0;
+
+function startLoading() {
+  activeRequests++;
+  if (activeRequests === 1 && typeof window !== "undefined") {
+    window.dispatchEvent(new Event("api-start"));
+  }
+}
+
+function endLoading() {
+  activeRequests = Math.max(0, activeRequests - 1);
+  if (activeRequests === 0 && typeof window !== "undefined") {
+    window.dispatchEvent(new Event("api-end"));
+  }
+}
 
 async function fetchWithRetry(url: string, options: RequestInit = {}, timeout = 10000, maxRetries = 1) {
+  startLoading();
   let lastError: any;
+  const requestId = Date.now();
   
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-    
-    try {
-
+  try {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
       
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal
-      });
-      clearTimeout(id);
+      try {
+        const signal = options.signal ? (typeof AbortSignal !== 'undefined' && AbortSignal.any ? AbortSignal.any([options.signal, controller.signal]) : options.signal) : controller.signal;
+        
+        const response = await fetch(url, {
+          ...options,
+          signal
+        });
+        clearTimeout(id);
 
-      if (response.status === 401) {
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
+        if (response.status === 401) {
+          if (typeof window !== "undefined") {
+            window.location.href = "/login";
+          }
+          console.error("UNAUTHORIZED_API_CALL");
+          return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), { status: 401, headers: { 'Content-Type': 'application/json' } }) as any;
         }
-        throw new Error("UNAUTHORIZED_API_CALL");
-      }
 
-      return response;
-    } catch (error) {
-      clearTimeout(id);
-      lastError = error;
-      
-      // If we've reached max retries, throw the last error
-      if (attempt === maxRetries) {
-        throw lastError;
+        return response;
+      } catch (error) {
+        clearTimeout(id);
+        lastError = error;
+        
+        // If we've reached max retries, throw the last error
+        if (attempt === maxRetries) {
+          console.error(`API error: [ReqID: ${requestId}]`, lastError);
+          return new Response(JSON.stringify({ success: false, error: "Network failed" }), { status: 500, headers: { 'Content-Type': 'application/json' } }) as any;
+        }
+        
+        // Optional: Add a small delay between retries
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
-      
-      // Optional: Add a small delay between retries
-      await new Promise(resolve => setTimeout(resolve, 500));
     }
+    
+    console.error(`API error: [ReqID: ${requestId}]`, lastError);
+    return new Response(JSON.stringify({ success: false, error: "Network failed" }), { status: 500, headers: { 'Content-Type': 'application/json' } }) as any;
+  } finally {
+    endLoading();
   }
-  
-  throw lastError;
 }
 
 // Keep FetchScenes mock since it's hardcoded for UI visually.
-async function getAuthHeaders() {
-  const { data, error } = await supabase.auth.getSession();
-  
+export const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  const { data } = await supabase.auth.getSession();
   if (!data?.session) {
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
-    throw new Error("User not authenticated");
+    return { "Content-Type": "application/json" };
   }
-
-  console.log("TOKEN:", data.session.access_token);
-
   return {
     "Content-Type": "application/json",
     "Authorization": `Bearer ${data.session.access_token}`
@@ -109,7 +127,7 @@ async function getAuthHeaders() {
 
 supabase.auth.onAuthStateChange((event, session) => {
   if (session) {
-    console.log("SESSION READY");
+    // Session is ready
   }
 });
 
@@ -121,9 +139,12 @@ export async function fetchScenes(): Promise<Scene[]> {
 export async function generateProduct(payload: {
   product_image: File | null;
   product_url?: string;
-  prompt: string;
+  background_image?: File | null;
+  model_image?: File | null;
+  user_prompt: string;
+  generation_type: string;
   scene?: string;
-  model?: string;
+  ai_model?: string;
   image_count: number;
   enhancements: string[];
 }): Promise<{ job_id: string }> {
@@ -137,6 +158,24 @@ export async function generateProduct(payload: {
     });
   }
 
+  let base64Background = "";
+  if (payload.background_image) {
+    base64Background = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(payload.background_image as File);
+    });
+  }
+
+  let base64Model = "";
+  if (payload.model_image) {
+    base64Model = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(payload.model_image as File);
+    });
+  }
+
   const fetchers = {
     remove_background: payload.enhancements.includes("remove_bg"),
     white_background: payload.enhancements.includes("white_bg"),
@@ -145,22 +184,26 @@ export async function generateProduct(payload: {
     product_fix: payload.enhancements.includes("product_fix"),
   };
 
-  const response = await fetchWithRetry(`${API_URL}/api/generate-product`, {
+  const response = await fetchWithRetry(`${API_BASE}/generate-product`, {
     method: "POST",
     headers: await getAuthHeaders(),
     body: JSON.stringify({
       product_image: base64Image,
-      prompt: payload.prompt,
+      background_image: base64Background || null,
+      model_image: base64Model || null,
+      user_prompt: payload.user_prompt,
+      generation_type: payload.generation_type,
       scene: payload.scene,
-      model: payload.model,
+      model: payload.ai_model,
       image_count: payload.image_count,
       fetchers
     }),
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
   if (!data.success) {
-    throw new Error(data.error || "Generation failed");
+    console.error(data.error || "Generation failed");
+    return { job_id: "" };
   }
 
   return { job_id: data.data.generation_id || data.data.id };
@@ -170,11 +213,14 @@ export async function fetchResults(jobId: string): Promise<GenerationJob> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`${API_URL}/api/results?generation_id=${jobId}`, {
+  const response = await fetchWithRetry(`${API_BASE}/results?generation_id=${jobId}`, {
     headers
   });
-  const data = await response.json();
-  if (!data.success) throw new Error(data.error || "Failed to fetch results");
+  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
+  if (!data.success) {
+    console.error(data.error || "Failed to fetch results");
+    return { id: jobId, status: "failed", images: [], scene: "", model: "", created_at: new Date().toISOString() };
+  }
   return {
     id: data.data.generation_id || jobId,
     status: data.data.status,
@@ -187,7 +233,7 @@ export async function fetchResults(jobId: string): Promise<GenerationJob> {
 }
 
 export async function retryGeneration(generation_id: string): Promise<{ success: boolean }> {
-  const response = await fetchWithRetry(`${API_URL}/api/retry-generation`, {
+  const response = await fetchWithRetry(`${API_BASE}/retry-generation`, {
     method: "POST",
     headers: await getAuthHeaders(),
     body: JSON.stringify({ generation_id }),
@@ -195,31 +241,36 @@ export async function retryGeneration(generation_id: string): Promise<{ success:
   
   const data = await response.json().catch(() => ({}));
   if (!data.success) {
-    throw new Error(data.error || "Failed to retry generation");
+    console.error(data.error || "Failed to retry generation");
+    return { success: false };
   }
   return data.data;
 }
 
-export async function getGenerations(): Promise<any[]> {
+export async function getGenerations(signal?: AbortSignal): Promise<any[]> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`${API_URL}/api/generations`, { headers });
-  const data = await response.json();
-  if (!data.success) throw new Error(data.error || "Failed to fetch generations history");
+  const response = await fetchWithRetry(`${API_BASE}/generations`, { headers, signal });
+  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
+  if (!data.success) {
+    console.error(data.error || "Failed to fetch generations history");
+    return [];
+  }
   
   return Array.isArray(data.data) ? data.data : [];
 }
 
 export async function generateVariations(generation_id: string, image_url: string): Promise<{ job_id: string }> {
-  const response = await fetchWithRetry(`${API_URL}/api/generate-variations`, {
+  const response = await fetchWithRetry(`${API_BASE}/generate-variations`, {
     method: "POST",
     headers: await getAuthHeaders(),
     body: JSON.stringify({ generation_id, image_url }),
   });
   const data = await response.json().catch(() => ({}));
   if (!data.success) {
-    throw new Error(data.error || "Failed to generate variations");
+    console.error(data.error || "Failed to generate variations");
+    return { job_id: "" };
   }
   return { job_id: data.data.generation_id || data.data.id };
 }
@@ -228,10 +279,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`${API_URL}/api/dashboard-stats`, { headers });
-  const data = await response.json();
+  const response = await fetchWithRetry(`${API_BASE}/dashboard-stats`, { headers });
+  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
   if (!data.success) {
-    throw new Error(data.error || "Failed to fetch dashboard stats");
+    console.error(data.error || "Failed to fetch dashboard stats");
+    return { credits: 0, images_generated: 0, active_projects: 0, storage_used: "0 MB" };
   }
   return data.data.stats || data.data;
 }
@@ -244,15 +296,16 @@ export async function uploadProduct(file: File, name: string): Promise<{ product
   formData.append('file', file);
   formData.append('name', name);
 
-  const response = await fetchWithRetry(`${API_URL}/api/products`, {
+  const response = await fetchWithRetry(`${API_BASE}/products`, {
     method: 'POST',
     headers,
     body: formData,
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
   if (!data.success) {
-    throw new Error(data.error || 'Failed to upload product');
+    console.error(data.error || 'Failed to upload product');
+    return { product_id: "", image_url: "" };
   }
   return { product_id: data.data.product?.id || data.data.productId, image_url: data.data.imageUrl };
 }
@@ -261,14 +314,15 @@ export async function deleteProduct(id: string): Promise<boolean> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`${API_URL}/api/products?id=${id}`, {
+  const response = await fetchWithRetry(`${API_BASE}/products?id=${id}`, {
     method: 'DELETE',
     headers,
   });
 
   const data = await response.json().catch(() => ({}));
   if (!data.success) {
-    throw new Error(data.error || 'Failed to delete product');
+    console.error(data.error || 'Failed to delete product');
+    return false;
   }
   return true;
 }
@@ -285,22 +339,23 @@ export async function uploadAsset(blob: Blob): Promise<{ asset_url: string }> {
   formData.append('file', file);
   formData.append('name', file.name);
 
-  const response = await fetchWithRetry(`${API_URL}/api/products`, {
+  const response = await fetchWithRetry(`${API_BASE}/products`, {
     method: 'POST',
     headers,
     body: formData,
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
   if (!data.success) {
-    throw new Error(data.error || 'Failed to save asset');
+    console.error(data.error || 'Failed to save asset');
+    return { asset_url: "" };
   }
 
   // Once safely saved inside storage via the product's wrapper, we'll manually log it to the assets table on the dashboard
   return { asset_url: data.data.imageUrl };
 }
 
-export async function fetchAssets(): Promise<{ id: string; src: string; name: string }[]> {
+export async function fetchAssets(signal?: AbortSignal): Promise<{ id: string; src: string; name: string }[]> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
   
@@ -322,13 +377,16 @@ export async function fetchAssets(): Promise<{ id: string; src: string; name: st
   }));
 }
 
-export async function fetchProducts(): Promise<any[]> {
+export async function fetchProducts(signal?: AbortSignal): Promise<any[]> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`${API_URL}/api/products`, { headers });
-  const data = await response.json();
-  if (!data.success) throw new Error(data.error || 'Failed to fetch products');
+  const response = await fetchWithRetry(`${API_BASE}/products`, { headers, signal });
+  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
+  if (!data.success) {
+    console.error(data.error || 'Failed to fetch products');
+    return [];
+  }
 
   const productsArray = Array.isArray(data.data?.products) ? data.data.products : (Array.isArray(data.data) ? data.data : []);
   return productsArray.map((p: any) => ({
@@ -339,24 +397,30 @@ export async function fetchProducts(): Promise<any[]> {
   }));
 }
 
-export async function fetchCredits(): Promise<{ credits: number, maxCredits: number }> {
+export async function fetchCredits(signal?: AbortSignal): Promise<{ credits: number, maxCredits: number }> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`${API_URL}/api/credits`, { headers });
-  const data = await response.json();
-  if (!data.success) throw new Error(data.error || 'Failed to fetch credits');
+  const response = await fetchWithRetry(`${API_BASE}/credits`, { headers, signal });
+  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
+  if (!data.success) {
+    console.error(data.error || 'Failed to fetch credits');
+    return { credits: 0, maxCredits: 0 };
+  }
   return { credits: data.data.credits_remaining || 0, maxCredits: data.data.max_credits || 50 };
 }
 
 export async function callImageTool(imageUrl: string, tool: 'remove_bg' | 'upscale' | 'product_fix' | string): Promise<{ job_id: string }> {
   const headers = await getAuthHeaders();
-  const response = await fetchWithRetry(`${API_URL}/api/image-tools`, {
+  const response = await fetchWithRetry(`${API_BASE}/tools/${tool}`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ imageUrl, tool }),
   });
-  const data = await response.json();
-  if (!data.success) throw new Error(data.error || 'Failed to start tool');
+  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
+  if (!data.success) {
+    console.error(data.error || 'Failed to start tool');
+    return { job_id: "" };
+  }
   return { job_id: data.data.job_id || data.data.jobId };
 }
