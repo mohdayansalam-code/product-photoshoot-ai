@@ -53,20 +53,14 @@ export function TopNavbar() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem asChild>
-              <Link to="/settings" className="flex items-center gap-2 cursor-pointer">
+            <DropdownMenuItem onClick={() => navigate("/dashboard/profile")} className="flex items-center gap-2 cursor-pointer">
                 <User className="h-4 w-4" /> Profile
-              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/credits" className="flex items-center gap-2 cursor-pointer">
+            <DropdownMenuItem onClick={() => navigate("/dashboard/credits")} className="flex items-center gap-2 cursor-pointer">
                 <Coins className="h-4 w-4" /> Credits
-              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/settings" className="flex items-center gap-2 cursor-pointer">
+            <DropdownMenuItem onClick={() => navigate("/dashboard/settings")} className="flex items-center gap-2 cursor-pointer">
                 <Settings className="h-4 w-4" /> Settings
-              </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2 cursor-pointer text-destructive">

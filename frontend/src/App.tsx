@@ -99,6 +99,7 @@ const AppContent = () => {
                 <Route path="/credits" element={<CreditsPage />} />
                 <Route path="/billing" element={<BillingPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/profile" element={<SettingsPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </DashboardLayout>
