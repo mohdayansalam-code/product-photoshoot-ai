@@ -101,49 +101,83 @@ export async function POST(req: NextRequest) {
         
         await rateLimiter.checkLimit(supabaseAdmin, user.id, 10, 60000, "generation");
 
-        // Double Credit Safety Check
-        const { data: userData, error: userError } = await supabaseAdmin.from('users').select('credits').eq('id', user.id).single();
-        if (userError || !userData) {
-            throw new ApiError(500, "Could not verify user credits.");
-        }
-        if (userData.credits < credits_cost) {
+        // STEP 1 — check credits
+        const hasCredits = await creditSystem.hasCredits(supabaseAdmin, user.id, credits_cost);
+        if (!hasCredits) {
             throw new ApiError(402, "Not enough credits", "INSUFFICIENT_CREDITS");
         }
 
-        // Idempotency: request_id check is integrated into the RPC below for ultimate atomicity.
         const request_id = body.request_id || req.headers.get("x-request-id");
+        
+        // STEP 2 — deduct credits
+        await creditSystem.deductCredits(
+            supabaseAdmin,
+            user.id,
+            credits_cost,
+            "generation",
+            `Photoshoot generation: ${model}`
+        );
 
-        const { data: result, error: rpcError } = await supabaseAdmin.rpc("create_generation_job", {
-            p_user_id: user.id,
-            p_request_id: request_id,
-            p_image_url: product_image,
-            p_prompt: finalPrompt,
-            p_model: model,
-            p_image_count: image_count,
-            p_fetchers_json: fetchers,
-            p_credits_cost: credits_cost
-        });
+        let jobId;
+        let idempotent = false;
 
-        if (rpcError) {
-            logger.error("RPC Atomic Job Creation Failed", { error: rpcError });
+        try {
+            // STEP 3 & 4 — save generation job to DB 
+            // (this puts it in the queue for the worker)
+            const { data: insertData, error: dbError } = await supabaseAdmin.from("generations").insert({
+                user_id: user.id,
+                request_id: request_id || null, // handle idempotency mapping
+                image_url: product_image,
+                prompt: finalPrompt,
+                model: model,
+                image_count: image_count,
+                fetchers: fetchers,
+                credits_used: credits_cost,
+                status: "queued"
+            }).select("id").single();
+
+            if (dbError) {
+                // Check if idempotency conflict
+                if (dbError.code === '23505' && request_id) {
+                    const { data: existing } = await supabaseAdmin.from("generations").select("id").eq("request_id", request_id).single();
+                    if (existing) {
+                        jobId = existing.id;
+                        idempotent = true;
+                        // Refund the credits we just deducted since it's a duplicate request
+                        await creditSystem.refundCredits(supabaseAdmin, user.id, credits_cost, "refund", "Idempotent generation request duplicate refund");
+                    } else {
+                        throw new Error(`DB Error: ${dbError.message}`);
+                    }
+                } else {
+                    throw new Error(`DB Error: ${dbError.message}`);
+                }
+            } else {
+                jobId = insertData?.id;
+            }
+
+            if (!jobId) throw new Error("Failed to return job ID from database");
+
+        } catch (error: any) {
+            // STEP 5 — refund credits
+            await creditSystem.refundCredits(
+                supabaseAdmin,
+                user.id,
+                credits_cost,
+                "refund",
+                "Generation enqueue failed refund"
+            );
+            logger.error("Generation insert failed, credits refunded", { error: error.message });
             throw new ApiError(500, "Failed to initialize generation safely.");
         }
 
-        if (!result.success) {
-            if (result.error === "INSUFFICIENT_CREDITS") {
-                throw new ApiError(402, "Insufficient credits for this model and quantity.", "INSUFFICIENT_CREDITS");
-            }
-            throw new ApiError(500, `DB Error: ${result.error}`);
+        if (idempotent) {
+            logger.info(`Idempotent hit via Node.js for ${request_id}`);
         }
 
-        if (result.idempotent) {
-            logger.info(`Idempotent hit via RPC for ${request_id}`);
-        }
-
-        logger.generation("started", user.id, result.id, "queued", { credits_deducted: credits_cost, idempotent: result.idempotent });
+        logger.generation("started", user.id, jobId, "queued", { credits_deducted: credits_cost, idempotent: idempotent });
 
         return standardResponse.success({
-            generation_id: result.id,
+            generation_id: jobId,
             status: "queued"
         });
 

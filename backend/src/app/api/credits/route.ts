@@ -27,13 +27,27 @@ export async function GET(req: NextRequest) {
         if (!creditsData) {
             await supabaseAdmin.from("credits").insert({
                 user_id: user.id,
-                credits_remaining: 100
+                credits_remaining: 10
             });
-            creditsData = { credits_remaining: 100 };
+            await supabaseAdmin.from("credit_transactions").insert({
+                user_id: user.id,
+                amount: 10,
+                type: "purchase",
+                description: "Welcome Bonus"
+            });
+            creditsData = { credits_remaining: 10 };
         }
 
+        const { data: transactions } = await supabaseAdmin
+            .from("credit_transactions")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(10);
+
         return standardResponse.success({
-            credits_remaining: creditsData.credits_remaining
+            credits_remaining: creditsData.credits_remaining,
+            transactions: transactions || []
         });
 
     } catch (error: any) {

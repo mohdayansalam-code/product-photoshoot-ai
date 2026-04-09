@@ -397,7 +397,7 @@ export async function fetchProducts(signal?: AbortSignal): Promise<any[]> {
   }));
 }
 
-export async function fetchCredits(signal?: AbortSignal): Promise<{ credits: number, maxCredits: number }> {
+export async function fetchCredits(signal?: AbortSignal): Promise<{ credits: number, maxCredits: number, transactions: any[] }> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
@@ -405,9 +405,13 @@ export async function fetchCredits(signal?: AbortSignal): Promise<{ credits: num
   const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
   if (!data.success) {
     console.error(data.error || 'Failed to fetch credits');
-    return { credits: 0, maxCredits: 0 };
+    return { credits: 0, maxCredits: 0, transactions: [] };
   }
-  return { credits: data.data.credits_remaining || 0, maxCredits: data.data.max_credits || 50 };
+  return { 
+    credits: data.data.credits_remaining || 0, 
+    maxCredits: data.data.max_credits || 50,
+    transactions: data.data.transactions || []
+  };
 }
 
 export async function callImageTool(imageUrl: string, tool: 'remove_bg' | 'upscale' | 'product_fix' | string): Promise<{ job_id: string }> {
