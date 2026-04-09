@@ -1,5 +1,5 @@
 import { Search, Bell, ChevronDown, User, Coins, Settings, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,7 +15,26 @@ import { useNavigate } from "react-router-dom";
 
 export function TopNavbar() {
   const [searchFocused, setSearchFocused] = useState(false);
+  const [initials, setInitials] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        const name = user.user_metadata?.name;
+        if (name) {
+          const parts = name.trim().split(/\s+/);
+          if (parts.length >= 2) {
+            setInitials((parts[0][0] + parts[1][0]).toUpperCase());
+          } else {
+            setInitials(name[0].toUpperCase());
+          }
+        } else if (user.email) {
+          setInitials(user.email[0].toUpperCase());
+        }
+      }
+    });
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -47,15 +66,12 @@ export function TopNavbar() {
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 h-9 px-2 rounded-lg hover:bg-secondary transition-colors">
               <div className="h-7 w-7 rounded-full gradient-primary flex items-center justify-center">
-                <span className="text-xs font-semibold text-primary-foreground">JD</span>
+                <span className="text-xs font-semibold text-primary-foreground">{initials}</span>
               </div>
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => navigate("/dashboard/profile")} className="flex items-center gap-2 cursor-pointer">
-                <User className="h-4 w-4" /> Profile
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate("/dashboard/credits")} className="flex items-center gap-2 cursor-pointer">
                 <Coins className="h-4 w-4" /> Credits
             </DropdownMenuItem>
