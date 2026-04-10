@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
             }), { status: 500, headers: { "Content-Type": "application/json" } });
         }
 
-        // 2. If no user → INSERT
+        // 2. If no row → INSERT
         if (!creditsData) {
             const { data: newCredits, error } = await supabaseAdmin
                 .from("credits")
@@ -56,20 +56,20 @@ export async function GET(req: NextRequest) {
                 .select()
                 .single();
 
-            console.log("INSERT RESULT:", newCredits);
-            console.log("INSERT ERROR:", error);
-
             if (error) {
                 console.error("INSERT ERROR:", error);
                 throw new Error("Insert failed");
             }
 
-            creditsData = newCredits;
+            return NextResponse.json({
+                success: true,
+                data: newCredits
+            });
         }
 
-        // 3. If user exists but 0 → FIX
+        // 3. If row exists but broken → FIX
         if (creditsData.credits_purchased === 0) {
-            const { data: updatedCredits, error } = await supabaseAdmin
+            const { data: fixedCredits, error } = await supabaseAdmin
                 .from("credits")
                 .update({
                     credits_remaining: 10,
@@ -85,18 +85,16 @@ export async function GET(req: NextRequest) {
                 throw new Error("Update failed");
             }
 
-            creditsData = updatedCredits;
+            return NextResponse.json({
+                success: true,
+                data: fixedCredits
+            });
         }
 
-        console.log("FINAL CREDITS SENT:", creditsData);
-
+        // 4. Otherwise return existing
         return NextResponse.json({
             success: true,
-            data: {
-                credits_remaining: creditsData.credits_remaining,
-                credits_used: creditsData.credits_used,
-                credits_purchased: creditsData.credits_purchased
-            }
+            data: creditsData
         });
 
     } catch (error: any) {
