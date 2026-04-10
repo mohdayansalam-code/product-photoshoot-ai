@@ -56,6 +56,9 @@ export async function GET(req: NextRequest) {
                 .select()
                 .single();
 
+            console.log("INSERT RESULT:", newCredits);
+            console.log("INSERT ERROR:", error);
+
             if (error) {
                 console.error("INSERT ERROR:", error);
                 throw new Error("Insert failed");
