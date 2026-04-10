@@ -47,7 +47,7 @@ export default function Index() {
         setProducts(productsReq || []);
         setAssetsCount(assetsReq?.length || 0);
         setGenerationsCount(generationsReq?.length || 0);
-        setCreditsLeft(creditsReq?.credits_remaining || 0);
+        console.log("CREDITS API:", creditsReq); setCreditsLeft(creditsReq.credits_remaining);
         setLastUpdated(new Date());
       }
     } catch(e) {

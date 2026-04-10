@@ -430,9 +430,9 @@ export async function fetchCredits(signal?: AbortSignal, retryAllowed = 1): Prom
     }
     
     return { 
-      credits_remaining: Number(data.data?.credits_remaining || 0),
-      credits_used: Number(data.data?.credits_used || 0),
-      credits_purchased: Number(data.data?.credits_purchased || 0),
+      credits_remaining: Number(data?.data?.credits_remaining ?? 0),
+      credits_used: Number(data?.data?.credits_used ?? 0),
+      credits_purchased: Number(data?.data?.credits_purchased ?? 0),
       transactions: data.data?.transactions || []
     };
   } catch (error) {
