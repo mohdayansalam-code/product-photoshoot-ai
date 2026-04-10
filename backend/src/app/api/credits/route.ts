@@ -43,28 +43,46 @@ export async function GET(req: NextRequest) {
             }), { status: 500, headers: { "Content-Type": "application/json" } });
         }
 
-        if (!creditsData || creditsData.credits_purchased === 0) {
-            console.log("Fixing zero credits user or creating new user:", userId);
-
-            const { data: updatedData, error: updateError } = await supabaseAdmin
+        // 2. If no user → INSERT
+        if (!creditsData) {
+            const { data: newCredits, error } = await supabaseAdmin
                 .from("credits")
-                .upsert({
+                .insert({
                     user_id: userId,
                     credits_remaining: 10,
                     credits_used: 0,
                     credits_purchased: 10
-                }, { onConflict: "user_id" })
+                })
                 .select()
                 .single();
-                
-            if (updateError) {
-                return new Response(JSON.stringify({
-                    success: false,
-                    error: updateError?.message || "Failed to fix credits"
-                }), { status: 500, headers: { "Content-Type": "application/json" } });
+
+            if (error) {
+                console.error("INSERT ERROR:", error);
+                throw new Error("Insert failed");
             }
-            
-            creditsData = updatedData;
+
+            creditsData = newCredits;
+        }
+
+        // 3. If user exists but 0 → FIX
+        if (creditsData.credits_purchased === 0) {
+            const { data: updatedCredits, error } = await supabaseAdmin
+                .from("credits")
+                .update({
+                    credits_remaining: 10,
+                    credits_used: 0,
+                    credits_purchased: 10
+                })
+                .eq("user_id", userId)
+                .select()
+                .single();
+
+            if (error) {
+                console.error("UPDATE ERROR:", error);
+                throw new Error("Update failed");
+            }
+
+            creditsData = updatedCredits;
         }
 
         console.log("FINAL CREDITS SENT:", creditsData);
