@@ -30,22 +30,41 @@ export async function GET(req: NextRequest) {
 
         const userId = userData.user.id;
 
-        const { data: creditsData, error: creditsError } = await supabaseAdmin
+        let { data: creditsData, error: creditsError } = await supabaseAdmin
             .from("credits")
-            .upsert({
-                user_id: userId,
-                credits_remaining: 10,
-                credits_used: 0,
-                credits_purchased: 10
-            }, { onConflict: "user_id" })
-            .select()
-            .single();
+            .select("*")
+            .eq("user_id", userId)
+            .maybeSingle();
 
-        if (creditsError || !creditsData) {
+        if (creditsError) {
             return new Response(JSON.stringify({
                 success: false,
-                error: creditsError?.message || "Failed to upsert credits"
+                error: creditsError?.message || "Failed to fetch credits"
             }), { status: 500, headers: { "Content-Type": "application/json" } });
+        }
+
+        if (!creditsData || creditsData.credits_purchased === 0) {
+            console.log("Fixing zero credits user or creating new user:", userId);
+
+            const { data: updatedData, error: updateError } = await supabaseAdmin
+                .from("credits")
+                .upsert({
+                    user_id: userId,
+                    credits_remaining: 10,
+                    credits_used: 0,
+                    credits_purchased: 10
+                }, { onConflict: "user_id" })
+                .select()
+                .single();
+                
+            if (updateError) {
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: updateError?.message || "Failed to fix credits"
+                }), { status: 500, headers: { "Content-Type": "application/json" } });
+            }
+            
+            creditsData = updatedData;
         }
 
         console.log("User ID:", userId);
