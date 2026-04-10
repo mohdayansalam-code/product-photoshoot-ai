@@ -55,22 +55,45 @@ export default function Index() {
       }
     }
 
-    let creditsReq = null;
-    try {
-      creditsReq = await safeApi(() => fetchCredits(signal), null);
-    } catch (e) {
-      console.error("Credits API failed", e);
-    }
-
     if (isMountedRef.current) {
-        console.log("CREDITS API FULL:", JSON.stringify(creditsReq));
-        if (creditsReq) {
-            setCreditsLeft(creditsReq.credits_remaining);
-        }
         setLastUpdated(new Date());
         setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const loadCredits = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+
+        if (!sessionData?.session) {
+          console.log("NO SESSION");
+          return;
+        }
+
+        console.log("SESSION OK");
+
+        const res = await fetch("/api/credits", {
+          headers: {
+            Authorization: `Bearer ${sessionData.session.access_token}`,
+          },
+        });
+
+        const text = await res.text();
+        console.log("RAW RESPONSE:", text);
+
+        const data = JSON.parse(text);
+
+        console.log("CREDITS API FINAL:", data);
+
+        setCreditsLeft(data?.data?.credits_remaining ?? 0);
+      } catch (err) {
+        console.error("CREDITS ERROR:", err);
+      }
+    };
+
+    loadCredits();
+  }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
