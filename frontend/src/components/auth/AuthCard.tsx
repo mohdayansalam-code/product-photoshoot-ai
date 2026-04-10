@@ -51,7 +51,7 @@ export function AuthCard() {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: AUTH_REDIRECT,
+          emailRedirectTo: window.location.origin + "/dashboard",
           shouldCreateUser: true
         }
       });

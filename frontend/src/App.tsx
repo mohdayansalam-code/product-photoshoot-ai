@@ -51,6 +51,9 @@ const AppContent = () => {
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setLoading(false);
+      if (event === "SIGNED_IN" && session) {
+        window.location.href = "/dashboard";
+      }
     });
 
     return () => {
