@@ -3,82 +3,123 @@ import { createClient } from "@supabase/supabase-js";
 
 export async function GET(req: NextRequest) {
     try {
+        // ✅ 1. AUTH HEADER CHECK
         const authHeader = req.headers.get("authorization");
 
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return new Response(JSON.stringify({
-                success: false,
-                error: "Unauthorized"
-            }), { status: 401, headers: { "Content-Type": "application/json" } });
+            return NextResponse.json(
+                { success: false, error: "Unauthorized" },
+                { status: 401 }
+            );
         }
 
         const token = authHeader.split(" ")[1];
 
+        // ✅ 2. ADMIN CLIENT
         const supabaseAdmin = createClient(
             process.env.SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!
         );
 
-        const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+        // ✅ 3. VERIFY USER
+        const { data: userData, error: userError } =
+            await supabaseAdmin.auth.getUser(token);
 
         if (userError || !userData?.user) {
-            return new Response(JSON.stringify({
-                success: false,
-                error: "Invalid user"
-            }), { status: 401, headers: { "Content-Type": "application/json" } });
+            return NextResponse.json(
+                { success: false, error: "Invalid user" },
+                { status: 401 }
+            );
         }
 
         const userId = userData.user.id;
 
-        let { data: credits, error: creditsError } = await supabaseAdmin
+        // ✅ 4. FETCH CREDITS
+        const { data: credits, error: creditsError } = await supabaseAdmin
             .from("credits")
             .select("*")
             .eq("user_id", userId)
             .maybeSingle();
 
         if (creditsError) {
-             throw new Error(creditsError.message);
+            console.error("FETCH ERROR:", creditsError);
+            throw new Error(creditsError.message);
         }
 
-        // Create new user credits
+        // ✅ 5. NEW USER → INSERT
         if (!credits) {
-            const { data } = await supabaseAdmin
+            const { data, error } = await supabaseAdmin
                 .from("credits")
                 .insert({
                     user_id: userId,
                     credits_remaining: 10,
                     credits_used: 0,
-                    credits_purchased: 10
+                    credits_purchased: 10,
                 })
                 .select()
                 .single();
 
-            return NextResponse.json({ success: true, data });
+            if (error) {
+                console.error("INSERT ERROR:", error);
+                throw new Error(error.message);
+            }
+
+            return NextResponse.json({
+                success: true,
+                data: {
+                    credits_remaining: data.credits_remaining,
+                    credits_used: data.credits_used,
+                    credits_purchased: data.credits_purchased,
+                },
+            });
         }
 
-        // Fix broken users
+        // ✅ 6. FIX BROKEN USER
         if (credits.credits_purchased === 0) {
-            const { data } = await supabaseAdmin
+            const { data, error } = await supabaseAdmin
                 .from("credits")
                 .update({
                     credits_remaining: 10,
                     credits_used: 0,
-                    credits_purchased: 10
+                    credits_purchased: 10,
                 })
                 .eq("user_id", userId)
                 .select()
                 .single();
 
-            return NextResponse.json({ success: true, data });
+            if (error) {
+                console.error("UPDATE ERROR:", error);
+                throw new Error(error.message);
+            }
+
+            return NextResponse.json({
+                success: true,
+                data: {
+                    credits_remaining: data.credits_remaining,
+                    credits_used: data.credits_used,
+                    credits_purchased: data.credits_purchased,
+                },
+            });
         }
 
-        // Normal case
-        return NextResponse.json({ success: true, data: credits });
-
+        // ✅ 7. NORMAL USER
+        return NextResponse.json({
+            success: true,
+            data: {
+                credits_remaining: credits.credits_remaining,
+                credits_used: credits.credits_used,
+                credits_purchased: credits.credits_purchased,
+            },
+        });
     } catch (error: any) {
-        return new Response(JSON.stringify({
-            success: false,
-            error: error.message || "Internal Server Error"
-        }), { status: 500, headers: { "Content-Type": "application/json" } });
+        console.error("API ERROR:", error);
+
+        return NextResponse.json(
+            {
+                success: false,
+                error: error.message || "Internal Server Error",
+            },
+            { status: 500 }
+        );
     }
 }

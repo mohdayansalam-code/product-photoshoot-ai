@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { fetchCredits } from "@/lib/api";
+
 import { useEffect, useState, useRef } from "react";
 import { ErrorState } from "@/components/ErrorState";
 import { useProductStore } from "@/lib/productStore";
