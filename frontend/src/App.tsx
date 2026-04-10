@@ -26,8 +26,6 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const AppContent = () => {
-  const [session, setSession] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [globalProgress, setGlobalProgress] = useState(false);
 
   useEffect(() => {
@@ -43,29 +41,12 @@ const AppContent = () => {
     };
     window.addEventListener("offline", onOffline);
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setLoading(false);
-    });
-
     return () => {
       window.removeEventListener("api-start", start);
       window.removeEventListener("api-end", end);
       window.removeEventListener("offline", onOffline);
-      listener.subscription.unsubscribe();
     };
   }, []);
-
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  const activeSession = session;
 
   return (
     <>
@@ -76,37 +57,33 @@ const AppContent = () => {
       )}
       <Routes>
       {/* Public Pages */}
-      <Route path="/" element={activeSession ? <Navigate to="/dashboard" replace /> : <Navigate to="/landing" replace />} />
+      <Route path="/" element={<Navigate to="/landing" replace />} />
       <Route path="/landing" element={<LandingPage />} />
-      <Route path="/auth" element={activeSession ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
-      <Route path="/login" element={activeSession ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+      <Route path="/auth" element={<AuthPage />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<Navigate to="/" replace />} />
 
       {/* Protected App Pages */}
       <Route path="/dashboard/*" element={
-        activeSession ? (
-          <ProtectedRoute>
-            <DashboardLayout>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/generate" element={<GeneratePage />} />
-                <Route path="/generations" element={<GenerationsPage />} />
-                <Route path="/tools" element={<AIToolsPage />} />
-                <Route path="/editor" element={<EditorPage />} />
-                <Route path="/products" element={<ProductsLibraryPage />} />
-                <Route path="/assets" element={<AssetsPage />} />
-                <Route path="/credits" element={<CreditsPage />} />
-                <Route path="/billing" element={<BillingPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/profile" element={<SettingsPage />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </DashboardLayout>
-          </ProtectedRoute>
-        ) : (
-          <Navigate to="/login" replace />
-        )
+        <ProtectedRoute>
+          <DashboardLayout>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/generate" element={<GeneratePage />} />
+              <Route path="/generations" element={<GenerationsPage />} />
+              <Route path="/tools" element={<AIToolsPage />} />
+              <Route path="/editor" element={<EditorPage />} />
+              <Route path="/products" element={<ProductsLibraryPage />} />
+              <Route path="/assets" element={<AssetsPage />} />
+              <Route path="/credits" element={<CreditsPage />} />
+              <Route path="/billing" element={<BillingPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/profile" element={<SettingsPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </DashboardLayout>
+        </ProtectedRoute>
       } />
     </Routes>
     </>

@@ -1,31 +1,39 @@
-import { useEffect } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
-import { useAuthStore } from "@/lib/authStore";
+import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 import { Loader2 } from "lucide-react";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-    const { session, initialized, initialize } = useAuthStore();
-    const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<any>(null);
 
-    useEffect(() => {
-        if (!initialized) {
-            initialize();
-        }
-    }, [initialized, initialize]);
+  useEffect(() => {
+    const init = async () => {
+      const { data } = await supabase.auth.getSession();
+      setSession(data?.session || null);
+      setLoading(false);
+    };
 
-    if (!initialized) {
-        return (
-            <div className="flex min-h-screen items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
+    init();
 
-    const activeSession = session;
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+      }
+    );
 
-    if (!activeSession) {
-        return <Navigate to="/auth" replace />;
-    }
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
-    return <>{children}</>;
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!session) return <Navigate to="/auth" />;
+
+  return <>{children}</>;
 }

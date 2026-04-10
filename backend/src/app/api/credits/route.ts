@@ -30,22 +30,19 @@ export async function GET(req: NextRequest) {
 
         const userId = userData.user.id;
 
-        let { data: creditsData, error: creditsError } = await supabaseAdmin
+        let { data: credits, error: creditsError } = await supabaseAdmin
             .from("credits")
             .select("*")
             .eq("user_id", userId)
             .maybeSingle();
 
         if (creditsError) {
-            return new Response(JSON.stringify({
-                success: false,
-                error: creditsError?.message || "Failed to fetch credits"
-            }), { status: 500, headers: { "Content-Type": "application/json" } });
+             throw new Error(creditsError.message);
         }
 
-        // 2. If no row → INSERT
-        if (!creditsData) {
-            const { data: newCredits, error } = await supabaseAdmin
+        // Create new user credits
+        if (!credits) {
+            const { data } = await supabaseAdmin
                 .from("credits")
                 .insert({
                     user_id: userId,
@@ -56,20 +53,12 @@ export async function GET(req: NextRequest) {
                 .select()
                 .single();
 
-            if (error) {
-                console.error("INSERT ERROR:", error);
-                throw new Error("Insert failed");
-            }
-
-            return NextResponse.json({
-                success: true,
-                data: newCredits
-            });
+            return NextResponse.json({ success: true, data });
         }
 
-        // 3. If row exists but broken → FIX
-        if (creditsData.credits_purchased === 0) {
-            const { data: fixedCredits, error } = await supabaseAdmin
+        // Fix broken users
+        if (credits.credits_purchased === 0) {
+            const { data } = await supabaseAdmin
                 .from("credits")
                 .update({
                     credits_remaining: 10,
@@ -80,22 +69,11 @@ export async function GET(req: NextRequest) {
                 .select()
                 .single();
 
-            if (error) {
-                console.error("UPDATE ERROR:", error);
-                throw new Error("Update failed");
-            }
-
-            return NextResponse.json({
-                success: true,
-                data: fixedCredits
-            });
+            return NextResponse.json({ success: true, data });
         }
 
-        // 4. Otherwise return existing
-        return NextResponse.json({
-            success: true,
-            data: creditsData
-        });
+        // Normal case
+        return NextResponse.json({ success: true, data: credits });
 
     } catch (error: any) {
         return new Response(JSON.stringify({

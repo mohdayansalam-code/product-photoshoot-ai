@@ -1,4 +1,5 @@
 import React, { useState, memo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Download, Maximize, Eraser, Copy, Loader2, Pencil, Wrench, SplitSquareHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export const GenerationGallery = memo(function GenerationGallery({
   progress = 0, 
   status = "processing" 
 }: GenerationGalleryProps) {
+  const navigate = useNavigate();
   const generatedCount = Math.min(Math.floor((progress / 100) * imageCount), imageCount - 1);
   const { toast } = useToast();
   const [activeToolId, setActiveToolId] = useState<string | null>(null);
@@ -210,7 +212,7 @@ export const GenerationGallery = memo(function GenerationGallery({
               <Button disabled={activeToolId === `remove_bg-${i}`} size="sm" variant="secondary" className="h-8 text-xs gap-1 bg-card/90 backdrop-blur-sm hover:bg-card" onClick={() => handleTool(img, 'remove_bg', i)}>
                 {activeToolId === `remove_bg-${i}` ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eraser className="h-3 w-3" />} Remove BG
               </Button>
-              <Button size="sm" variant="secondary" className="h-8 text-xs gap-1 bg-card/90 backdrop-blur-sm hover:bg-card" onClick={() => window.location.href = `/editor?image=${encodeURIComponent(img)}`}>
+              <Button size="sm" variant="secondary" className="h-8 text-xs gap-1 bg-card/90 backdrop-blur-sm hover:bg-card" onClick={() => navigate(`/editor?image=${encodeURIComponent(img)}`)}>
                 <Pencil className="h-3 w-3" /> Edit
               </Button>
               <Button disabled={varyingImage === img} size="sm" variant="secondary" className="h-8 text-xs gap-1 bg-card/90 backdrop-blur-sm hover:bg-card" onClick={() => handleVariations(img)}>

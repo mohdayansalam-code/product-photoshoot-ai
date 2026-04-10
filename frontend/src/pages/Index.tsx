@@ -3,12 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { fetchProducts, fetchAssets, fetchCredits, getGenerations } from "@/lib/api";
+import { fetchCredits } from "@/lib/api";
 import { useEffect, useState, useRef } from "react";
 import { ErrorState } from "@/components/ErrorState";
 import { useProductStore } from "@/lib/productStore";
 import { GridSkeleton } from "@/components/ui/SkeletonViews";
-import { safeApi } from "@/utils/safeApi";
+
 import { supabase } from "@/lib/supabase";
 
 export default function Index() {
@@ -25,7 +25,7 @@ export default function Index() {
   const [slowLoad, setSlowLoad] = useState(false);
   const { products, setProducts } = useProductStore();
 
-  const loadDashboard = async (signal?: AbortSignal) => {
+  const loadDashboard = async () => {
     if (loading) return;
     
     const { data: sessionData } = await supabase.auth.getSession();
@@ -38,81 +38,52 @@ export default function Index() {
     setErrorFetch(null);
 
     try {
-      // Temporarily disabled due to backend misconfiguration throwing invalid JSON
-      // const productsReq = await safeApi(() => fetchProducts(signal), []);
-      // const assetsReq = await safeApi(() => fetchAssets(signal), []);
-      const generationsReq = await safeApi(() => getGenerations(signal), []);
+      // Direct raw API calls - simple architecture
+      const token = sessionData.session.access_token;
+      const headers = { Authorization: `Bearer ${token}` };
 
-      if (isMountedRef.current) {
-        // setProducts(productsReq || []);
-        // setAssetsCount(assetsReq?.length || 0);
-        setGenerationsCount(generationsReq?.length || 0);
+      // Fetch generations directly 
+      const genRes = await fetch("/api/generations", { headers });
+      if (genRes.ok) {
+         const genJson = await genRes.json();
+         if (genJson.success && Array.isArray(genJson.data)) {
+             setGenerationsCount(genJson.data.length);
+         }
       }
     } catch(e) {
       console.error("Dashboard primary API failed", e);
-      if (isMountedRef.current) {
-        setErrorFetch("Unable to load full dashboard.");
-      }
+      setErrorFetch("Unable to load full dashboard.");
     }
 
-    if (isMountedRef.current) {
-        setLastUpdated(new Date());
-        setLoading(false);
-    }
+    setLastUpdated(new Date());
+    setLoading(false);
   };
 
   useEffect(() => {
     const loadCredits = async () => {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-
-        if (!sessionData?.session) {
-          console.log("NO SESSION");
-          return;
-        }
-
-        console.log("SESSION OK");
+        const { data } = await supabase.auth.getSession();
+        if (!data?.session) return;
 
         const res = await fetch("/api/credits", {
           headers: {
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-          },
+            Authorization: `Bearer ${data.session.access_token}`
+          }
         });
 
-        const text = await res.text();
-        console.log("RAW RESPONSE:", text);
-
-        const data = JSON.parse(text);
-
-        console.log("CREDITS API FINAL:", data);
-
-        setCreditsLeft(data?.data?.credits_remaining ?? 0);
+        const json = await res.json();
+        
+        if (json.success && json.data) {
+           setCreditsLeft(json.data.credits_remaining);
+        }
       } catch (err) {
-        console.error("CREDITS ERROR:", err);
+        console.error("Credits fetch failed:", err);
       }
     };
 
     loadCredits();
+    loadDashboard();
   }, []);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    const controller = new AbortController();
-    loadDashboard(controller.signal);
-    return () => {
-      isMountedRef.current = false;
-      controller.abort();
-    };
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (loading) {
-        setSlowLoad(true);
-      }
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [loading]);
 
   const recentProducts = (Array.isArray(products) ? products : []).slice(0, 4);
 

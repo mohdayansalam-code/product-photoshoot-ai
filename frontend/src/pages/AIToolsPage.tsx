@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ErrorState } from "@/components/ErrorState";
 import { motion } from "framer-motion";
 import { Wand2, Eraser, Square, ZoomIn, ArrowUpFromLine, Upload, Download, ArrowRight, Loader2, Wrench, Smile } from "lucide-react";
@@ -25,6 +26,7 @@ const tools: Tool[] = [
 ];
 
 export default function AIToolsPage() {
+  const navigate = useNavigate();
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
   const [uploadedImage, setUploadedImage] = useState<{ url: string, id: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -204,7 +206,7 @@ export default function AIToolsPage() {
                     }}>
                       <Download className="h-4 w-4 mr-2" /> Download
                     </Button>
-                    <Button className="flex-1 gradient-primary text-primary-foreground" onClick={() => window.location.href = `/editor?image=${encodeURIComponent(uploadedImage.url)}`}>
+                    <Button className="flex-1 gradient-primary text-primary-foreground" onClick={() => navigate(`/editor?image=${encodeURIComponent(uploadedImage.url)}`)}>
                       <ArrowRight className="h-4 w-4 mr-2" /> Edit Result
                     </Button>
                   </>

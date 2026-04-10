@@ -83,11 +83,8 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, timeout = 
         clearTimeout(id);
 
         if (response.status === 401) {
-          if (typeof window !== "undefined") {
-            window.location.href = "/login";
-          }
           console.error("UNAUTHORIZED_API_CALL");
-          return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), { status: 401, headers: { 'Content-Type': 'application/json' } }) as any;
+          throw new Error("Unauthorized");
         }
 
         return response;
@@ -358,92 +355,7 @@ export async function uploadAsset(blob: Blob): Promise<{ asset_url: string }> {
   return { asset_url: data.data.imageUrl };
 }
 
-export const fetchAssets = async (signal?: AbortSignal): Promise<{ id: string; src: string; name: string }[]> => {
-  try {
-    const { data } = await supabase.auth.getSession();
-    const token = data?.session?.access_token;
 
-    if (!token) return [];
-
-    const res = await fetch("/api/assets", {
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      signal
-    });
-
-    if (!res.ok) return [];
-
-    const text = await res.text();
-
-    let dataJson;
-    try {
-      dataJson = JSON.parse(text);
-    } catch {
-      return [];
-    }
-
-    const assets = dataJson?.data || [];
-    return assets.map((d: any, index: number) => ({
-      id: d.id,
-      src: d.image_url || d.src, // Support both possible payload schemas
-      name: `Edited Asset ${index + 1}`
-    }));
-  } catch {
-    return [];
-  }
-};
-
-export async function fetchProducts(signal?: AbortSignal): Promise<any[]> {
-  const headers = await getAuthHeaders();
-  delete headers["Content-Type"];
-
-  const response = await fetchWithRetry(`/api/products`, { headers, signal });
-  if (!response.ok) { const errText = await response.text(); console.error("API ERROR RAW:", errText); throw new Error("API failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
-  if (!data || !data.success) {
-    console.error(data.error || 'Failed to fetch products');
-    return [];
-  }
-
-  const productsArray = Array.isArray(data.data?.products) ? data.data.products : (Array.isArray(data.data) ? data.data : []);
-  return productsArray.map((p: any) => ({
-    id: p.id,
-    name: p.name,
-    imageUrl: p.image_url,
-    addedAt: p.created_at,
-  }));
-}
-
-export async function fetchCredits(signal?: AbortSignal, retryAllowed = 1): Promise<{ credits_remaining: number, credits_used: number, credits_purchased: number, transactions: any[] }> {
-  try {
-    const headers = await getAuthHeaders();
-    delete headers["Content-Type"];
-
-    const response = await fetchWithRetry(`/api/credits`, { headers, signal });
-    if (!response.ok) { const errText = await response.text(); console.error("API ERROR RAW:", errText); throw new Error("API failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
-    if (!data || !data.success) {
-      console.error(data.error || 'Failed to fetch credits');
-      if (retryAllowed > 0) {
-        await new Promise(r => setTimeout(r, 1000));
-        return fetchCredits(signal, retryAllowed - 1);
-      }
-      return { credits_remaining: 0, credits_used: 0, credits_purchased: 0, transactions: [] };
-    }
-    
-    return { 
-      credits_remaining: Number(data?.data?.credits_remaining ?? 0),
-      credits_used: Number(data?.data?.credits_used ?? 0),
-      credits_purchased: Number(data?.data?.credits_purchased ?? 0),
-      transactions: data.data?.transactions || []
-    };
-  } catch (error) {
-    if (retryAllowed > 0) {
-      await new Promise(r => setTimeout(r, 1000));
-      return fetchCredits(signal, retryAllowed - 1);
-    }
-    return { credits_remaining: 0, credits_used: 0, credits_purchased: 0, transactions: [] };
-  }
-}
 
 
 export async function callImageTool(imageUrl: string, tool: 'remove_bg' | 'upscale' | 'product_fix' | string): Promise<{ job_id: string }> {
