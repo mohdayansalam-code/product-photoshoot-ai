@@ -203,7 +203,7 @@ export async function generateProduct(payload: {
     }),
   });
 
-  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
+  if (!response.ok) { throw new Error("API request failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
   if (!data || !data.success) {
     console.error(data.error || "Generation failed");
     return { job_id: "" };
@@ -219,7 +219,7 @@ export async function fetchResults(jobId: string): Promise<GenerationJob> {
   const response = await fetchWithRetry(`/api/results?generation_id=${jobId}`, {
     headers
   });
-  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
+  if (!response.ok) { throw new Error("API request failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
   if (!data || !data.success) {
     console.error(data.error || "Failed to fetch results");
     return { id: jobId, status: "failed", images: [], scene: "", model: "", created_at: new Date().toISOString() };
@@ -255,7 +255,7 @@ export async function getGenerations(signal?: AbortSignal): Promise<any[]> {
   delete headers["Content-Type"];
 
   const response = await fetchWithRetry(`/api/generations`, { headers, signal });
-  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
+  if (!response.ok) { throw new Error("API request failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
   if (!data || !data.success) {
     console.error(data.error || "Failed to fetch generations history");
     return [];
@@ -283,7 +283,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   delete headers["Content-Type"];
 
   const response = await fetchWithRetry(`/api/dashboard-stats`, { headers });
-  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
+  if (!response.ok) { throw new Error("API request failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
   if (!data || !data.success) {
     console.error(data.error || "Failed to fetch dashboard stats");
     return { credits: 0, images_generated: 0, active_projects: 0, storage_used: "0 MB" };
@@ -305,7 +305,7 @@ export async function uploadProduct(file: File, name: string): Promise<{ product
     body: formData,
   });
 
-  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
+  if (!response.ok) { throw new Error("API request failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
   if (!data || !data.success) {
     console.error(data.error || 'Failed to upload product');
     return { product_id: "", image_url: "" };
@@ -348,7 +348,7 @@ export async function uploadAsset(blob: Blob): Promise<{ asset_url: string }> {
     body: formData,
   });
 
-  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
+  if (!response.ok) { throw new Error("API request failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
   if (!data || !data.success) {
     console.error(data.error || 'Failed to save asset');
     return { asset_url: "" };
@@ -358,32 +358,47 @@ export async function uploadAsset(blob: Blob): Promise<{ asset_url: string }> {
   return { asset_url: data.data.imageUrl };
 }
 
-export async function fetchAssets(signal?: AbortSignal): Promise<{ id: string; src: string; name: string }[]> {
-  const headers = await getAuthHeaders();
-  delete headers["Content-Type"];
-  
-  // Since we don't have an exact /api/assets endpoint defined yet, 
-  // we fetch directly using Supabase client to retrieve the user's unified assets, assuming RLS allows it,
-  // or we combine the products list as a fallback for the "Assets" view to ensure sync.
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return [];
+export const fetchAssets = async (): Promise<{ id: string; src: string; name: string }[]> => {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
 
-  const { data } = await supabase.from("assets").select("*").eq("user_id", session.user.id).order("created_at", { ascending: false });
+    if (!token) return [];
 
-  if (!data) return [];
-  return data.map((d: any, index: number) => ({
-    id: d.id,
-    src: d.image_url,
-    name: `Edited Asset ${index + 1}`
-  }));
-}
+    const res = await fetch("/api/assets", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!res.ok) return [];
+
+    const text = await res.text();
+
+    let dataJson;
+    try {
+      dataJson = JSON.parse(text);
+    } catch {
+      return [];
+    }
+
+    const assets = dataJson?.data || [];
+    return assets.map((d: any, index: number) => ({
+      id: d.id,
+      src: d.image_url || d.src, // Support both possible payload schemas
+      name: `Edited Asset ${index + 1}`
+    }));
+  } catch {
+    return [];
+  }
+};
 
 export async function fetchProducts(signal?: AbortSignal): Promise<any[]> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
   const response = await fetchWithRetry(`/api/products`, { headers, signal });
-  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
+  if (!response.ok) { throw new Error("API request failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
   if (!data || !data.success) {
     console.error(data.error || 'Failed to fetch products');
     return [];
@@ -404,7 +419,7 @@ export async function fetchCredits(signal?: AbortSignal, retryAllowed = 1): Prom
     delete headers["Content-Type"];
 
     const response = await fetchWithRetry(`/api/credits`, { headers, signal });
-    if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
+    if (!response.ok) { throw new Error("API request failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
     if (!data || !data.success) {
       console.error(data.error || 'Failed to fetch credits');
       if (retryAllowed > 0) {
@@ -437,7 +452,7 @@ export async function callImageTool(imageUrl: string, tool: 'remove_bg' | 'upsca
     headers,
     body: JSON.stringify({ imageUrl, tool }),
   });
-  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
+  if (!response.ok) { throw new Error("API request failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
   if (!data || !data.success) {
     console.error(data.error || 'Failed to start tool');
     return { job_id: "" };

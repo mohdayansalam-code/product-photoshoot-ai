@@ -208,7 +208,7 @@ export default function ProductsLibraryPage() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
           <AnimatePresence>
-            {products.map((product, i) => (
+            {(products || []).map((product, i) => (
               <motion.div
                 key={product.id}
                 initial={{ opacity: 0, y: 12 }}

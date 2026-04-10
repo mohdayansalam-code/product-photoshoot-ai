@@ -25,7 +25,7 @@ export default function AssetsPage() {
        try {
           if (activeTab === "Products" && products.length === 0) {
              const data = await fetchProducts();
-             setProducts(data.map((p: any, i) => ({ id: p.id, src: p.imageUrl, name: p.name || `Product ${(i+1)}` })));
+             setProducts((data || []).map((p: any, i) => ({ id: p.id, src: p.imageUrl, name: p.name || `Product ${(i+1)}` })));
           }
           if (activeTab === "Generated" && generations.length === 0) {
              const data = await getGenerations();
@@ -66,7 +66,7 @@ export default function AssetsPage() {
       </motion.div>
 
       <div className="flex gap-1 bg-secondary rounded-lg p-1 w-fit">
-        {tabs.map((tab) => (
+        {(tabs || []).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -113,7 +113,7 @@ export default function AssetsPage() {
             transition={{ duration: 0.2 }}
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-4"
           >
-            {getActiveList().map((asset, i) => (
+            {(getActiveList() || []).map((asset, i) => (
             <motion.div
               key={asset.id}
               initial={{ opacity: 0, scale: 0.95 }}

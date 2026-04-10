@@ -102,7 +102,7 @@ export default function GenerationsPage() {
         Generations
       </motion.h1>
       <div className="space-y-6">
-        {generations.map((gen, idx) => (
+        {(generations || []).map((gen, idx) => (
           <motion.div
             key={gen.id}
             initial={{ opacity: 0, y: 16 }}
@@ -139,7 +139,7 @@ export default function GenerationsPage() {
               </div>
             </div>
             <div className="grid grid-cols-4 gap-3">
-              {(gen.image_urls || []).map((img: string, i: number) => (
+              {((gen.image_urls || gen.images) || []).map((img: string, i: number) => (
                 <motion.img
                   key={i}
                   src={img}
