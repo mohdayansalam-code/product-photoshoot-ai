@@ -10,16 +10,17 @@ export async function GET(req: NextRequest) {
         const token = authHeader?.replace("Bearer ", "");
         if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
 
-        const supabaseAuth = createClient(config.supabase.url, config.supabase.anonKey);
-        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
+        const supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
         if (authError || !user) {
             throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
         }
 
-        const supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-
         const creditsData = await creditSystem.getOrCreateCredits(supabaseAdmin, user.id);
+
+        console.log("User:", user.id);
+        console.log("Credits result:", creditsData);
 
         const { data: transactions } = await supabaseAdmin
             .from("credit_transactions")

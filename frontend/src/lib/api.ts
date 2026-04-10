@@ -116,12 +116,15 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, timeout = 
 // Keep FetchScenes mock since it's hardcoded for UI visually.
 export const getAuthHeaders = async (): Promise<Record<string, string>> => {
   const { data } = await supabase.auth.getSession();
-  if (!data?.session) {
-    return { "Content-Type": "application/json" };
+  const session = data?.session;
+
+  if (!session?.access_token) {
+    throw new Error("User not authenticated");
   }
+
   return {
     "Content-Type": "application/json",
-    "Authorization": `Bearer ${data.session.access_token}`
+    "Authorization": `Bearer ${session.access_token}`
   };
 }
 
@@ -200,8 +203,8 @@ export async function generateProduct(payload: {
     }),
   });
 
-  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
-  if (!data.success) {
+  const data = await response.json().catch(() => null);
+  if (!data || !data.success) {
     console.error(data.error || "Generation failed");
     return { job_id: "" };
   }
@@ -216,8 +219,8 @@ export async function fetchResults(jobId: string): Promise<GenerationJob> {
   const response = await fetchWithRetry(`${API_BASE}/results?generation_id=${jobId}`, {
     headers
   });
-  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
-  if (!data.success) {
+  const data = await response.json().catch(() => null);
+  if (!data || !data.success) {
     console.error(data.error || "Failed to fetch results");
     return { id: jobId, status: "failed", images: [], scene: "", model: "", created_at: new Date().toISOString() };
   }
@@ -240,7 +243,7 @@ export async function retryGeneration(generation_id: string): Promise<{ success:
   });
   
   const data = await response.json().catch(() => ({}));
-  if (!data.success) {
+  if (!data || !data.success) {
     console.error(data.error || "Failed to retry generation");
     return { success: false };
   }
@@ -252,8 +255,8 @@ export async function getGenerations(signal?: AbortSignal): Promise<any[]> {
   delete headers["Content-Type"];
 
   const response = await fetchWithRetry(`${API_BASE}/generations`, { headers, signal });
-  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
-  if (!data.success) {
+  const data = await response.json().catch(() => null);
+  if (!data || !data.success) {
     console.error(data.error || "Failed to fetch generations history");
     return [];
   }
@@ -268,7 +271,7 @@ export async function generateVariations(generation_id: string, image_url: strin
     body: JSON.stringify({ generation_id, image_url }),
   });
   const data = await response.json().catch(() => ({}));
-  if (!data.success) {
+  if (!data || !data.success) {
     console.error(data.error || "Failed to generate variations");
     return { job_id: "" };
   }
@@ -280,8 +283,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   delete headers["Content-Type"];
 
   const response = await fetchWithRetry(`${API_BASE}/dashboard-stats`, { headers });
-  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
-  if (!data.success) {
+  const data = await response.json().catch(() => null);
+  if (!data || !data.success) {
     console.error(data.error || "Failed to fetch dashboard stats");
     return { credits: 0, images_generated: 0, active_projects: 0, storage_used: "0 MB" };
   }
@@ -302,8 +305,8 @@ export async function uploadProduct(file: File, name: string): Promise<{ product
     body: formData,
   });
 
-  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
-  if (!data.success) {
+  const data = await response.json().catch(() => null);
+  if (!data || !data.success) {
     console.error(data.error || 'Failed to upload product');
     return { product_id: "", image_url: "" };
   }
@@ -320,7 +323,7 @@ export async function deleteProduct(id: string): Promise<boolean> {
   });
 
   const data = await response.json().catch(() => ({}));
-  if (!data.success) {
+  if (!data || !data.success) {
     console.error(data.error || 'Failed to delete product');
     return false;
   }
@@ -345,8 +348,8 @@ export async function uploadAsset(blob: Blob): Promise<{ asset_url: string }> {
     body: formData,
   });
 
-  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
-  if (!data.success) {
+  const data = await response.json().catch(() => null);
+  if (!data || !data.success) {
     console.error(data.error || 'Failed to save asset');
     return { asset_url: "" };
   }
@@ -362,12 +365,10 @@ export async function fetchAssets(signal?: AbortSignal): Promise<{ id: string; s
   // Since we don't have an exact /api/assets endpoint defined yet, 
   // we fetch directly using Supabase client to retrieve the user's unified assets, assuming RLS allows it,
   // or we combine the products list as a fallback for the "Assets" view to ensure sync.
-  const { data: { session } } = await import("./supabase").then(m => m.supabase.auth.getSession());
+  const { data: { session } } = await supabase.auth.getSession();
   if (!session) return [];
 
-  const { data } = await import("./supabase").then(m => 
-    m.supabase.from("assets").select("*").eq("user_id", session.user.id).order("created_at", { ascending: false })
-  );
+  const { data } = await supabase.from("assets").select("*").eq("user_id", session.user.id).order("created_at", { ascending: false });
 
   if (!data) return [];
   return data.map((d: any, index: number) => ({
@@ -382,8 +383,8 @@ export async function fetchProducts(signal?: AbortSignal): Promise<any[]> {
   delete headers["Content-Type"];
 
   const response = await fetchWithRetry(`${API_BASE}/products`, { headers, signal });
-  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
-  if (!data.success) {
+  const data = await response.json().catch(() => null);
+  if (!data || !data.success) {
     console.error(data.error || 'Failed to fetch products');
     return [];
   }
@@ -397,23 +398,35 @@ export async function fetchProducts(signal?: AbortSignal): Promise<any[]> {
   }));
 }
 
-export async function fetchCredits(signal?: AbortSignal): Promise<{ credits_remaining: number, credits_used: number, credits_purchased: number, transactions: any[] }> {
-  const headers = await getAuthHeaders();
-  delete headers["Content-Type"];
+export async function fetchCredits(signal?: AbortSignal, retryAllowed = 1): Promise<{ credits_remaining: number, credits_used: number, credits_purchased: number, transactions: any[] }> {
+  try {
+    const headers = await getAuthHeaders();
+    delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`${API_BASE}/credits`, { headers, signal });
-  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
-  if (!data.success) {
-    console.error(data.error || 'Failed to fetch credits');
+    const response = await fetchWithRetry(`${API_BASE}/credits`, { headers, signal });
+    const data = await response.json().catch(() => null);
+    if (!data || !data.success) {
+      console.error(data.error || 'Failed to fetch credits');
+      if (retryAllowed > 0) {
+        await new Promise(r => setTimeout(r, 1000));
+        return fetchCredits(signal, retryAllowed - 1);
+      }
+      return { credits_remaining: 0, credits_used: 0, credits_purchased: 0, transactions: [] };
+    }
+    
+    return { 
+      credits_remaining: Number(data.data?.credits_remaining || 0),
+      credits_used: Number(data.data?.credits_used || 0),
+      credits_purchased: Number(data.data?.credits_purchased || 0),
+      transactions: data.data?.transactions || []
+    };
+  } catch (error) {
+    if (retryAllowed > 0) {
+      await new Promise(r => setTimeout(r, 1000));
+      return fetchCredits(signal, retryAllowed - 1);
+    }
     return { credits_remaining: 0, credits_used: 0, credits_purchased: 0, transactions: [] };
   }
-  
-  return { 
-    credits_remaining: Number(data.data?.credits_remaining || 0),
-    credits_used: Number(data.data?.credits_used || 0),
-    credits_purchased: Number(data.data?.credits_purchased || 0),
-    transactions: data.data?.transactions || []
-  };
 }
 
 
@@ -424,8 +437,8 @@ export async function callImageTool(imageUrl: string, tool: 'remove_bg' | 'upsca
     headers,
     body: JSON.stringify({ imageUrl, tool }),
   });
-  const data = await response.json().catch(() => ({ success: false, error: "Invalid JSON" }));
-  if (!data.success) {
+  const data = await response.json().catch(() => null);
+  if (!data || !data.success) {
     console.error(data.error || 'Failed to start tool');
     return { job_id: "" };
   }

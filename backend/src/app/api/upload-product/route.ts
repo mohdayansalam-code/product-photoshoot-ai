@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
             throw new ApiError(415, "Invalid file format. Only JPEG, PNG, and WEBP are allowed.");
         }
 
-        const authHeader = req.headers.get("authorization"); const token = authHeader?.replace("Bearer ", ""); if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED"); const supabaseAuth = createClient(config.supabase.url, config.supabase.anonKey);
+        const authHeader = req.headers.get("authorization"); const token = authHeader?.replace("Bearer ", ""); if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED"); const supabaseAuth = createClient(config.supabase.url, config.supabase.serviceRoleKey);
         const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
 
         if (authError || !user) {

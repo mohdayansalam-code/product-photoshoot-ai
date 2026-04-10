@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
         const token = authHeader?.replace("Bearer ", "");
         if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
 
-        const supabaseAuth = createClient(config.supabase.url, config.supabase.anonKey);
+        const supabaseAuth = createClient(config.supabase.url, config.supabase.serviceRoleKey);
         const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
 
         if (authError || !user) {
