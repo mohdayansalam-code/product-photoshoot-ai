@@ -38,31 +38,37 @@ export default function Index() {
     setErrorFetch(null);
 
     try {
-      const productsReq = await safeApi(() => fetchProducts(signal), []);
-      const assetsReq = await safeApi(() => fetchAssets(signal), []);
+      // Temporarily disabled due to backend misconfiguration throwing invalid JSON
+      // const productsReq = await safeApi(() => fetchProducts(signal), []);
+      // const assetsReq = await safeApi(() => fetchAssets(signal), []);
       const generationsReq = await safeApi(() => getGenerations(signal), []);
-      const creditsReq = await safeApi(() => fetchCredits(signal), { credits_remaining: 0, credits_used: 0, credits_purchased: 0, transactions: [] });
 
       if (isMountedRef.current) {
-        setProducts(productsReq || []);
-        setAssetsCount(assetsReq?.length || 0);
+        // setProducts(productsReq || []);
+        // setAssetsCount(assetsReq?.length || 0);
         setGenerationsCount(generationsReq?.length || 0);
-        console.log("CREDITS API:", creditsReq); setCreditsLeft(creditsReq.credits_remaining);
-        setLastUpdated(new Date());
       }
     } catch(e) {
-      console.error("Dashboard failed");
+      console.error("Dashboard primary API failed", e);
       if (isMountedRef.current) {
-        setProducts([]);
-        setAssetsCount(0);
-        setGenerationsCount(0);
-        setCreditsLeft(0);
-        setErrorFetch("Unable to load dashboard.");
+        setErrorFetch("Unable to load full dashboard.");
       }
-    } finally {
-      if (isMountedRef.current) {
+    }
+
+    let creditsReq = null;
+    try {
+      creditsReq = await safeApi(() => fetchCredits(signal), null);
+    } catch (e) {
+      console.error("Credits API failed", e);
+    }
+
+    if (isMountedRef.current) {
+        console.log("CREDITS API FULL:", JSON.stringify(creditsReq));
+        if (creditsReq) {
+            setCreditsLeft(creditsReq.credits_remaining);
+        }
+        setLastUpdated(new Date());
         setLoading(false);
-      }
     }
   };
 
