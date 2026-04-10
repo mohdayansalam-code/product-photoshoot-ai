@@ -358,7 +358,7 @@ export async function uploadAsset(blob: Blob): Promise<{ asset_url: string }> {
   return { asset_url: data.data.imageUrl };
 }
 
-export const fetchAssets = async (): Promise<{ id: string; src: string; name: string }[]> => {
+export const fetchAssets = async (signal?: AbortSignal): Promise<{ id: string; src: string; name: string }[]> => {
   try {
     const { data } = await supabase.auth.getSession();
     const token = data?.session?.access_token;
@@ -368,7 +368,8 @@ export const fetchAssets = async (): Promise<{ id: string; src: string; name: st
     const res = await fetch("/api/assets", {
       headers: {
         Authorization: `Bearer ${token}`
-      }
+      },
+      signal
     });
 
     if (!res.ok) return [];
