@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export async function GET(req: NextRequest) {
@@ -67,15 +67,15 @@ export async function GET(req: NextRequest) {
             creditsData = updatedData;
         }
 
-        console.log("User ID:", userId);
-        console.log("Credits:", creditsData);
+        console.log("FINAL CREDITS SENT:", creditsData);
 
-        return new Response(JSON.stringify({
+        return NextResponse.json({
             success: true,
-            data: creditsData
-        }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
+            data: {
+                credits_remaining: creditsData.credits_remaining,
+                credits_used: creditsData.credits_used,
+                credits_purchased: creditsData.credits_purchased
+            }
         });
 
     } catch (error: any) {
