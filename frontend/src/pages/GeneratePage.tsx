@@ -90,7 +90,7 @@ export default function GeneratePage() {
     
     try {
        const userCredits = await fetchCredits();
-       if (userCredits.credits < costCredits) {
+       if (userCredits.credits_remaining < costCredits) {
           sonnerToast.error("Not enough credits");
           setIsGenerating(false);
           return;

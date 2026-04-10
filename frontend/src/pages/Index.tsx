@@ -41,13 +41,13 @@ export default function Index() {
       const productsReq = await safeApi(() => fetchProducts(signal), []);
       const assetsReq = await safeApi(() => fetchAssets(signal), []);
       const generationsReq = await safeApi(() => getGenerations(signal), []);
-      const creditsReq = await safeApi(() => fetchCredits(signal), { credits: 0, maxCredits: 0 });
+      const creditsReq = await safeApi(() => fetchCredits(signal), { credits_remaining: 0, credits_used: 0, credits_purchased: 0, transactions: [] });
 
       if (isMountedRef.current) {
         setProducts(productsReq || []);
         setAssetsCount(assetsReq?.length || 0);
         setGenerationsCount(generationsReq?.length || 0);
-        setCreditsLeft(creditsReq?.credits || 0);
+        setCreditsLeft(creditsReq?.credits_remaining || 0);
         setLastUpdated(new Date());
       }
     } catch(e) {

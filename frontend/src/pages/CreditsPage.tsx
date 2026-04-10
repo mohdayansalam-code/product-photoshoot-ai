@@ -20,7 +20,7 @@ export default function CreditsPage() {
           fetchCredits(),
           getGenerations().catch(()=>[])
         ]);
-        setCredits(credData.credits);
+        setCredits(credData.credits_remaining);
         setTransactions(credData.transactions || []);
         setGenerations(genData || []);
       } finally {

@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface CreditIndicatorProps {
-  credits: number;
-  maxCredits: number;
+  credits_remaining: number;
+  credits_purchased: number;
   collapsed: boolean;
   loading?: boolean;
   error?: boolean;
@@ -14,15 +14,15 @@ interface CreditIndicatorProps {
 }
 
 export function CreditIndicator({ 
-  credits, 
-  maxCredits, 
+  credits_remaining, 
+  credits_purchased, 
   collapsed,
   loading = false,
   error = false,
   retrying = false,
   onRetry
 }: CreditIndicatorProps) {
-  const percentage = Math.round((credits / maxCredits) * 100);
+  const percentage = credits_purchased > 0 ? Math.round((credits_remaining / credits_purchased) * 100) : 0;
 
   if (error && !collapsed) {
     return (
@@ -63,11 +63,11 @@ export function CreditIndicator({
           <div className="flex-1 min-w-0">
             <p className="text-xs text-muted-foreground">Credits remaining</p>
             <div className="flex items-baseline justify-between">
-              <p className="text-sm font-semibold text-foreground">{credits}</p>
+              <p className="text-sm font-semibold text-foreground">{credits_remaining}</p>
               <span className="text-[10px] text-muted-foreground">{percentage}%</span>
             </div>
             <Progress value={percentage} className="h-1.3 mt-1.5" />
-            {credits < 15 && (
+            {credits_remaining < 15 && (
                <p className="text-[10px] text-amber-500 mt-2 font-medium leading-tight">
                  Add credits to continue generating product photos
                </p>

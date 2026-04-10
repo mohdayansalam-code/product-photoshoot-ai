@@ -13,6 +13,7 @@ import {
   Package,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
@@ -43,7 +44,7 @@ const navItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const [credits, setCredits] = useState({ credits: 0, maxCredits: 200 });
+  const [credits, setCredits] = useState({ credits_remaining: 0, credits_used: 0, credits_purchased: 50 });
   const [loadingCredits, setLoadingCredits] = useState(true);
   const [errorCredits, setErrorCredits] = useState(false);
   const [retryingCredits, setRetryingCredits] = useState(false);
@@ -59,6 +60,7 @@ export function AppSidebar() {
     } catch (err) {
       console.error("Failed to fetch credits", err);
       setErrorCredits(true);
+      toast.error("Failed to load credits");
     } finally {
       setLoadingCredits(false);
       setRetryingCredits(false);
@@ -104,8 +106,8 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-3">
         <CreditIndicator 
-          credits={credits.credits} 
-          maxCredits={credits.maxCredits} 
+          credits_remaining={credits.credits_remaining} 
+          credits_purchased={credits.credits_purchased} 
           collapsed={collapsed}
           loading={loadingCredits}
           error={errorCredits}

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { standardResponse, ApiError } from "@/lib/apiError";
 import { config } from "@/config/env";
+import { creditSystem } from "@/services/creditSystem";
 
 export async function GET(req: NextRequest) {
     try {
@@ -18,25 +19,7 @@ export async function GET(req: NextRequest) {
 
         const supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
-        let { data: creditsData } = await supabaseAdmin
-            .from("credits")
-            .select("credits_remaining")
-            .eq("user_id", user.id)
-            .single();
-
-        if (!creditsData) {
-            await supabaseAdmin.from("credits").insert({
-                user_id: user.id,
-                credits_remaining: 10
-            });
-            await supabaseAdmin.from("credit_transactions").insert({
-                user_id: user.id,
-                amount: 10,
-                type: "purchase",
-                description: "Welcome Bonus"
-            });
-            creditsData = { credits_remaining: 10 };
-        }
+        const creditsData = await creditSystem.getOrCreateCredits(supabaseAdmin, user.id);
 
         const { data: transactions } = await supabaseAdmin
             .from("credit_transactions")
@@ -47,6 +30,8 @@ export async function GET(req: NextRequest) {
 
         return standardResponse.success({
             credits_remaining: creditsData.credits_remaining,
+            credits_used: creditsData.credits_used,
+            credits_purchased: creditsData.credits_purchased,
             transactions: transactions || []
         });
 
