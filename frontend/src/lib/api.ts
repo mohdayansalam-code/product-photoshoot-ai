@@ -45,7 +45,7 @@ export const MODELS = [
   { id: "flux-2-pro", name: "Flux 2 Pro", credits_per_image: 2, badge: "Fast" },
 ];
 
-const API_BASE = import.meta.env.VITE_API_URL || (typeof window !== "undefined" && window.location.hostname === "localhost" ? "http://localhost:3000/api" : "/api");
+
 
 let activeRequests = 0;
 
@@ -187,7 +187,7 @@ export async function generateProduct(payload: {
     product_fix: payload.enhancements.includes("product_fix"),
   };
 
-  const response = await fetchWithRetry(`${API_BASE}/generate-product`, {
+  const response = await fetchWithRetry(`/api/generate-product`, {
     method: "POST",
     headers: await getAuthHeaders(),
     body: JSON.stringify({
@@ -203,7 +203,7 @@ export async function generateProduct(payload: {
     }),
   });
 
-  const data = await response.json().catch(() => null);
+  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
   if (!data || !data.success) {
     console.error(data.error || "Generation failed");
     return { job_id: "" };
@@ -216,10 +216,10 @@ export async function fetchResults(jobId: string): Promise<GenerationJob> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`${API_BASE}/results?generation_id=${jobId}`, {
+  const response = await fetchWithRetry(`/api/results?generation_id=${jobId}`, {
     headers
   });
-  const data = await response.json().catch(() => null);
+  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
   if (!data || !data.success) {
     console.error(data.error || "Failed to fetch results");
     return { id: jobId, status: "failed", images: [], scene: "", model: "", created_at: new Date().toISOString() };
@@ -236,7 +236,7 @@ export async function fetchResults(jobId: string): Promise<GenerationJob> {
 }
 
 export async function retryGeneration(generation_id: string): Promise<{ success: boolean }> {
-  const response = await fetchWithRetry(`${API_BASE}/retry-generation`, {
+  const response = await fetchWithRetry(`/api/retry-generation`, {
     method: "POST",
     headers: await getAuthHeaders(),
     body: JSON.stringify({ generation_id }),
@@ -254,8 +254,8 @@ export async function getGenerations(signal?: AbortSignal): Promise<any[]> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`${API_BASE}/generations`, { headers, signal });
-  const data = await response.json().catch(() => null);
+  const response = await fetchWithRetry(`/api/generations`, { headers, signal });
+  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
   if (!data || !data.success) {
     console.error(data.error || "Failed to fetch generations history");
     return [];
@@ -265,7 +265,7 @@ export async function getGenerations(signal?: AbortSignal): Promise<any[]> {
 }
 
 export async function generateVariations(generation_id: string, image_url: string): Promise<{ job_id: string }> {
-  const response = await fetchWithRetry(`${API_BASE}/generate-variations`, {
+  const response = await fetchWithRetry(`/api/generate-variations`, {
     method: "POST",
     headers: await getAuthHeaders(),
     body: JSON.stringify({ generation_id, image_url }),
@@ -282,8 +282,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`${API_BASE}/dashboard-stats`, { headers });
-  const data = await response.json().catch(() => null);
+  const response = await fetchWithRetry(`/api/dashboard-stats`, { headers });
+  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
   if (!data || !data.success) {
     console.error(data.error || "Failed to fetch dashboard stats");
     return { credits: 0, images_generated: 0, active_projects: 0, storage_used: "0 MB" };
@@ -299,13 +299,13 @@ export async function uploadProduct(file: File, name: string): Promise<{ product
   formData.append('file', file);
   formData.append('name', name);
 
-  const response = await fetchWithRetry(`${API_BASE}/products`, {
+  const response = await fetchWithRetry(`/api/products`, {
     method: 'POST',
     headers,
     body: formData,
   });
 
-  const data = await response.json().catch(() => null);
+  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
   if (!data || !data.success) {
     console.error(data.error || 'Failed to upload product');
     return { product_id: "", image_url: "" };
@@ -317,7 +317,7 @@ export async function deleteProduct(id: string): Promise<boolean> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`${API_BASE}/products?id=${id}`, {
+  const response = await fetchWithRetry(`/api/products?id=${id}`, {
     method: 'DELETE',
     headers,
   });
@@ -342,13 +342,13 @@ export async function uploadAsset(blob: Blob): Promise<{ asset_url: string }> {
   formData.append('file', file);
   formData.append('name', file.name);
 
-  const response = await fetchWithRetry(`${API_BASE}/products`, {
+  const response = await fetchWithRetry(`/api/products`, {
     method: 'POST',
     headers,
     body: formData,
   });
 
-  const data = await response.json().catch(() => null);
+  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
   if (!data || !data.success) {
     console.error(data.error || 'Failed to save asset');
     return { asset_url: "" };
@@ -382,8 +382,8 @@ export async function fetchProducts(signal?: AbortSignal): Promise<any[]> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`${API_BASE}/products`, { headers, signal });
-  const data = await response.json().catch(() => null);
+  const response = await fetchWithRetry(`/api/products`, { headers, signal });
+  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
   if (!data || !data.success) {
     console.error(data.error || 'Failed to fetch products');
     return [];
@@ -403,8 +403,8 @@ export async function fetchCredits(signal?: AbortSignal, retryAllowed = 1): Prom
     const headers = await getAuthHeaders();
     delete headers["Content-Type"];
 
-    const response = await fetchWithRetry(`${API_BASE}/credits`, { headers, signal });
-    const data = await response.json().catch(() => null);
+    const response = await fetchWithRetry(`/api/credits`, { headers, signal });
+    if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
     if (!data || !data.success) {
       console.error(data.error || 'Failed to fetch credits');
       if (retryAllowed > 0) {
@@ -432,12 +432,12 @@ export async function fetchCredits(signal?: AbortSignal, retryAllowed = 1): Prom
 
 export async function callImageTool(imageUrl: string, tool: 'remove_bg' | 'upscale' | 'product_fix' | string): Promise<{ job_id: string }> {
   const headers = await getAuthHeaders();
-  const response = await fetchWithRetry(`${API_BASE}/tools/${tool}`, {
+  const response = await fetchWithRetry(`/api/tools/${tool}`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ imageUrl, tool }),
   });
-  const data = await response.json().catch(() => null);
+  if (!response.ok) { throw new Error("API request failed"); } const data = await response.json();
   if (!data || !data.success) {
     console.error(data.error || 'Failed to start tool');
     return { job_id: "" };
