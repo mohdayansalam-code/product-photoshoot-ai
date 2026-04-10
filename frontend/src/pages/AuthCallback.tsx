@@ -1,15 +1,6 @@
 import { useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 
-if(window.location.hash){
- const hash = window.location.hash
- if(hash.includes("access_token")){
-  // Force reload to trigger Supabase parser
-  window.location.replace(
-   window.location.origin + "/auth/callback"
-  )
- }
-}
 
 export default function AuthCallback(){
 
