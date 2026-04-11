@@ -19,7 +19,6 @@ import EditorPage from "./pages/EditorPage";
 import ProductsLibraryPage from "./pages/ProductsLibraryPage";
 import LandingPage from "./pages/LandingPage";
 import AuthPage from "./pages/AuthPage";
-import AuthCallback from "./pages/AuthCallback";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
@@ -41,6 +40,21 @@ const AppContent = () => {
     };
     window.addEventListener("offline", onOffline);
 
+    const handleAuth = async () => {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(
+        window.location.href
+      );
+
+      const sessionRes = await supabase.auth.getSession();
+
+      if (data?.session || sessionRes.data?.session) {
+        if (window.location.pathname === '/' || window.location.pathname === '/auth' || window.location.search.includes('code=')) {
+          window.location.replace("/dashboard");
+        }
+      }
+    };
+    handleAuth();
+
     return () => {
       window.removeEventListener("api-start", start);
       window.removeEventListener("api-end", end);
@@ -61,7 +75,6 @@ const AppContent = () => {
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/auth" element={<AuthPage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<Navigate to="/" replace />} />
 
       {/* Protected App Pages */}

@@ -67,14 +67,6 @@ export default function LandingPage() {
   const [activeTab, setActiveTab] = useState(0);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        window.location.replace("/dashboard");
-      }
-    });
-  }, []);
-
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans overflow-x-hidden">
       {/* NAV */}
