@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { MODEL_COST } from "@/utils/modelCosts";
-import { SCENES, generateProduct, fetchCredits } from "@/lib/api";
+import { SCENES, generateProduct } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { toast as sonnerToast } from "sonner";
 
 const PROMPT_PRESETS = ["Luxury", "Minimal", "Studio", "Beauty", "Fashion", "Dark"];
@@ -89,7 +90,16 @@ export default function GeneratePage() {
     const costCredits = (MODEL_COST[selectedModel as keyof typeof MODEL_COST] * imageCount) / 10;
     
     try {
-       const userCredits = await fetchCredits();
+       const { data: sessionData } = await supabase.auth.getSession();
+       if (!sessionData?.session) return;
+       
+       const res = await fetch("/api/credits", {
+         headers: {
+           Authorization: `Bearer ${sessionData.session.access_token}`
+         }
+       });
+       const userCredits = await res.json();
+
        if (userCredits.credits_remaining < costCredits) {
           sonnerToast.error("Not enough credits");
           setIsGenerating(false);
