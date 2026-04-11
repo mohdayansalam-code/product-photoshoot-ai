@@ -5,6 +5,8 @@ import sceneInfluencer from "@/assets/scene-influencer.jpg";
 import sceneJewelry from "@/assets/scene-jewelry.jpg";
 import { supabase } from "@/lib/supabase";
 
+export const API_BASE_URL = "https://YOUR-AWS-BACKEND-URL.com";
+
 export interface DashboardStats {
   credits: number;
   images_generated: number;
@@ -184,7 +186,7 @@ export async function generateProduct(payload: {
     product_fix: payload.enhancements.includes("product_fix"),
   };
 
-  const response = await fetchWithRetry(`/api/generate-product`, {
+  const response = await fetchWithRetry(`${API_BASE_URL}/api/generate-product`, {
     method: "POST",
     headers: await getAuthHeaders(),
     body: JSON.stringify({
@@ -213,7 +215,7 @@ export async function fetchResults(jobId: string): Promise<GenerationJob> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`/api/results?generation_id=${jobId}`, {
+  const response = await fetchWithRetry(`${API_BASE_URL}/api/results?generation_id=${jobId}`, {
     headers
   });
   if (!response.ok) { const errText = await response.text(); console.error("API ERROR RAW:", errText); throw new Error("API failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
@@ -233,7 +235,7 @@ export async function fetchResults(jobId: string): Promise<GenerationJob> {
 }
 
 export async function retryGeneration(generation_id: string): Promise<{ success: boolean }> {
-  const response = await fetchWithRetry(`/api/retry-generation`, {
+  const response = await fetchWithRetry(`${API_BASE_URL}/api/retry-generation`, {
     method: "POST",
     headers: await getAuthHeaders(),
     body: JSON.stringify({ generation_id }),
@@ -251,7 +253,7 @@ export async function getGenerations(signal?: AbortSignal): Promise<any[]> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`/api/generations`, { headers, signal });
+  const response = await fetchWithRetry(`${API_BASE_URL}/api/generations`, { headers, signal });
   if (!response.ok) { const errText = await response.text(); console.error("API ERROR RAW:", errText); throw new Error("API failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
   if (!data || !data.success) {
     console.error(data.error || "Failed to fetch generations history");
@@ -262,7 +264,7 @@ export async function getGenerations(signal?: AbortSignal): Promise<any[]> {
 }
 
 export async function generateVariations(generation_id: string, image_url: string): Promise<{ job_id: string }> {
-  const response = await fetchWithRetry(`/api/generate-variations`, {
+  const response = await fetchWithRetry(`${API_BASE_URL}/api/generate-variations`, {
     method: "POST",
     headers: await getAuthHeaders(),
     body: JSON.stringify({ generation_id, image_url }),
@@ -279,7 +281,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`/api/dashboard-stats`, { headers });
+  const response = await fetchWithRetry(`${API_BASE_URL}/api/dashboard-stats`, { headers });
   if (!response.ok) { const errText = await response.text(); console.error("API ERROR RAW:", errText); throw new Error("API failed"); } const text = await response.text(); let data; try { data = JSON.parse(text); } catch { throw new Error("Invalid JSON response"); }
   if (!data || !data.success) {
     console.error(data.error || "Failed to fetch dashboard stats");
@@ -296,7 +298,7 @@ export async function uploadProduct(file: File, name: string): Promise<{ product
   formData.append('file', file);
   formData.append('name', name);
 
-  const response = await fetchWithRetry(`/api/products`, {
+  const response = await fetchWithRetry(`${API_BASE_URL}/api/products`, {
     method: 'POST',
     headers,
     body: formData,
@@ -314,7 +316,7 @@ export async function deleteProduct(id: string): Promise<boolean> {
   const headers = await getAuthHeaders();
   delete headers["Content-Type"];
 
-  const response = await fetchWithRetry(`/api/products?id=${id}`, {
+  const response = await fetchWithRetry(`${API_BASE_URL}/api/products?id=${id}`, {
     method: 'DELETE',
     headers,
   });
@@ -339,7 +341,7 @@ export async function uploadAsset(blob: Blob): Promise<{ asset_url: string }> {
   formData.append('file', file);
   formData.append('name', file.name);
 
-  const response = await fetchWithRetry(`/api/products`, {
+  const response = await fetchWithRetry(`${API_BASE_URL}/api/products`, {
     method: 'POST',
     headers,
     body: formData,
@@ -360,7 +362,7 @@ export async function uploadAsset(blob: Blob): Promise<{ asset_url: string }> {
 
 export async function callImageTool(imageUrl: string, tool: 'remove_bg' | 'upscale' | 'product_fix' | string): Promise<{ job_id: string }> {
   const headers = await getAuthHeaders();
-  const response = await fetchWithRetry(`/api/tools/${tool}`, {
+  const response = await fetchWithRetry(`${API_BASE_URL}/api/tools/${tool}`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ imageUrl, tool }),

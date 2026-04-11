@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { MODEL_COST } from "@/utils/modelCosts";
-import { SCENES, generateProduct } from "@/lib/api";
+import { SCENES, generateProduct, API_BASE_URL } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { toast as sonnerToast } from "sonner";
 
@@ -93,11 +93,20 @@ export default function GeneratePage() {
        const { data: sessionData } = await supabase.auth.getSession();
        if (!sessionData?.session) return;
        
-       const res = await fetch("/api/credits", {
+       const res = await fetch(`${API_BASE_URL}/api/credits`, {
          headers: {
            Authorization: `Bearer ${sessionData.session.access_token}`
          }
        });
+
+       if (!res.ok) {
+         const text = await res.text();
+         console.error("API ERROR:", text);
+         setIsGenerating(false);
+         sonnerToast.error("Failed to check credits");
+         return;
+       }
+
        const userCredits = await res.json();
 
        if (userCredits.credits_remaining < costCredits) {

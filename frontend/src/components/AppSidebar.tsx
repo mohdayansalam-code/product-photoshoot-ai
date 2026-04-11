@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/sidebar";
 import { CreditIndicator } from "@/components/CreditIndicator";
 import { supabase } from "@/lib/supabase";
+import { API_BASE_URL } from "@/lib/api";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -58,9 +59,18 @@ export function AppSidebar() {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData?.session) return;
 
-      const res = await fetch("/api/credits", {
+      const res = await fetch(`${API_BASE_URL}/api/credits`, {
         headers: { Authorization: `Bearer ${sessionData.session.access_token}` }
       });
+      
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("API ERROR:", text);
+        setErrorCredits(true);
+        toast.error("Failed to load credits");
+        return;
+      }
+
       const json = await res.json();
 
       if (json.success && json.data) {

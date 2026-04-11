@@ -10,6 +10,7 @@ import { useProductStore } from "@/lib/productStore";
 import { GridSkeleton } from "@/components/ui/SkeletonViews";
 
 import { supabase } from "@/lib/supabase";
+import { API_BASE_URL } from "@/lib/api";
 
 export default function Index() {
   const navigate = useNavigate();
@@ -43,8 +44,11 @@ export default function Index() {
       const headers = { Authorization: `Bearer ${token}` };
 
       // Fetch generations directly 
-      const genRes = await fetch("/api/generations", { headers });
-      if (genRes.ok) {
+      const genRes = await fetch(`${API_BASE_URL}/api/generations`, { headers });
+      if (!genRes.ok) {
+        const text = await genRes.text();
+        console.error("API ERROR:", text);
+      } else {
          const genJson = await genRes.json();
          if (genJson.success && Array.isArray(genJson.data)) {
              setGenerationsCount(genJson.data.length);
@@ -65,11 +69,17 @@ export default function Index() {
         const { data } = await supabase.auth.getSession();
         if (!data?.session) return;
 
-        const res = await fetch("/api/credits", {
+        const res = await fetch(`${API_BASE_URL}/api/credits`, {
           headers: {
             Authorization: `Bearer ${data.session.access_token}`
           }
         });
+
+        if (!res.ok) {
+          const text = await res.text();
+          console.error("API ERROR:", text);
+          return;
+        }
 
         const json = await res.json();
         

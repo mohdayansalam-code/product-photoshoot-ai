@@ -3,7 +3,7 @@ import { Coins, TrendingDown, TrendingUp, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useEffect, useState } from "react";
-import { getGenerations } from "@/lib/api";
+import { getGenerations, API_BASE_URL } from "@/lib/api";
 import { format, parseISO, subDays, isSameDay } from "date-fns";
 import { supabase } from "@/lib/supabase";
 
@@ -20,10 +20,19 @@ export default function CreditsPage() {
         const { data: sessionData } = await supabase.auth.getSession();
         if (!sessionData?.session) return;
 
-        const [res, genData] = await Promise.all([
-          fetch("/api/credits", {
+        const fetchRes = fetch(`${API_BASE_URL}/api/credits`, {
             headers: { Authorization: `Bearer ${sessionData.session.access_token}` }
-          }),
+          }).then(async r => {
+            if (!r.ok) {
+              const text = await r.text();
+              console.error("API ERROR:", text);
+              throw new Error("Failed to load credits");
+            }
+            return r;
+          });
+
+        const [res, genData] = await Promise.all([
+          fetchRes,
           getGenerations().catch(()=>[])
         ]);
         
