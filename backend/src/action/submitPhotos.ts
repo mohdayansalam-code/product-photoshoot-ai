@@ -3,7 +3,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 
-export async function submitPhotos() {
+export async function submitPhotos(_formData: FormData) {
   const supabase = createClient();
 
   const {
@@ -13,7 +13,7 @@ export async function submitPhotos() {
 
   if (!userId) {
     console.error("No authenticated user found");
-    return { error: "User not authenticated" };
+    throw new Error("User not authenticated");
   }
 
   const { error } = await supabase
@@ -26,7 +26,7 @@ export async function submitPhotos() {
 
   if (error) {
     console.error("Error updating user data in Supabase:", error);
-    return { error: "Failed to update user data" };
+    throw new Error("Failed to update user data");
   }
 
   redirect("/wait");

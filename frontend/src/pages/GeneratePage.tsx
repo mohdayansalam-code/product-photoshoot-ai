@@ -1,16 +1,14 @@
 import { useState } from "react";
-import { Camera, Check, Sparkles, Package, ShieldAlert, Image as ImageIcon, Upload, X } from "lucide-react";
+import { Camera, Check, Sparkles, ShieldAlert, Image as ImageIcon, Upload, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useProductStore } from "@/lib/productStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { MODEL_COST } from "@/utils/modelCosts";
-import { SCENES, generateProduct, API_BASE_URL } from "@/lib/api";
-import { supabase } from "@/lib/supabase";
+import { SCENES, generateProduct, getCredits } from "@/lib/api";
 import { toast as sonnerToast } from "sonner";
 
 const PROMPT_PRESETS = ["Luxury", "Minimal", "Studio", "Beauty", "Fashion", "Dark"];
@@ -76,7 +74,6 @@ export default function GeneratePage() {
   const [imageCount, setImageCount] = useState<number>(4);
   const [isGenerating, setIsGenerating] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   const handleGenerate = async () => {
     const productImage = uploadedProduct || selectedProductId;
@@ -90,26 +87,15 @@ export default function GeneratePage() {
     const costCredits = (MODEL_COST[selectedModel as keyof typeof MODEL_COST] * imageCount) / 10;
     
     try {
-       const { data: sessionData } = await supabase.auth.getSession();
-       if (!sessionData?.session) return;
+       const res = await fetch("http://localhost:3000/api/credits");
+       const creditBalance = await res.json();
        
-       const res = await fetch(`${API_BASE_URL}/api/credits`, {
-         headers: {
-           Authorization: `Bearer ${sessionData.session.access_token}`
-         }
-       });
-
-       if (!res.ok) {
-         const text = await res.text();
-         console.error("API ERROR:", text);
-         setIsGenerating(false);
-         sonnerToast.error("Failed to check credits");
-         return;
+       if (!creditBalance || creditBalance.credits_remaining === undefined) {
+          sonnerToast.error("Unable to verify credits right now");
+          return;
        }
 
-       const userCredits = await res.json();
-
-       if (userCredits.credits_remaining < costCredits) {
+       if (creditBalance.credits_remaining < costCredits) {
           sonnerToast.error("Not enough credits");
           setIsGenerating(false);
           return;
@@ -146,9 +132,7 @@ export default function GeneratePage() {
          {
            loading: `Generating images...`,
            success: (data) => {
-             setTimeout(() => {
-                navigate(`/dashboard/generations?job=${data.job_id}`);
-             }, 2000);
+             navigate(`/dashboard/generations?job=${data.job_id}`);
              return "Generation started successfully";
            },
            error: "Generation failed. Try again."

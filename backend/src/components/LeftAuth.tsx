@@ -1,39 +1,17 @@
-import React from "react";
-import { AvatarGroupWithInfo } from "@/components/landing/AvatarGroup";
-import Image from "next/image";
-import Logo from "@/components/Logo";
+import React from 'react';
 
-const NumberOne = () => (
-  <div className="mb-4">
-    <Image
-      src="/NumberOne.svg"
-      alt="The #1 AI Headshot Generator in Sweden"
-      width={200}
-      height={50}
-      priority
-    />
-  </div>
-);
-
-const LeftAuth: React.FC = () => {
+export default function LeftAuth() {
   return (
-    <div className="hidden md:flex md:w-1/2 bg-mainBlack flex-col justify-center items-center text-center p-12">
-      <div className="flex flex-col items-center mb-20">
-        <NumberOne />
-        <h1 className="text-xl font-bold mt-4 mb-6 text-center text-mainWhite">
-          Studio Quality Photos at Home.
+    <div className="hidden md:flex w-1/2 bg-gray-900 text-white flex-col justify-center items-center p-12 relative overflow-hidden">
+      <div className="relative z-10 max-w-lg">
+        <h1 className="text-4xl font-bold tracking-tight mb-4 text-center md:text-left">
+          Welcome to CVPHOTO
         </h1>
-        <AvatarGroupWithInfo />
-        <div className="flex items-center gap-2 mt-10">
-          <Logo className="w-7 h-7" />
-          <span className="font-sans font-light tracking-wider text-mainWhite text-xl uppercase">
-            cvphoto
-          </span>
-        </div>
+        <p className="text-lg text-gray-300 mb-8 text-center md:text-left">
+          Get professional quality product photoshoot imagery dynamically generated using AI.
+        </p>
       </div>
-      <div className="flex justify-center w-full"></div>
+      <div className="absolute inset-0 z-0 bg-gradient-to-tr from-gray-800 to-black opacity-80" />
     </div>
   );
-};
-
-export default LeftAuth;
+}

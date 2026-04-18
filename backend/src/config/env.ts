@@ -13,7 +13,7 @@ export const config = {
     env: requireEnv("ENVIRONMENT", "development"),
     nodeEnv: requireEnv("NODE_ENV", "development"),
     supabase: {
-        url: requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+        url: requireEnv("SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL),
         anonKey: requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
         serviceRoleKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
     },
@@ -43,7 +43,7 @@ export const config = {
 
 // Only validate immediately if not in build phase to prevent build crashes
 if (process.env.NEXT_PHASE !== 'phase-production-build') {
-    requireEnv("NEXT_PUBLIC_SUPABASE_URL");
+    requireEnv("SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL);
     requireEnv("SUPABASE_SERVICE_ROLE_KEY");
     requireEnv("NODE_ENV", "development");
 }

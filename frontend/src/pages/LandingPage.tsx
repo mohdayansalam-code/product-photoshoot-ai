@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, type Easing } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+
 import { Button } from "@/components/ui/button";
 import {
   Camera, Sparkles, ArrowRight, Play, Mail, Eraser, Maximize,

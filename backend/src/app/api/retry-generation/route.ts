@@ -1,9 +1,8 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";
 import { standardResponse, ApiError } from "@/lib/apiError";
-import { config } from "@/config/env";
 import { rateLimiter } from "@/services/rateLimiter";
+import { requireAuthenticatedUser } from "@/lib/routeAuth";
 
 export async function POST(req: NextRequest) {
     try {
@@ -14,18 +13,9 @@ export async function POST(req: NextRequest) {
             throw new ApiError(400, "Missing generation_id");
         }
 
-        const authHeader = req.headers.get("authorization");
-        const token = authHeader?.replace("Bearer ", "");
-        if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
-
-        const supabaseAuth = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
-
-        if (authError || !user) {
-            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
-        }
-
-        const supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+        const { user, supabaseAdmin } = await requireAuthenticatedUser(
+            req.headers.get("authorization")
+        );
 
         await rateLimiter.checkLimit(supabaseAdmin, user.id, 5, 60000, "retry-generation");
 

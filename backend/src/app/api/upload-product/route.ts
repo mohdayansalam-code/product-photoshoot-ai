@@ -1,10 +1,8 @@
 import { NextRequest } from "next/server";
-// removed
-import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";
 import { standardResponse, ApiError } from "@/lib/apiError";
-import { config } from "@/config/env";
 import { rateLimiter } from "@/services/rateLimiter";
+import { requireAuthenticatedUser } from "@/lib/routeAuth";
 
 const MAX_UPLOAD_MB = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -27,14 +25,9 @@ export async function POST(req: NextRequest) {
             throw new ApiError(415, "Invalid file format. Only JPEG, PNG, and WEBP are allowed.");
         }
 
-        const authHeader = req.headers.get("authorization"); const token = authHeader?.replace("Bearer ", ""); if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED"); const supabaseAuth = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
-
-        if (authError || !user) {
-            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
-        }
-
-        const supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+        const { user, supabaseAdmin } = await requireAuthenticatedUser(
+            req.headers.get("authorization")
+        );
         
         await rateLimiter.checkLimit(supabaseAdmin, user.id, 20, 60000, "upload_product");
 

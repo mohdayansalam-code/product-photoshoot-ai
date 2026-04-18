@@ -84,10 +84,12 @@
 @layer base {
   * {
     @apply border-border;
+    transition: all 0.2s ease;
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    overflow-x: hidden;
   }
 }
 

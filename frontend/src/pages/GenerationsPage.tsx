@@ -12,8 +12,18 @@ export default function GenerationsPage() {
 
   const [retrying, setRetrying] = useState<Record<string, boolean>>({});
 
-  const fetchGens = () => {
-    getGenerations().then(setGenerations).catch(console.error);
+  const fetchGens = async () => {
+    try {
+      const backendGens = await getGenerations();
+      const localGens = JSON.parse(localStorage.getItem("recent_generations") || "[]");
+      // Merge unique IDs
+      const merged = [...localGens, ...backendGens].filter((gen, index, self) => 
+         index === self.findIndex((t) => t.id === gen.id)
+      );
+      setGenerations(merged);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   useEffect(() => {
@@ -79,21 +89,21 @@ export default function GenerationsPage() {
 
   if (generations.length === 0) {
     return (
-      <div className="p-8 max-w-6xl mx-auto">
+      <div className="p-8 max-w-5xl mx-auto">
         <h1 className="text-2xl font-semibold text-foreground mb-2">Generations</h1>
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="h-16 w-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
             <Images className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="font-semibold text-foreground">No generations yet</p>
-          <p className="text-sm text-muted-foreground mt-1 max-w-sm">Create your first photoshoot to see generated images here.</p>
+          <p className="font-semibold text-foreground">Upload your product to start creating photos</p>
+          <p className="text-sm text-muted-foreground mt-1 max-w-sm">AI will place your product in realistic scenes</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-6">
+    <div className="p-8 max-w-5xl mx-auto space-y-6">
       <motion.h1
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

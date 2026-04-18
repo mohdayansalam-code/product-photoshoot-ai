@@ -10,7 +10,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 
 export function TopNavbar() {
@@ -19,26 +18,11 @@ export function TopNavbar() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        const name = user.user_metadata?.name;
-        if (name) {
-          const parts = name.trim().split(/\s+/);
-          if (parts.length >= 2) {
-            setInitials((parts[0][0] + parts[1][0]).toUpperCase());
-          } else {
-            setInitials(name[0].toUpperCase());
-          }
-        } else if (user.email) {
-          setInitials(user.email[0].toUpperCase());
-        }
-      }
-    });
+    setInitials("TU");
   }, []);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/login");
+  const handleLogout = () => {
+    navigate("/landing");
   };
 
   return (

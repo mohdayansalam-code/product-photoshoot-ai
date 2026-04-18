@@ -1,26 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";
 import { standardResponse, ApiError } from "@/lib/apiError";
-import { config } from "@/config/env";
+import { getSupabaseAdminClient, requireAuthenticatedUser } from "@/lib/routeAuth";
 
-const supabaseAdmin = createClient(
-    config.supabase.url,
-    config.supabase.serviceRoleKey
-);
+const supabaseAdmin = getSupabaseAdminClient();
 
 export async function POST(req: NextRequest) {
     try {
-        const authHeader = req.headers.get("authorization");
-        const token = authHeader?.replace("Bearer ", "");
-        if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
-
-        const supabaseAuth = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
-
-        if (authError || !user) {
-            return standardResponse.error("Unauthorized", "UNAUTHORIZED");
-        }
+        const { user } = await requireAuthenticatedUser(
+            req.headers.get("authorization")
+        );
 
         const formData = await req.formData();
         const file = formData.get("file") as File | null;
@@ -98,16 +87,9 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
     try {
-        const authHeader = req.headers.get("authorization");
-        const token = authHeader?.replace("Bearer ", "");
-        if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
-
-        const supabaseAuth = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
-
-        if (authError || !user) {
-            return standardResponse.error(new ApiError(401, "Unauthorized", "UNAUTHORIZED"));
-        }
+        const { user } = await requireAuthenticatedUser(
+            req.headers.get("authorization")
+        );
 
         const { data: products, error } = await supabaseAdmin
             .from("products")
@@ -130,16 +112,9 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
     try {
-        const authHeader = req.headers.get("authorization");
-        const token = authHeader?.replace("Bearer ", "");
-        if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
-
-        const supabaseAuth = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-        const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
-
-        if (authError || !user) {
-            return standardResponse.error(new ApiError(401, "Unauthorized", "UNAUTHORIZED"));
-        }
+        const { user } = await requireAuthenticatedUser(
+            req.headers.get("authorization")
+        );
 
         const url = new URL(req.url);
         const productId = url.searchParams.get("id");

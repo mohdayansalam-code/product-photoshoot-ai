@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { uploadAsset } from "@/lib/api";
 import Cropper, { ReactCropperElement } from "react-cropper";
 import "cropperjs/dist/cropper.css";
 
@@ -158,32 +158,8 @@ export default function EditorPage() {
       if (!blob) throw new Error("Could not construct image blob.");
 
       // 2. Upload securely using existing product-images logic
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
-      if (!userId) throw new Error("User not authenticated.");
-
-      const timestamp = Date.now();
-      const storagePath = `users/${userId}/assets/${timestamp}.png`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("product-images")
-        .upload(storagePath, blob, { contentType: "image/png" });
-
-      if (uploadError) throw new Error("Save failed. Try again.");
-
-      const { data: publicUrlData } = supabase.storage.from("product-images").getPublicUrl(storagePath);
-      const publicUrl = publicUrlData.publicUrl;
-
-      // 3. Create Asset Record cleanly
-      const { error: dbError } = await supabase
-        .from("assets")
-        .insert({
-           user_id: userId,
-           image_url: publicUrl,
-           source: "editor"
-        });
-
-      if (dbError) throw new Error("Save failed. Try again.");
+      const { asset_url } = await uploadAsset(blob);
+      if (!asset_url) throw new Error("Save failed. Try again.");
 
       toast({
         title: "Saved to Assets",

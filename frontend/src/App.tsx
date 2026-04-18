@@ -6,9 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import Index from "./pages/Index";
-import GeneratePage from "./pages/GeneratePage";
+import CreatePhotoshootPage from "./pages/CreatePhotoshootPage";
 import GenerationsPage from "./pages/GenerationsPage";
 import CreditsPage from "./pages/CreditsPage";
 import AIToolsPage from "./pages/AIToolsPage";
@@ -18,8 +17,6 @@ import SettingsPage from "./pages/SettingsPage";
 import EditorPage from "./pages/EditorPage";
 import ProductsLibraryPage from "./pages/ProductsLibraryPage";
 import LandingPage from "./pages/LandingPage";
-import AuthPage from "./pages/AuthPage";
-import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,20 +37,6 @@ const AppContent = () => {
     };
     window.addEventListener("offline", onOffline);
 
-    const handleAuth = async () => {
-      const { data, error } = await supabase.auth.exchangeCodeForSession(
-        window.location.href
-      );
-
-      const sessionRes = await supabase.auth.getSession();
-
-      if (data?.session || sessionRes.data?.session) {
-        if (window.location.pathname === '/' || window.location.pathname === '/auth' || window.location.search.includes('code=')) {
-          window.location.replace("/dashboard");
-        }
-      }
-    };
-    handleAuth();
 
     return () => {
       window.removeEventListener("api-start", start);
@@ -71,10 +54,8 @@ const AppContent = () => {
       )}
       <Routes>
       {/* Public Pages */}
-      <Route path="/" element={<Navigate to="/landing" replace />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/landing" element={<LandingPage />} />
-      <Route path="/auth" element={<AuthPage />} />
-      <Route path="/login" element={<LoginPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
 
       {/* Protected App Pages */}
@@ -83,7 +64,7 @@ const AppContent = () => {
           <DashboardLayout>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/generate" element={<GeneratePage />} />
+              <Route path="/create-photoshoot" element={<CreatePhotoshootPage />} />
               <Route path="/generations" element={<GenerationsPage />} />
               <Route path="/tools" element={<AIToolsPage />} />
               <Route path="/editor" element={<EditorPage />} />

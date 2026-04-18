@@ -1,15 +1,13 @@
 import { motion } from "framer-motion";
 import { Coins, TrendingDown, TrendingUp, Loader2 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useEffect, useState } from "react";
-import { getGenerations, API_BASE_URL } from "@/lib/api";
+import { getCredits, getGenerations } from "@/lib/api";
 import { format, parseISO, subDays, isSameDay } from "date-fns";
-import { supabase } from "@/lib/supabase";
 
 export default function CreditsPage() {
   const [loading, setLoading] = useState(true);
-  const [credits, setCredits] = useState(0);
+  const [credits, setCredits] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [generations, setGenerations] = useState<any[]>([]);
 
@@ -17,28 +15,22 @@ export default function CreditsPage() {
     const loadData = async () => {
       setLoading(true);
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (!sessionData?.session) return;
-
-        const fetchRes = fetch(`${API_BASE_URL}/api/credits`, {
-            headers: { Authorization: `Bearer ${sessionData.session.access_token}` }
-          }).then(async r => {
-            if (!r.ok) {
-              const text = await r.text();
-              console.error("API ERROR:", text);
-              throw new Error("Failed to load credits");
-            }
-            return r;
-          });
-
-        const [res, genData] = await Promise.all([
-          fetchRes,
-          getGenerations().catch(()=>[])
-        ]);
+        const res = await fetch("http://localhost:3000/api/credits");
+        const creditBalance = await res.json();
         
-        const credData = await res.json();
-        setCredits(credData.credits_remaining);
-        setTransactions(credData.transactions || []);
+        let genData = [];
+        try {
+          genData = await getGenerations();
+        } catch (e) {
+          // fallback
+        }
+
+        if (creditBalance && creditBalance.credits_remaining !== undefined) {
+          setCredits(creditBalance.credits_remaining);
+        } else {
+          console.error("Credits request did not return a usable response");
+        }
+        setTransactions([]);
         setGenerations(genData || []);
       } finally {
         setLoading(false);
@@ -87,7 +79,7 @@ export default function CreditsPage() {
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Current Balance</p>
-            <p className="text-3xl font-bold text-foreground">{credits} <span className="text-base font-normal text-muted-foreground">credits</span></p>
+            <p className="text-3xl font-bold text-foreground">{credits !== null ? credits : "..."} <span className="text-base font-normal text-muted-foreground">credits</span></p>
           </div>
         </div>
       </motion.div>

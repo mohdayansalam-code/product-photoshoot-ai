@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "./logger";
 import { ApiError } from "../lib/apiError";
+import { getOrCreateCreditsRecord } from "../lib/creditsAuth.js";
 
 export const creditSystem = {
     /**
@@ -9,51 +10,12 @@ export const creditSystem = {
     getOrCreateCredits: async (supabaseAdmin: SupabaseClient, userId: string) => {
         console.log("Checking credits for:", userId);
 
-        let { data: creditsData } = await supabaseAdmin
-            .from("credits")
-            .select("credits_remaining, credits_used, credits_purchased")
-            .eq("user_id", userId)
-            .single();
-
-        if (!creditsData) {
-            console.log("Creating credits for new user");
-
-            const { data: newRow, error } = await supabaseAdmin
-                .from("credits")
-                .upsert({ 
-                    user_id: userId, 
-                    credits_remaining: 10,
-                    credits_used: 0,
-                    credits_purchased: 10
-                }, { onConflict: 'user_id' })
-                .select("credits_remaining, credits_used, credits_purchased")
-                .single();
-            
-            if (error) {
-                logger.error("Failed to initialize credits row", { error, userId });
-                throw new ApiError(500, "Failed to initialize credit balance.");
-            }
-            
-            // Log the welcome bonus transaction
-            await supabaseAdmin.from("credit_transactions").insert({
-                user_id: userId,
-                amount: 10,
-                type: "purchase",
-                description: "Welcome Bonus"
-            });
-            
-            return {
-                credits_remaining: newRow?.credits_remaining ?? 10,
-                credits_used: newRow?.credits_used ?? 0,
-                credits_purchased: newRow?.credits_purchased ?? 10
-            };
+        try {
+            return await getOrCreateCreditsRecord(supabaseAdmin, userId);
+        } catch (error) {
+            logger.error("Failed to initialize credits row", { error, userId });
+            throw new ApiError(500, "Failed to initialize credit balance.");
         }
-        
-        return {
-            credits_remaining: creditsData.credits_remaining ?? 0,
-            credits_used: creditsData.credits_used ?? 0,
-            credits_purchased: creditsData.credits_purchased ?? 0
-        };
     },
 
     /**

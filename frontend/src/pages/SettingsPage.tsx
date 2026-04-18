@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -15,27 +15,16 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setEmail(user.email || "");
-        setName(user.user_metadata?.name || user.user_metadata?.full_name || "");
-      }
-      setLoading(false);
-    });
+    setEmail("test@photoai.app");
+    setName("Test User");
+    setLoading(false);
   }, []);
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase.auth.updateUser({
-      data: { name: name }
-    });
+    await new Promise((r) => setTimeout(r, 800));
     setSaving(false);
-    
-    if (error) {
-       toast.error("Failed to update profile: " + error.message);
-    } else {
-       toast.success("Profile updated successfully");
-    }
+    toast.success("Profile updated successfully");
   };
 
   if (loading) {

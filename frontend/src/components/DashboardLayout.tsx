@@ -5,12 +5,19 @@ import { TopNavbar } from "@/components/TopNavbar";
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
-        <AppSidebar />
-        <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex min-h-screen bg-gray-50 w-full overflow-hidden">
+        {/* Sidebar */}
+        <aside className="hidden md:block w-64 fixed left-0 top-0 h-full bg-white border-r z-50">
+          <AppSidebar />
+        </aside>
+
+        {/* Main Content */}
+        <main className="md:ml-64 w-full flex flex-col h-screen overflow-y-auto">
           <TopNavbar />
-          <main className="flex-1 overflow-auto">{children}</main>
-        </div>
+          <div className="px-6 md:px-10 py-6 w-full">
+            {children}
+          </div>
+        </main>
       </div>
     </SidebarProvider>
   );

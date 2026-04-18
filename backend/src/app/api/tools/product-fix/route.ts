@@ -1,23 +1,13 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { standardResponse, ApiError } from "@/lib/apiError";
-import { config } from "@/config/env";
 import { processTool } from "@/services/toolProcessor";
+import { requireAuthenticatedUser } from "@/lib/routeAuth";
 
 export async function POST(req: NextRequest) {
     try {
-        const authHeader = req.headers.get("authorization");
-        const token = authHeader?.replace("Bearer ", "");
-        if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
-
-        const supabaseAuth = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-        let user;
-        const { data, error: authError } = await supabaseAuth.auth.getUser(token);
-        if (authError || !data?.user) {
-            throw new ApiError(401, 'Unauthorized', 'UNAUTHORIZED');
-        } else {
-            user = data.user;
-        }
+        const { user } = await requireAuthenticatedUser(
+            req.headers.get("authorization")
+        );
 
         const body = await req.json();
         const { imageUrl } = body;
@@ -34,6 +24,6 @@ export async function POST(req: NextRequest) {
 
         return standardResponse.success({ image_url: resultUrl });
     } catch (error: any) {
-        return standardResponse.error({ message: "Something went wrong. Please try again." } as unknown as Error);
+        return standardResponse.error(error);
     }
 }

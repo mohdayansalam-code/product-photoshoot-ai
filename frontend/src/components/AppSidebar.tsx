@@ -8,8 +8,6 @@ import {
   Coins,
   Settings,
   Sparkles,
-  FolderKanban,
-  Activity,
   Package,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -27,12 +25,11 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { CreditIndicator } from "@/components/CreditIndicator";
-import { supabase } from "@/lib/supabase";
-import { API_BASE_URL } from "@/lib/api";
+import { getCredits } from "@/lib/api";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Generate Photoshoot", url: "/dashboard/generate", icon: Camera },
+  { title: "Generate Photoshoot", url: "/dashboard/create-photoshoot", icon: Camera },
   { title: "Generations", url: "/dashboard/generations", icon: Images },
   { title: "AI Image Tools", url: "/dashboard/tools", icon: Wand2 },
   { title: "AI Image Editor", url: "/dashboard/editor", icon: Pencil },
@@ -45,7 +42,7 @@ const navItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const [credits, setCredits] = useState({ credits_remaining: 0, credits_used: 0, credits_purchased: 50 });
+  const [creditsRemaining, setCreditsRemaining] = useState(0);
   const [loadingCredits, setLoadingCredits] = useState(true);
   const [errorCredits, setErrorCredits] = useState(false);
   const [retryingCredits, setRetryingCredits] = useState(false);
@@ -56,30 +53,19 @@ export function AppSidebar() {
     
     setErrorCredits(false);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) return;
+      const res = await fetch("http://localhost:3000/api/credits");
+      const creditBalance = await res.json();
 
-      const res = await fetch(`${API_BASE_URL}/api/credits`, {
-        headers: { Authorization: `Bearer ${sessionData.session.access_token}` }
-      });
-      
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("API ERROR:", text);
+      if (!creditBalance || creditBalance.credits === undefined) {
+        console.error("Credits request did not return a usable response");
         setErrorCredits(true);
-        toast.error("Failed to load credits");
+        if (isRetry) {
+          toast.error("Failed to load credits");
+        }
         return;
       }
 
-      const json = await res.json();
-
-      if (json.success && json.data) {
-        setCredits({
-          credits_remaining: json.data.credits_remaining || 0,
-          credits_used: json.data.credits_used || 0,
-          credits_purchased: json.data.credits_purchased || 0
-        });
-      }
+      setCreditsRemaining(creditBalance.credits);
     } catch (err) {
       console.error("Failed to fetch credits", err);
       setErrorCredits(true);
@@ -129,8 +115,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-3">
         <CreditIndicator 
-          credits_remaining={credits.credits_remaining} 
-          credits_purchased={credits.credits_purchased} 
+          credits_remaining={creditsRemaining}
           collapsed={collapsed}
           loading={loadingCredits}
           error={errorCredits}

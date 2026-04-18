@@ -1,24 +1,17 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/utils/logger";
 import { standardResponse, ApiError } from "@/lib/apiError";
 import { config } from "@/config/env";
 import { rateLimiter } from "@/services/rateLimiter";
 import { buildPrompt } from "@/lib/promptBuilder";
 import { creditSystem } from "@/services/creditSystem";
+import { requireAuthenticatedUser } from "@/lib/routeAuth";
 
 export async function POST(req: NextRequest) {
     try {
-        const authHeader = req.headers.get("authorization");
-        const token = authHeader?.replace("Bearer ", "");
-        if (!token) throw new ApiError(401, "No token provided", "UNAUTHORIZED");
-
-        const supabaseAdmin = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-        if (authError || !user) {
-            throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
-        }
+        const { user, supabaseAdmin } = await requireAuthenticatedUser(
+            req.headers.get("authorization")
+        );
 
         const body = await req.json();
 
@@ -97,8 +90,6 @@ export async function POST(req: NextRequest) {
 
         const credits_cost = generation_credits + fetcher_credits;
 
-        // Redundant supabaseAdmin instantiation removed, it's globally defined at top of POST
-        
         await rateLimiter.checkLimit(supabaseAdmin, user.id, 10, 60000, "generation");
 
         // STEP 1 — check credits

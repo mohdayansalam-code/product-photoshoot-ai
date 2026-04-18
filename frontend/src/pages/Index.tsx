@@ -1,323 +1,147 @@
-import { Camera, ArrowRight, Upload, Pencil, FolderOpen, Package, Layers } from "lucide-react";
+import { Camera, FolderOpen, Images, Plus } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-
-import { useEffect, useState, useRef } from "react";
-import { ErrorState } from "@/components/ErrorState";
-import { useProductStore } from "@/lib/productStore";
-import { GridSkeleton } from "@/components/ui/SkeletonViews";
-
-import { supabase } from "@/lib/supabase";
-import { API_BASE_URL } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { getGenerations } from "@/lib/api";
 
 export default function Index() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const isMountedRef = useRef(true);
-  const [retrying, setRetrying] = useState(false);
-  const [errorFetch, setErrorFetch] = useState<string | null>(null);
-  
-  const [assetsCount, setAssetsCount] = useState(0);
-  const [generationsCount, setGenerationsCount] = useState(0);
-  const [creditsLeft, setCreditsLeft] = useState(0);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [slowLoad, setSlowLoad] = useState(false);
-  const { products, setProducts } = useProductStore();
-
-  const loadDashboard = async () => {
-    if (loading) return;
-    
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData?.session) {
-      navigate("/auth");
-      return;
-    }
-
-    setLoading(true);
-    setErrorFetch(null);
-
-    try {
-      // Direct raw API calls - simple architecture
-      const token = sessionData.session.access_token;
-      const headers = { Authorization: `Bearer ${token}` };
-
-      // Fetch generations directly 
-      const genRes = await fetch(`${API_BASE_URL}/api/generations`, { headers });
-      if (!genRes.ok) {
-        const text = await genRes.text();
-        console.error("API ERROR:", text);
-      } else {
-         const genJson = await genRes.json();
-         if (genJson.success && Array.isArray(genJson.data)) {
-             setGenerationsCount(genJson.data.length);
-         }
-      }
-    } catch(e) {
-      console.error("Dashboard primary API failed", e);
-      setErrorFetch("Unable to load full dashboard.");
-    }
-
-    setLastUpdated(new Date());
-    setLoading(false);
-  };
+  const [generations, setGenerations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadCredits = async () => {
+    const fetchGens = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        if (!data?.session) return;
-
-        const res = await fetch(`${API_BASE_URL}/api/credits`, {
-          headers: {
-            Authorization: `Bearer ${data.session.access_token}`
-          }
-        });
-
-        if (!res.ok) {
-          const text = await res.text();
-          console.error("API ERROR:", text);
-          return;
-        }
-
-        const json = await res.json();
-        
-        if (json.success && json.data) {
-           setCreditsLeft(json.data.credits_remaining);
-        }
+        const gens = await getGenerations();
+        setGenerations(gens || []);
       } catch (err) {
-        console.error("Credits fetch failed:", err);
+        console.error("Failed to load generations for dashboard", err);
+      } finally {
+        setLoading(false);
       }
     };
-
-    loadCredits();
-    loadDashboard();
+    fetchGens();
   }, []);
 
-  const recentProducts = (Array.isArray(products) ? products : []).slice(0, 4);
+  const recentGenerations = generations.slice(0, 4);
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8">
+    <div className="p-8 max-w-5xl mx-auto space-y-12">
       {/* Clean Dynamic Header */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-        <div>
-           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-             <h1 className="text-3xl font-bold text-foreground">Overview</h1>
-             {!loading && (
-               <span className="text-xs text-muted-foreground bg-secondary/30 px-3 py-1 rounded-full mt-1 sm:mt-0 font-medium">
-                 Last updated: {format(lastUpdated, "h:mm a")}
-               </span>
-             )}
-           </div>
-           {loading && !retrying ? (
-              <div className="h-4 w-48 bg-secondary rounded animate-pulse mt-1" />
-           ) : (
-              <p className="text-muted-foreground mt-1 text-lg">
-                Welcome! You have <span className="font-medium text-foreground">{products.length} products</span> ready for editing.
-              </p>
-           )}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row md:items-center justify-between gap-6 pt-4">
+        <div className="space-y-1">
+           <h1 className="text-4xl font-bold tracking-tight text-foreground">Create Photoshoot</h1>
+           <p className="text-lg text-muted-foreground">Generate stunning AI product photos in seconds.</p>
         </div>
+        <Button 
+          onClick={() => navigate("/dashboard/create-photoshoot")} 
+          size="lg" 
+          className="h-14 px-8 text-lg rounded-2xl shadow-lg gradient-primary hidden md:inline-flex"
+        >
+           <Plus className="w-5 h-5 mr-2" /> Create Photoshoot
+        </Button>
       </motion.div>
 
-      {errorFetch ? (
-        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-8">
-          <ErrorState 
-            message={errorFetch} 
-            onRetry={() => loadDashboard()} 
-            retrying={retrying}
-          />
-        </div>
-      ) : loading ? (
-        <div className="space-y-6">
-           <GridSkeleton count={2} />
-           <GridSkeleton count={4} />
-           {slowLoad && (
-             <p className="text-center text-sm text-muted-foreground animate-pulse mt-4">
-               Still loading... network may be slow.
-             </p>
-           )}
-        </div>
-      ) : (
-        <div className="space-y-8">
-            
-          {/* Top summary stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="flex flex-col items-center justify-center p-5 bg-card border border-border rounded-xl shadow-sm text-center">
-               <div className="p-3 bg-primary/10 rounded-lg text-primary mb-3">
-                  <Package className="h-6 w-6" />
-               </div>
-               <h3 className="text-2xl font-bold text-foreground">{products.length}</h3>
-               <p className="text-sm font-medium text-muted-foreground mt-1">Total Products</p>
-            </div>
-            
-            <div className="flex flex-col items-center justify-center p-5 bg-card border border-border rounded-xl shadow-sm text-center">
-               <div className="p-3 bg-blue-500/10 rounded-lg text-blue-500 mb-3">
-                  <Camera className="h-6 w-6" />
-               </div>
-               <h3 className="text-2xl font-bold text-foreground">{generationsCount}</h3>
-               <p className="text-sm font-medium text-muted-foreground mt-1">Generated Images</p>
-            </div>
+      {/* Mobile CTA */}
+      <Button 
+        onClick={() => navigate("/dashboard/create-photoshoot")} 
+        size="lg" 
+        className="w-full h-14 text-lg rounded-2xl shadow-lg gradient-primary md:hidden"
+      >
+         <Plus className="w-5 h-5 mr-2" /> Create Photoshoot
+      </Button>
 
-            <div className="flex flex-col items-center justify-center p-5 bg-card border border-border rounded-xl shadow-sm text-center">
-               <div className="p-3 bg-secondary rounded-lg text-foreground mb-3">
-                  <Layers className="h-6 w-6 opacity-80" />
-               </div>
-               <h3 className="text-2xl font-bold text-foreground">{assetsCount}</h3>
-               <p className="text-sm font-medium text-muted-foreground mt-1">Assets Saved</p>
-            </div>
-            
-            <div className="flex flex-col items-center justify-center p-5 bg-card border border-border rounded-xl shadow-sm text-center">
-               <div className="p-3 bg-amber-500/10 rounded-lg text-amber-500 mb-3">
-                  <ArrowRight className="h-6 w-6 rotate-45" />
-               </div>
-               <h3 className="text-2xl font-bold text-foreground">{creditsLeft}</h3>
-               <p className="text-sm font-medium text-muted-foreground mt-1">Credits Remaining</p>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <h2 className="text-sm font-semibold text-muted-foreground mb-3 px-1 uppercase tracking-wider">Quick Actions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Link
-                  to="/dashboard/products"
-                  className="group flex flex-col items-center text-center gap-4 rounded-2xl border border-border bg-card p-8 transition-all hover:border-primary/50 hover:shadow-soft"
-                >
-                  <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                     <Upload className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <span className="text-lg font-medium text-foreground block mb-1">Upload Product</span>
-                    <span className="text-sm text-muted-foreground">Add your first product image</span>
-                  </div>
-                </Link>
-
-                <Link
-                  to="/dashboard/editor"
-                  className="group flex flex-col items-center text-center gap-4 rounded-2xl border border-border bg-card p-8 transition-all hover:border-primary/50 hover:shadow-soft"
-                >
-                  <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center text-foreground group-hover:scale-110 transition-transform">
-                     <Pencil className="h-6 w-6 opacity-80" />
-                  </div>
-                  <div>
-                    <span className="text-lg font-medium text-foreground block mb-1">Open Editor</span>
-                    <span className="text-sm text-muted-foreground">Edit and crop images</span>
-                  </div>
-                </Link>
-
-                <Link
-                  to="/dashboard/assets"
-                  className="group flex flex-col items-center text-center gap-4 rounded-2xl border border-border bg-card p-8 transition-all hover:border-primary/50 hover:shadow-soft"
-                >
-                  <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center text-foreground group-hover:scale-110 transition-transform">
-                     <FolderOpen className="h-6 w-6 opacity-80" />
-                  </div>
-                  <div>
-                    <span className="text-lg font-medium text-foreground block mb-1">View Assets</span>
-                    <span className="text-sm text-muted-foreground">Manage generated photos</span>
-                  </div>
-                </Link>
-            </div>
-          </motion.div>
-
-          {/* Recent Products */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="rounded-xl border border-border bg-card shadow-soft p-6"
-          >
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="font-semibold text-foreground text-lg">Your Products</h2>
-              {products.length > 0 && (
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
-                  <Link to="/dashboard/products">View Library <ArrowRight className="h-4 w-4 ml-1" /></Link>
-                </Button>
-              )}
-            </div>
-            
-            {products.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center rounded-2xl bg-secondary/20 border border-border mx-2">
-                 <div className="max-w-md space-y-6">
-                     <div className="bg-background rounded-full p-4 inline-block shadow-sm border border-border mb-2">
-                         <Camera className="h-10 w-10 text-primary" />
-                     </div>
-                     <h3 className="text-2xl font-bold text-foreground">Welcome to PhotoAI</h3>
-                     <p className="text-muted-foreground text-lg">Create studio-quality product photos in seconds.</p>
-                     
-                     <div className="flex flex-col gap-3 text-left bg-card p-6 rounded-xl border border-border my-6">
-                         <div className="flex items-center gap-3"><span className="bg-primary text-primary-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">1</span> <span className="font-medium">Upload product</span></div>
-                         <div className="flex items-center gap-3"><span className="bg-primary text-primary-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">2</span> <span className="font-medium">Describe photoshoot</span></div>
-                         <div className="flex items-center gap-3"><span className="bg-primary text-primary-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">3</span> <span className="font-medium">Generate images</span></div>
-                     </div>
-
-                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                         <Button onClick={() => navigate("/dashboard/products")} size="lg" variant="outline" className="h-12 px-8">
-                            <Upload className="h-4 w-4 mr-2" /> Upload Product
-                         </Button>
-                         <Button onClick={() => navigate("/dashboard/generate")} size="lg" className="h-12 px-8 gradient-primary text-white shadow-md">
-                            Generate Photoshoot
-                         </Button>
-                     </div>
-                 </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {recentProducts.map((product) => (
-                  <motion.div
-                    key={product.id}
-                    whileHover={{ y: -4 }}
-                    className="group relative rounded-xl overflow-hidden border border-border bg-background shadow-sm"
-                  >
-                    <div className="relative aspect-square">
-                        <img
-                          src={product.imageUrl}
-                          alt={product.name}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          onError={(e) => {
-                             (e.target as HTMLImageElement).outerHTML = '<div class="absolute inset-0 flex items-center justify-center bg-secondary text-xs text-muted-foreground">Missing</div>';
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-all duration-300 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100">
-                          <Button size="sm" className="bg-white text-black hover:bg-neutral-200 shadow-md" asChild>
-                            <Link to={`/dashboard/editor?image=${encodeURIComponent(product.imageUrl)}`}>
-                              <Pencil className="h-3 w-3 mr-2" /> Edit locally
-                            </Link>
-                          </Button>
-                        </div>
-                    </div>
-                    <div className="p-3 border-t border-border">
-                      <p className="text-sm font-medium text-foreground truncate">{product.name}</p>
-                      <p className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">{format(new Date(product.addedAt), "MMM d, yyyy")}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </motion.div>
-
-          {/* Example Results Section */}
-          {products.length === 0 && generationsCount === 0 && (
-             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="pt-4">
-               <h2 className="text-xl font-bold text-foreground mb-4">Example Results</h2>
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Using standard demo images logically mapped for SaaS representation */}
-                  <div className="rounded-xl overflow-hidden shadow-sm aspect-square border border-border">
-                     <img src="https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80" alt="Example 1" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="rounded-xl overflow-hidden shadow-sm aspect-square border border-border">
-                     <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80" alt="Example 2" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="rounded-xl overflow-hidden shadow-sm aspect-square border border-border">
-                     <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&q=80" alt="Example 3" className="w-full h-full object-cover" />
-                  </div>
-               </div>
-             </motion.div>
+      {/* Recent Generations */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="space-y-6"
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Images className="w-5 h-5 text-primary" /> Recent Generations
+          </h2>
+          {generations.length > 4 && (
+            <Button variant="ghost" asChild>
+              <Link to="/dashboard/generations">View all</Link>
+            </Button>
           )}
-
         </div>
-      )}
+        
+        {loading ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map(idx => (
+               <div key={idx} className="aspect-square rounded-2xl bg-secondary/50 animate-pulse" />
+            ))}
+          </div>
+        ) : recentGenerations.length === 0 ? (
+          <div className="border border-border/50 rounded-2xl p-12 flex flex-col items-center justify-center text-center bg-card/30">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+               <Camera className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">No generations yet</h3>
+            <p className="text-muted-foreground max-w-sm">Start your first AI photoshoot to see your generated images appear here.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {recentGenerations.map((gen, idx) => (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: idx * 0.1 }}
+                key={gen.id} 
+                className="group relative aspect-square rounded-2xl border border-border overflow-hidden bg-card/50 shadow-sm hover:shadow-md transition-all"
+              >
+                <img 
+                  src={gen.image_urls?.[0] || gen.images?.[0] || "https://via.placeholder.com/400?text=Processing..."} 
+                  alt={gen.prompt} 
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                />
+                <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+                  <p className="text-white text-xs font-medium truncate">{gen.prompt || "Photoshoot"}</p>
+                  <p className="text-white/70 text-[10px] mt-0.5">{format(new Date(gen.created_at), "MMM d, yyyy")}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Quick Links / Saved Assets */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="pt-8 space-y-6"
+      >
+        <h2 className="text-xl font-bold flex items-center gap-2">
+            <FolderOpen className="w-5 h-5 text-primary" /> Library
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Link to="/dashboard/assets" className="p-6 rounded-2xl border border-border bg-card/50 hover:bg-card transition-colors flex items-center gap-4 group">
+               <div className="p-4 bg-primary/10 rounded-xl group-hover:scale-105 transition-transform text-primary">
+                 <FolderOpen className="w-6 h-6" />
+               </div>
+               <div>
+                  <h3 className="font-semibold text-lg">Saved Assets</h3>
+                  <p className="text-sm text-muted-foreground">Manage your saved product images</p>
+               </div>
+            </Link>
+            
+            <Link to="/dashboard/generations" className="p-6 rounded-2xl border border-border bg-card/50 hover:bg-card transition-colors flex items-center gap-4 group">
+               <div className="p-4 bg-secondary rounded-xl group-hover:scale-105 transition-transform">
+                 <Images className="w-6 h-6 text-foreground" />
+               </div>
+               <div>
+                  <h3 className="font-semibold text-lg">Generation History</h3>
+                  <p className="text-sm text-muted-foreground">View all past generations</p>
+               </div>
+            </Link>
+        </div>
+      </motion.div>
     </div>
   );
 }

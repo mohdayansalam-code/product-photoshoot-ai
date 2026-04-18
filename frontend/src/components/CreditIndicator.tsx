@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 
 interface CreditIndicatorProps {
   credits_remaining: number;
-  credits_purchased: number;
   collapsed: boolean;
+  baseline_credits?: number;
   loading?: boolean;
   error?: boolean;
   retrying?: boolean;
@@ -15,14 +15,15 @@ interface CreditIndicatorProps {
 
 export function CreditIndicator({ 
   credits_remaining, 
-  credits_purchased, 
   collapsed,
+  baseline_credits = 10,
   loading = false,
   error = false,
   retrying = false,
   onRetry
 }: CreditIndicatorProps) {
-  const percentage = credits_purchased > 0 ? Math.round((credits_remaining / credits_purchased) * 100) : 0;
+  const percentageBase = Math.max(credits_remaining, baseline_credits);
+  const percentage = percentageBase > 0 ? Math.round((credits_remaining / percentageBase) * 100) : 0;
 
   if (error && !collapsed) {
     return (
