@@ -25,32 +25,6 @@ import { supabase } from "./lib/supabase";
 
 const AppContent = () => {
   const [globalProgress, setGlobalProgress] = useState(false);
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const handleSession = async () => {
-      const { data } = await supabase.auth.getSession();
-
-      if (data.session) {
-        window.location.href = "/dashboard";
-      }
-    };
-
-    handleSession();
-
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === "SIGNED_IN" && session) {
-          window.location.href = "/dashboard";
-        }
-      }
-    );
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     let requests = 0;

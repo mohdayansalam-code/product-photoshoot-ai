@@ -3,17 +3,17 @@ import { supabase } from "@/lib/supabase";
 import { Navigate } from "react-router-dom";
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkUser = async () => {
+    const getUser = async () => {
       const { data } = await supabase.auth.getUser();
       setUser(data.user as any);
       setLoading(false);
     };
 
-    checkUser();
+    getUser();
   }, []);
 
   if (loading) return <div>Loading...</div>;
