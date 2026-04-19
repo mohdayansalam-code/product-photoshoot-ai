@@ -29,18 +29,20 @@ const AppContent = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // check existing session
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        navigate("/dashboard");
-      }
-    });
+    const handleSession = async () => {
+      const { data } = await supabase.auth.getSession();
 
-    // listen for login
+      if (data.session) {
+        window.location.href = "/dashboard";
+      }
+    };
+
+    handleSession();
+
     const { data: listener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === "SIGNED_IN" && session) {
-          navigate("/dashboard");
+          window.location.href = "/dashboard";
         }
       }
     );
