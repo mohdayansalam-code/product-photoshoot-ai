@@ -27,6 +27,18 @@ const AppContent = () => {
   const [globalProgress, setGlobalProgress] = useState(false);
 
   useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+
+      if (data.session && location.pathname === "/") {
+        window.location.href = "/dashboard";
+      }
+    };
+
+    checkSession();
+  }, []);
+
+  useEffect(() => {
     let requests = 0;
     const start = () => { requests++; setGlobalProgress(true); };
     const end = () => { requests = Math.max(0, requests - 1); if (requests === 0) setGlobalProgress(false); };
