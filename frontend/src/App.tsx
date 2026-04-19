@@ -29,13 +29,25 @@ const AppContent = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session && location.pathname === "/") {
+    // check session on load
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session && location.pathname === "/") {
         navigate("/dashboard");
       }
     });
 
-    return () => subscription.unsubscribe();
+    // listen login event
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_IN" && session && location.pathname === "/") {
+          navigate("/dashboard");
+        }
+      }
+    );
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, [navigate, location.pathname]);
 
   useEffect(() => {
