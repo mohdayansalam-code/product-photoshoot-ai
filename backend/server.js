@@ -7,9 +7,9 @@ import faceModelsRouter from "./routes/face-models.js";
 import generateRouter from "./routes/generate.js";
 import generationsRouter from "./routes/generations.js";
 import generationRouter from "./routes/generation.js";
+import adminRouter from "./routes/admin.js";
 
 import { supabase } from "./lib/db.js";
-import { getOrCreateUser } from "./utils/credits.js";
 
 const PORT = Number(process.env.PORT || 3000);
 const hostname = process.env.HOST || "0.0.0.0";
@@ -32,61 +32,9 @@ async function startServer() {
   app.use("/api/generate", generateRouter);
   app.use("/api/generations", generationsRouter);
   app.use("/api/generation", generationRouter);
+  app.use("/api/admin", adminRouter);
 
   // Missing APIs for dashboard mock
-  app.get("/api/credits", async (req, res, next) => {
-    try {
-      // In a real app, extract user_id from JWT token
-      const user_id = "demo-user";
-      const user = await getOrCreateUser(user_id);
-      
-      res.json({
-        success: true,
-        credits: user.credits
-      });
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  app.post("/api/purchase", async (req, res, next) => {
-    try {
-      const { user_id = "demo-user", plan } = req.body;
-      
-      let creditsToAdd = 0;
-      if (plan === "starter") creditsToAdd = 100;
-      if (plan === "pro") creditsToAdd = 300;
-      
-      if (creditsToAdd === 0) {
-        return res.status(400).json({ success: false, error: "Invalid plan" });
-      }
-
-      // Use RPC for safe increment
-      const { error: updateError } = await supabase.rpc("increment_credits", {
-        p_user_id: user_id,
-        p_amount: creditsToAdd
-      });
-        
-      if (updateError) {
-        console.error("Increment error:", updateError);
-        throw new Error("Failed to update credits");
-      }
-
-      // Log Transaction
-      await supabase.from("credit_transactions").insert({
-        user_id,
-        type: "purchase",
-        amount: creditsToAdd
-      });
-
-      res.json({
-        success: true,
-        credits_added: creditsToAdd
-      });
-    } catch (error) {
-      next(error);
-    }
-  });
 
   app.get("/api/products", (req, res) => {
     res.json([]);

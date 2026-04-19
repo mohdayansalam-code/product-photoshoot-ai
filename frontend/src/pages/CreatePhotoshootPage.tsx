@@ -14,7 +14,8 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { generateShoot, pollImage, getCredits } from "@/lib/api";
+import { generateShoot, pollImage } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -43,10 +44,20 @@ export default function CreatePhotoshootPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<"generate" | "regenerate" | "angles" | "improve" | null>(null);
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
-  const [credits, setCredits] = useState<number | null>(null);
+  const [imagesUsed, setImagesUsed] = useState(0);
+  const [monthlyLimit, setMonthlyLimit] = useState(10);
 
   useEffect(() => {
-    getCredits().then(res => setCredits(res?.credits_remaining ?? 0));
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        supabase.from("profiles").select("images_used, monthly_limit").eq("id", data.session.user.id).single().then(res => {
+           if (res.data) {
+             setImagesUsed(res.data.images_used || 0);
+             setMonthlyLimit(res.data.monthly_limit || 10);
+           }
+        });
+      }
+    });
   }, []);
   
   const [images, setImages] = useState<{url: string, angle: string}[]>([]);
@@ -54,6 +65,131 @@ export default function CreatePhotoshootPage() {
   const [isSuccess, setIsSuccess] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isPollingRef = useRef(false);
+  const recoveryAttemptsRef = useRef(0);
+
+  const isPollingStale = () => {
+    const raw = localStorage.getItem("polling_active");
+    if (!raw) return true; // doesn't exist = stale / free
+    try {
+      const obj = JSON.parse(raw);
+      if (!obj.active) return true;
+      if (Date.now() - obj.timestamp > 90 * 1000) return true; // >90s is stale
+      return false; // valid & active
+    } catch {
+      return true;
+    }
+  };
+
+  const setPollingLock = (active: boolean) => {
+    if (active) {
+      localStorage.setItem("polling_active", JSON.stringify({ active: true, timestamp: Date.now() }));
+    } else {
+      localStorage.removeItem("polling_active");
+    }
+  };
+
+  // Resume active_generation on page load
+  useEffect(() => {
+    // Safe cleanup on unload (Optional Safety Layer)
+    const handleUnload = () => {
+      if (isPollingRef.current) {
+        setPollingLock(false);
+      }
+    };
+    window.addEventListener("beforeunload", handleUnload);
+
+    const raw = localStorage.getItem("active_generation");
+    if (raw) {
+      try {
+        const stored = JSON.parse(raw);
+        // Validate timestamp (not older than 10 min)
+        if (Date.now() - stored.created_at < 10 * 60 * 1000) {
+          if (!isPollingStale()) {
+             toast.info("Your photoshoot is running in another tab");
+             return;
+          }
+          
+          isPollingRef.current = true;
+          setPollingLock(true);
+          setIsLoading(true);
+          toast.info("Resuming your photoshoot...", { description: "Please hold while we poll the results." });
+          processGenerationResults(stored.request_ids, stored.multi_angle, stored.final_prompt, stored.shoot_type);
+        } else {
+          // older than 10 minutes, timeout.
+          localStorage.removeItem("active_generation");
+          setPollingLock(false);
+        }
+      } catch (e) {
+        localStorage.removeItem("active_generation");
+        setPollingLock(false);
+      }
+    }
+    
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, []);
+
+  const tryResumeGeneration = (isCrossTabRecovery = false) => {
+    if (isPollingRef.current) return;
+    
+    // Failsafe: Prevent Infinite Loops
+    if (recoveryAttemptsRef.current >= 3) {
+      localStorage.removeItem("active_generation");
+      localStorage.removeItem("polling_active");
+      recoveryAttemptsRef.current = 0;
+      toast.error("Something went wrong. Please retry");
+      return;
+    }
+
+    // 1. DOUBLE-CHECK LOCK BEFORE CLAIM
+    if (!isPollingStale()) {
+      if (isCrossTabRecovery) toast.info("Another tab resumed your photoshoot");
+      return;
+    }
+
+    const rawGen = localStorage.getItem("active_generation");
+    if (!rawGen) return;
+
+    try {
+      const stored = JSON.parse(rawGen);
+      
+      // Failsafe: Validate parsed data
+      if (!stored || !Array.isArray(stored.request_ids)) {
+         throw new Error("Corrupted cache");
+      }
+
+      // Validate timestamp (not older than 10 min)
+      if (Date.now() - stored.created_at < 10 * 60 * 1000) {
+        
+        recoveryAttemptsRef.current += 1;
+
+        // 3. LOCK CLAIM SAFETY (Set instantly before async logic)
+        isPollingRef.current = true;
+        setPollingLock(true);
+        setIsLoading(true);
+        toast.success("Continuing photoshoot...", { description: "Resuming unfinished generation." });
+        processGenerationResults(stored.request_ids, stored.multi_angle, stored.final_prompt, stored.shoot_type);
+      } else {
+        localStorage.removeItem("active_generation");
+      }
+    } catch {
+      localStorage.removeItem("active_generation");
+      recoveryAttemptsRef.current = 0;
+    }
+  };
+
+  // Listen for Cross-Tab Lock Removals (Auto-resumes if blocking tab crashes/closes)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      // Trigger only when polling lock is completely freed
+      if (e.key === "polling_active" && isPollingStale()) {
+        tryResumeGeneration(true);
+      }
+    };
+    
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
 
   // Rotate loading messages
   useEffect(() => {
@@ -104,11 +240,19 @@ export default function CreatePhotoshootPage() {
       return;
     }
     
-    const requiredCredits = options.multiAngle ? 4 : 1;
-    if (credits !== null && credits < requiredCredits) {
-      alert("No credits left. Please purchase.");
+    if (imagesUsed >= monthlyLimit) {
+      alert("Limit reached");
       return;
     }
+
+    if (isPollingRef.current) return;
+    if (!isPollingStale()) {
+      toast.info("Your photoshoot is running in another tab");
+      return;
+    }
+
+    isPollingRef.current = true;
+    setPollingLock(true);
 
     setIsLoading(true);
     setActiveAction(actionType);
@@ -119,6 +263,8 @@ export default function CreatePhotoshootPage() {
        setImages([]);
        setSelectedImage(null);
     }
+    
+    recoveryAttemptsRef.current = 0;
 
     try {
       let finalPrompt = prompt || `A beautiful product photo in ${SHOOT_STYLES.find(s => s.id === shootType)?.name || shootType} style`;
@@ -142,6 +288,33 @@ export default function CreatePhotoshootPage() {
         throw new Error("No valid request IDs returned");
       }
 
+      // 1. SAVE GENERATION: Map state resilience
+      localStorage.setItem("active_generation", JSON.stringify({
+        request_ids: requestData,
+        multi_angle: options.multiAngle || false,
+        final_prompt: finalPrompt,
+        shoot_type: shootType,
+        created_at: Date.now()
+      }));
+
+      await processGenerationResults(requestData, options.multiAngle || false, finalPrompt, shootType);
+
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Something went wrong generating the photoshoot");
+      setIsLoading(false);
+      setActiveAction(null);
+      isPollingRef.current = false;
+      setPollingLock(false);
+      
+      // Attempt recovery recursively if generation still suspended
+      setTimeout(() => tryResumeGeneration(), 100);
+    }
+  };
+
+  const processGenerationResults = async (requestData: any[], multiAngle: boolean, finalPrompt: string, shootType: string) => {
+    try {
+
       const finalImages = await Promise.all(
         requestData.map(async (req) => {
           if (!req.request_id) return null;
@@ -152,17 +325,37 @@ export default function CreatePhotoshootPage() {
 
       const validImages = finalImages.filter(Boolean) as {url: string, angle: string}[];
       
-      setImages(prev => options.multiAngle ? [...prev, ...validImages] : validImages);
+      if (validImages.length === 0) {
+         toast.error("Generation failed. Please try again.");
+         localStorage.removeItem("active_generation");
+         return;
+      }
       
-      if (validImages.length > 0 && !options.multiAngle) {
+      setImages(prev => multiAngle ? [...prev, ...validImages] : validImages);
+      
+      if (validImages.length > 0 && !multiAngle) {
          setSelectedImage(validImages[0].url);
       }
 
       setIsSuccess(true);
-      toast.success("Your photoshoot is ready!");
+      toast.success(`Photoshoot ready!`);
       
-      // Refresh credits locally in background mapped natively
-      getCredits().then(res => setCredits(res?.credits_remaining ?? 0));
+      // Reset failsafe layer globally
+      recoveryAttemptsRef.current = 0;
+      
+      // Refresh image usages natively
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) {
+          supabase.from("profiles").select("images_used").eq("id", data.session.user.id).single().then(res => {
+             if (res.data) {
+               setImagesUsed(res.data.images_used || 0);
+             }
+          });
+        }
+      });
+
+      // Remove from storage after full completion
+      localStorage.removeItem("active_generation");
 
       // Save History (Frontend State)
       const generationRecord = {
@@ -184,11 +377,17 @@ export default function CreatePhotoshootPage() {
 
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Something went wrong generating the photoshoot");
+      toast.error(err.message || "Polling failed. Something went wrong resuming the photoshoot.");
+      localStorage.removeItem("active_generation");
     } finally {
+      isPollingRef.current = false;
+      setPollingLock(false);
       setIsLoading(false);
       setActiveAction(null);
       setTimeout(() => setIsSuccess(false), 4000);
+
+      // Attempt recovery on same tab if queued overlapping generations exist
+      setTimeout(() => tryResumeGeneration(), 100);
     }
   };
 
@@ -456,7 +655,7 @@ export default function CreatePhotoshootPage() {
                       <Button 
                         size="lg" 
                         onClick={() => handleGenerate("generate", { multiAngle: false })} 
-                        disabled={isLoading || !(productImage || imageUrl) || !shootType || (credits !== null && credits <= 0)}
+                        disabled={isLoading || !(productImage || imageUrl) || !shootType || (imagesUsed >= monthlyLimit)}
                         className="bg-black text-white px-6 py-3 rounded-xl hover:bg-gray-900 active:scale-95 transition transform hover:scale-[1.02] h-16 w-full md:w-auto text-xl font-bold disabled:opacity-50 disabled:hover:scale-100"
                       >
                         {isLoading && activeAction === "generate" ? (
@@ -464,9 +663,9 @@ export default function CreatePhotoshootPage() {
                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                              {LOADING_MESSAGES[loadingMsgIdx]}
                           </span>
-                        ) : (credits !== null && credits <= 0) ? (
+                        ) : (imagesUsed >= monthlyLimit) ? (
                           <span className="flex items-center gap-3 opacity-90 text-red-300">
-                             No credits left
+                             Image Limit Reached
                           </span>
                         ) : !(productImage || imageUrl) || !shootType ? (
                           <span className="flex items-center gap-3 opacity-90">
@@ -479,13 +678,13 @@ export default function CreatePhotoshootPage() {
                         )}
                       </Button>
                       
-                      {credits !== null && credits <= 0 && (
+                      {imagesUsed >= monthlyLimit && (
                         <Button 
                           size="lg" 
-                          onClick={() => window.location.href = "/dashboard/credits"} 
+                          onClick={() => window.location.href = "/dashboard/billing"} 
                           className="bg-primary text-white border-none shadow-md px-6 py-3 rounded-xl hover:bg-primary/90 active:scale-95 transition transform hover:scale-[1.02] h-16 w-full md:w-auto text-xl font-bold"
                         >
-                          <span className="flex items-center gap-2">Buy Credits</span>
+                          <span className="flex items-center gap-2">Upgrade Plan</span>
                         </Button>
                       )}
                     </div>

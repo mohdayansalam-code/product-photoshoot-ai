@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, type Easing } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -67,6 +68,12 @@ export default function LandingPage() {
   const [activeTab, setActiveTab] = useState(0);
   const navigate = useNavigate();
 
+  const handleGoogleLogin = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: "google"
+    });
+  };
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans overflow-x-hidden">
       {/* NAV */}
@@ -84,8 +91,8 @@ export default function LandingPage() {
             <a href="#tools" className="hover:text-slate-900 transition-colors">Platform</a>
             <a href="#demo" className="hover:text-slate-900 transition-colors">Demo</a>
           </div>
-          <Button asChild className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-6">
-            <Link to="/dashboard">Open Dashboard</Link>
+          <Button onClick={handleGoogleLogin} className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-6">
+            Continue with Google
           </Button>
         </div>
       </nav>
@@ -106,8 +113,8 @@ export default function LandingPage() {
             Upload your product and create studio-quality ecommerce photos in seconds using AI. No photoshoots, no designers, no waiting.
           </motion.p>
           <motion.div variants={fadeUp} custom={3} className="flex flex-wrap gap-4">
-            <Button asChild size="lg" className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-8 text-base h-12">
-              <Link to="/dashboard/generate"><Camera className="h-5 w-5 mr-2" /> Generate Photos</Link>
+            <Button onClick={handleGoogleLogin} size="lg" className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-8 text-base h-12">
+              <Camera className="h-5 w-5 mr-2" /> Continue with Google
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-full border-slate-200 hover:bg-slate-50 px-8 text-base h-12">
               <a href="#features">See Examples <ArrowRight className="h-4 w-4 ml-2" /></a>

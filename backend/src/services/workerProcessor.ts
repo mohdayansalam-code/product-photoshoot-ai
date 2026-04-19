@@ -4,7 +4,6 @@ import { logger } from "./logger";
 import { monitoring } from "./monitoring";
 import { retryManager } from "./retryManager";
 import { config } from "../config/env";
-import { creditSystem } from "./creditSystem";
 import { metrics } from "./metrics";
 
 export const workerProcessor = {
@@ -30,7 +29,7 @@ export const workerProcessor = {
             
             const { data: stuckJobs, error } = await supabaseAdmin
                 .from("generation_jobs")
-                .select("id, retry_count")
+                .select("id, retry_count, user_id, credits_used, credit_refunded")
                 .eq("status", "processing")
                 .lt("updated_at", tenMinutesAgo);
 
@@ -76,7 +75,6 @@ export const workerProcessor = {
     processJob: async (job: any, supabaseAdmin: SupabaseClient) => {
         const startTime = Date.now();
         let isTimeout = false;
-        let creditsDeducted = true; // Jobs in worker already have credits deducted by API
         
         // Timeout Protection mechanism
         const timeoutPromise = new Promise((_, reject) => {
@@ -235,6 +233,20 @@ export const workerProcessor = {
                 })
                 .eq("id", job.id);
 
+            // POST-GENERATION IMAGE UPDATE LOGIC
+            const { data: profile } = await supabaseAdmin
+                 .from("profiles")
+                 .select("images_used")
+                 .eq("id", job.user_id)
+                 .single();
+                 
+            if (profile) {
+                 await supabaseAdmin
+                     .from("profiles")
+                     .update({ images_used: profile.images_used + 6 })
+                     .eq("id", job.user_id);
+            }
+
             logger.worker(job.id, "completed", durationMs, job.model);
             
             // Collect Metrics
@@ -272,10 +284,6 @@ export const workerProcessor = {
             } else {
                 logger.error(`Job ${job.id} permanently failed: ${errorReason}`);
                 monitoring.logGenerationFailure(job.id, job.user_id, errorReason);
-                let refunded = false;
-                if (!job.credit_refunded && creditsDeducted && job.credits_used) {
-                    refunded = await creditSystem.refundCredits(supabaseAdmin, job.user_id, job.credits_used, `failed generation job ${job.id}`);
-                }
 
                 await supabaseAdmin
                     .from("generation_jobs")
@@ -284,9 +292,7 @@ export const workerProcessor = {
                         retry_count: tryCount,
                         error_reason: errorReason,
                         completed_at: new Date().toISOString(),
-                        duration_ms: durationMs,
-                        credit_refund_pending: false,
-                        credit_refunded: refunded || job.credit_refunded
+                        duration_ms: durationMs
                     })
                     .eq("id", job.id);
 

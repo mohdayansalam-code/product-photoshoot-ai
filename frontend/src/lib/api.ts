@@ -3,7 +3,7 @@ import sceneFashion from "@/assets/scene-fashion-editorial.jpg";
 import sceneWhite from "@/assets/scene-white-bg.jpg";
 import sceneInfluencer from "@/assets/scene-influencer.jpg";
 import sceneJewelry from "@/assets/scene-jewelry.jpg";
-
+import { toast } from "sonner";
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://localhost:3000" : "");
 
@@ -100,6 +100,7 @@ function endLoading() {
 
 function buildApiUrl(path: string) {
   if (!API_BASE_URL) {
+    toast.error("Server not configured. Please add VITE_API_BASE_URL.");
     throw new Error("Missing VITE_API_BASE_URL configuration");
   }
 
@@ -226,8 +227,15 @@ async function readJsonResponse<T>(response: Response) {
   }
 }
 
+import { supabase } from "./supabase";
+
 export async function getAccessToken(): Promise<string | null> {
-  return null;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
+  } catch {
+    return null;
+  }
 }
 
 async function requestJson<T>(path: string, options: RequestJsonOptions = {}): Promise<JsonRequestResult<T>> {
@@ -242,7 +250,10 @@ async function requestJson<T>(path: string, options: RequestJsonOptions = {}): P
 
   const headers: Record<string, string> = { ...customHeaders };
   
-  // Auth logic stripped as requested
+  const token = await getAccessToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   if (body && !(body instanceof FormData) && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
@@ -297,21 +308,7 @@ export async function fetchScenes(): Promise<Scene[]> {
   return SCENES;
 }
 
-export async function getCredits(): Promise<{ credits_remaining: number } | null> {
-  const result = await requestJson<{ credits: number }>("/api/credits", {
-    requireAuth: false,
-    maxRetries: 0,
-  });
 
-  if (result.error || !result.data || typeof result.data.credits !== "number") {
-    console.error("Failed to fetch credits", result.error || result.data);
-    return null;
-  }
-
-  return {
-    credits_remaining: result.data.credits,
-  };
-}
 
 export async function generateProduct(payload: {
   product_image: File | null;
@@ -421,20 +418,6 @@ export async function fetchResults(jobId: string): Promise<GenerationJob> {
   };
 }
 
-export async function retryGeneration(generation_id: string): Promise<{ success: boolean }> {
-  const result = await requestJson<ApiEnvelope<any>>("/api/retry-generation", {
-    method: "POST",
-    requireAuth: true,
-    body: JSON.stringify({ generation_id }),
-  });
-
-  if (result.error || !result.data) {
-    console.error("Failed to retry generation", result.error);
-    return { success: false };
-  }
-
-  return { success: true };
-}
 
 export async function getGenerations(signal?: AbortSignal): Promise<any[]> {
   const result = await requestJson<ApiEnvelope<any[]>>("/api/generations", {
@@ -663,8 +646,29 @@ export async function getGeneration(id: string): Promise<{ success: boolean; ima
   };
 }
 
+export async function retryGeneration(id: string) {
+  const result = await getGeneration(id);
+  
+  if (result.success && result.image_url) {
+    return result;
+  }
+  
+  throw new Error("Still processing or permanently failed");
+}
+
+export async function markGenerationFailed(id: string) {
+  try {
+    await requestJson<any>(`/api/generation/${id}/fail`, {
+      method: "POST",
+      requireAuth: false,
+    });
+  } catch (e) {
+    console.error("Failed to mark generation failed", e);
+  }
+}
+
 export async function pollImage(id: string): Promise<string> {
-  let retries = 20;
+  let retries = 35; // 35 * 2s = 70 seconds max polling time
 
   while (retries > 0) {
     try {
@@ -673,14 +677,19 @@ export async function pollImage(id: string): Promise<string> {
       if (res.image_url) {
         return res.image_url;
       }
-    } catch (e) {
+    } catch (e: any) {
+      if (e.message && e.message.includes("Billing")) {
+        throw e; // Hard abort on Strict Billing Locks instantly terminating useless loops
+      }
       console.warn("Polling error, continuing...", e);
     }
     await new Promise(r => setTimeout(r, 2000));
     retries--;
   }
 
-  throw new Error("Timeout");
+  // Forcefully notify backend of timeout freeing database states securely
+  await markGenerationFailed(id);
+  throw new Error("Generation failed. Please try again.");
 }
 
 export async function generateShoot(payload: {
@@ -690,7 +699,7 @@ export async function generateShoot(payload: {
   gender?: string;
   multi_angle: boolean;
 }) {
-  const res = await fetch("/api/generate", {
+  const res = await fetch(buildApiUrl("/api/generate"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

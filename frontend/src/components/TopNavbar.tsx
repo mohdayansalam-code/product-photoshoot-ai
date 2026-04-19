@@ -1,6 +1,7 @@
 import { Search, Bell, ChevronDown, User, Coins, Settings, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -16,9 +17,11 @@ export function TopNavbar() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [initials, setInitials] = useState("");
   const navigate = useNavigate();
-
   useEffect(() => {
-    setInitials("TU");
+    supabase.auth.getUser().then(({ data }) => {
+      const name = data.user?.user_metadata?.full_name || data.user?.email || "User";
+      setInitials(name.substring(0, 2).toUpperCase());
+    });
   }, []);
 
   const handleLogout = () => {
@@ -56,9 +59,6 @@ export function TopNavbar() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => navigate("/dashboard/credits")} className="flex items-center gap-2 cursor-pointer">
-                <Coins className="h-4 w-4" /> Credits
-            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate("/dashboard/settings")} className="flex items-center gap-2 cursor-pointer">
                 <Settings className="h-4 w-4" /> Settings
             </DropdownMenuItem>

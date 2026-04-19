@@ -15,11 +15,22 @@ export default function GenerationsPage() {
   const fetchGens = async () => {
     try {
       const backendGens = await getGenerations();
+      const formattedBackend = (backendGens || []).map((dbGen: any) => ({
+         id: dbGen.astria_request_id, // Pin atomic hooks directly preventing false duplicates
+         prompt: dbGen.prompt,
+         model: dbGen.shoot_type || dbGen.ai_model,
+         created_at: dbGen.created_at,
+         status: dbGen.status,
+         image_urls: dbGen.image_url ? [dbGen.image_url] : [],
+         images: dbGen.image_url ? [dbGen.image_url] : []
+      }));
+
       const localGens = JSON.parse(localStorage.getItem("recent_generations") || "[]");
-      // Merge unique IDs
-      const merged = [...localGens, ...backendGens].filter((gen, index, self) => 
+      // Merge unique IDs safely
+      const merged = [...localGens, ...formattedBackend].filter((gen, index, self) => 
          index === self.findIndex((t) => t.id === gen.id)
       );
+      
       setGenerations(merged);
     } catch (err) {
       console.error(err);
@@ -31,15 +42,39 @@ export default function GenerationsPage() {
   }, []);
 
   const handleRetry = async (id: string) => {
+    // 4. CROSS-TAB SAFETY: Store retry lock in localStorage protecting concurrency globally
+    const lockKey = `retry_lock_${id}`;
+    const lastLock = localStorage.getItem(lockKey);
+    if (lastLock && Date.now() - parseInt(lastLock) < 5000) {
+      toast.error("Retry already in progress in another window.");
+      return;
+    }
+    localStorage.setItem(lockKey, Date.now().toString());
+
     setRetrying(prev => ({ ...prev, [id]: true }));
     try {
-      await retryGeneration(id);
-      toast.success("Retry started. Check back soon.");
-      fetchGens();
+      const result = await retryGeneration(id);
+      if (result && result.image_url) {
+        toast.success("Your previous photoshoot completed successfully and 1 credit was used.", { description: "Late-success image recovered." });
+        
+        // 5. UI UPDATE: Replace failed card instantly on recovery
+        setGenerations(prev => prev.map(g => g.id === id ? { 
+           ...g, 
+           status: "completed", 
+           recovered: true, 
+           image_urls: [result.image_url], 
+           images: [result.image_url] 
+        } : g));
+        
+        // Broadcast global state synchronization hooking Credit Indicator!
+        window.dispatchEvent(new Event("sync_credits"));
+      }
     } catch (error: any) {
-      toast.error("Retry failed. Try again.");
+      toast.error("Retry failed. Generation still processing or permanently dropped.");
     } finally {
-      setRetrying(prev => ({ ...prev, [id]: false }));
+      setTimeout(() => {
+        setRetrying(prev => ({ ...prev, [id]: false }));
+      }, 3000); // 2. RETRY PROTECTION: 3-second cooldown globally
     }
   };
 
@@ -83,7 +118,7 @@ export default function GenerationsPage() {
 
   const getStatusColor = (status: string) => {
      if (status === "completed") return "bg-green-100 text-green-700 border-green-200";
-     if (status === "failed") return "bg-red-100 text-red-700 border-red-200";
+     if (status?.includes("failed")) return "bg-red-100 text-red-700 border-red-200";
      return "bg-yellow-100 text-yellow-700 border-yellow-200";
   };
 
@@ -95,12 +130,14 @@ export default function GenerationsPage() {
           <div className="h-16 w-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
             <Images className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="font-semibold text-foreground">Upload your product to start creating photos</p>
+          <p className="font-semibold text-foreground">Create your first photoshoot to get started</p>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm">AI will place your product in realistic scenes</p>
         </div>
       </div>
     );
   }
+
+  const hasRecoverable = generations.some(g => g.status?.includes("failed") && !g.recovered);
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-6">
@@ -111,6 +148,8 @@ export default function GenerationsPage() {
       >
         Generations
       </motion.h1>
+
+
       <div className="space-y-6">
         {(generations || []).map((gen, idx) => (
           <motion.div
@@ -128,14 +167,9 @@ export default function GenerationsPage() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${getStatusColor(gen.status)}`}>
-                  {gen.status === "completed" ? "Completed" : gen.status === "failed" ? "Failed" : "Processing"}
+                  {gen.status === "completed" ? "Completed" : gen.status?.includes("failed") ? "Failed" : "Processing"}
                 </span>
-                {gen.status === "failed" && (
-                   <Button variant="outline" size="sm" onClick={() => handleRetry(gen.id)} disabled={retrying[gen.id]}>
-                     {retrying[gen.id] ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />} 
-                     Retry
-                   </Button>
-                )}
+
                 {gen.status === "completed" && (
                    <>
                      <Button variant="outline" size="sm" onClick={() => handleSaveToAssets(gen.image_urls)}>

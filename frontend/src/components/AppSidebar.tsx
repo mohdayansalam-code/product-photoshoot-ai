@@ -78,6 +78,22 @@ export function AppSidebar() {
 
   useEffect(() => {
     loadCreditsData();
+
+    // 3. CREDIT UI SYNC: Listen for global hooks & fallbacks
+    const handleSync = () => loadCreditsData(true);
+    window.addEventListener("sync_credits", handleSync);
+    window.addEventListener("focus", handleSync); // Refresh on tab focus
+    
+    // Interval sync (60 seconds)
+    const syncInterval = setInterval(() => {
+       loadCreditsData(true);
+    }, 60000);
+
+    return () => {
+       window.removeEventListener("sync_credits", handleSync);
+       window.removeEventListener("focus", handleSync);
+       clearInterval(syncInterval);
+    };
   }, []);
 
   return (

@@ -5,13 +5,37 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import { getGenerations } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 export default function Index() {
   const navigate = useNavigate();
   const [generations, setGenerations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [imagesUsed, setImagesUsed] = useState(0);
+  const [monthlyLimit, setMonthlyLimit] = useState(10);
+
+  const getUsageUrl = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data } = await supabase
+         .from("profiles")
+         .select("images_used, monthly_limit")
+         .eq("id", session.user.id)
+         .single();
+
+      if (data) {
+         setImagesUsed(data.images_used || 0);
+         setMonthlyLimit(data.monthly_limit || 10);
+      }
+    } catch {
+      console.log("usage error");
+    }
+  };
 
   useEffect(() => {
+    getUsageUrl();
     const fetchGens = async () => {
       try {
         const gens = await getGenerations();
@@ -32,7 +56,10 @@ export default function Index() {
       {/* Clean Dynamic Header */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col md:flex-row md:items-center justify-between gap-6 pt-4">
         <div className="space-y-1">
-           <h1 className="text-4xl font-bold tracking-tight text-foreground">Create Photoshoot</h1>
+           <div className="flex items-center gap-4">
+             <h1 className="text-4xl font-bold tracking-tight text-foreground">Create Photoshoot</h1>
+             <p className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-bold text-sm border border-green-200">{imagesUsed} / {monthlyLimit} images used</p>
+           </div>
            <p className="text-lg text-muted-foreground">Generate stunning AI product photos in seconds.</p>
         </div>
         <Button 

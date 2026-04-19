@@ -11,12 +11,17 @@ router.get("/", async (req, res, next) => {
       .order("created_at", { ascending: false });
 
     if (error) {
-      return res.status(500).json({ success: false });
+      console.error(error);
+      return res.status(500).json({ success: false, error: "Database error" });
     }
 
-    return res.json(data);
+    return res.json({
+      success: true,
+      data: data || []
+    });
   } catch (err) {
-    next(err);
+    console.error(err);
+    res.status(500).json({ success: false, error: "Server error" });
   }
 });
 

@@ -4,7 +4,6 @@ import { standardResponse, ApiError } from "@/lib/apiError";
 import { config } from "@/config/env";
 import { rateLimiter } from "@/services/rateLimiter";
 import { buildPrompt } from "@/lib/promptBuilder";
-import { creditSystem } from "@/services/creditSystem";
 import { requireAuthenticatedUser } from "@/lib/routeAuth";
 
 export async function POST(req: NextRequest) {
@@ -92,23 +91,19 @@ export async function POST(req: NextRequest) {
 
         await rateLimiter.checkLimit(supabaseAdmin, user.id, 10, 60000, "generation");
 
-        // STEP 1 — check credits
-        const hasCredits = await creditSystem.hasCredits(supabaseAdmin, user.id, credits_cost);
-        if (!hasCredits) {
-            throw new ApiError(402, "Not enough credits", "INSUFFICIENT_CREDITS");
+        // STEP 1 — check limits
+        const { data: profile } = await supabaseAdmin
+            .from("profiles")
+            .select("images_used, monthly_limit")
+            .eq("id", user.id)
+            .single();
+
+        if (profile.images_used >= profile.monthly_limit) {
+            throw new ApiError(403, "Limit reached", "LIMIT_REACHED");
         }
 
         const request_id = body.request_id || req.headers.get("x-request-id");
         
-        // STEP 2 — deduct credits
-        await creditSystem.deductCredits(
-            supabaseAdmin,
-            user.id,
-            credits_cost,
-            "generation",
-            `Photoshoot generation: ${model}`
-        );
-
         let jobId;
         let idempotent = false;
 
@@ -123,7 +118,6 @@ export async function POST(req: NextRequest) {
                 model: model,
                 image_count: image_count,
                 fetchers: fetchers,
-                credits_used: credits_cost,
                 status: "queued"
             }).select("id").single();
 
@@ -134,8 +128,6 @@ export async function POST(req: NextRequest) {
                     if (existing) {
                         jobId = existing.id;
                         idempotent = true;
-                        // Refund the credits we just deducted since it's a duplicate request
-                        await creditSystem.refundCredits(supabaseAdmin, user.id, credits_cost, "refund", "Idempotent generation request duplicate refund");
                     } else {
                         throw new Error(`DB Error: ${dbError.message}`);
                     }
@@ -149,15 +141,7 @@ export async function POST(req: NextRequest) {
             if (!jobId) throw new Error("Failed to return job ID from database");
 
         } catch (error: any) {
-            // STEP 5 — refund credits
-            await creditSystem.refundCredits(
-                supabaseAdmin,
-                user.id,
-                credits_cost,
-                "refund",
-                "Generation enqueue failed refund"
-            );
-            logger.error("Generation insert failed, credits refunded", { error: error.message });
+            logger.error("Generation insert failed", { error: error.message });
             throw new ApiError(500, "Failed to initialize generation safely.");
         }
 
