@@ -68,7 +68,8 @@ export default function LandingPage() {
   const [activeTab, setActiveTab] = useState(0);
   const navigate = useNavigate();
 
-  const handleGoogleLogin = async () => {
+  const handleLogin = async () => {
+    console.log("LOGIN CLICKED");
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -94,7 +95,7 @@ export default function LandingPage() {
             <a href="#tools" className="hover:text-slate-900 transition-colors">Platform</a>
             <a href="#demo" className="hover:text-slate-900 transition-colors">Demo</a>
           </div>
-          <Button onClick={handleGoogleLogin} className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-6">
+          <Button type="button" onClick={handleLogin} className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-6">
             Continue with Google
           </Button>
         </div>
@@ -116,7 +117,7 @@ export default function LandingPage() {
             Upload your product and create studio-quality ecommerce photos in seconds using AI. No photoshoots, no designers, no waiting.
           </motion.p>
           <motion.div variants={fadeUp} custom={3} className="flex flex-wrap gap-4">
-            <Button onClick={handleGoogleLogin} size="lg" className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-8 text-base h-12">
+            <Button type="button" onClick={handleLogin} size="lg" className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-8 text-base h-12">
               <Camera className="h-5 w-5 mr-2" /> Continue with Google
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-full border-slate-200 hover:bg-slate-50 px-8 text-base h-12">
