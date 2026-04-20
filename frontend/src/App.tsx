@@ -26,7 +26,13 @@ import { supabase } from "./lib/supabase";
 const AppContent = () => {
   const [globalProgress, setGlobalProgress] = useState(false);
 
-
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session && window.location.pathname === "/") {
+        window.location.href = "/dashboard";
+      }
+    });
+  }, []);
 
   useEffect(() => {
     let requests = 0;
