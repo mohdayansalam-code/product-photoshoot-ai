@@ -14,7 +14,7 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { generateShoot, pollImage } from "@/lib/api";
+import { generateShoot, pollImage, DEFAULT_CREDITS } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,16 +48,8 @@ export default function CreatePhotoshootPage() {
   const [monthlyLimit, setMonthlyLimit] = useState(10);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        supabase.from("profiles").select("images_used, monthly_limit").eq("id", data.session.user.id).single().then(res => {
-           if (res.data) {
-             setImagesUsed(res.data.images_used || 0);
-             setMonthlyLimit(res.data.monthly_limit || 10);
-           }
-        });
-      }
-    });
+    setImagesUsed(DEFAULT_CREDITS.images_used);
+    setMonthlyLimit(DEFAULT_CREDITS.monthly_limit);
   }, []);
   
   const [images, setImages] = useState<{url: string, angle: string}[]>([]);
@@ -344,15 +336,7 @@ export default function CreatePhotoshootPage() {
       recoveryAttemptsRef.current = 0;
       
       // Refresh image usages natively
-      supabase.auth.getSession().then(({ data }) => {
-        if (data.session) {
-          supabase.from("profiles").select("images_used").eq("id", data.session.user.id).single().then(res => {
-             if (res.data) {
-               setImagesUsed(res.data.images_used || 0);
-             }
-          });
-        }
-      });
+      setImagesUsed(DEFAULT_CREDITS.images_used);
 
       // Remove from storage after full completion
       localStorage.removeItem("active_generation");
