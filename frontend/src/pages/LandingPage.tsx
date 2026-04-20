@@ -66,17 +66,25 @@ const FOOTER_LINKS = ["Home", "Features", "Pricing", "Docs", "Contact"];
 
 export default function LandingPage() {
   const [activeTab, setActiveTab] = useState(0);
+  const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("LOGIN CLICKED");
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
+    if (!email) return;
+    
+    setIsLoading(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email,
       options: {
-        redirectTo: window.location.origin + "/auth/callback"
+        emailRedirectTo: window.location.origin + "/dashboard"
       }
     });
+    setIsLoading(false);
+
+    if (error) alert(error.message);
+    else alert("Check your email for login link");
   };
 
   return (
@@ -96,8 +104,8 @@ export default function LandingPage() {
             <a href="#tools" className="hover:text-slate-900 transition-colors">Platform</a>
             <a href="#demo" className="hover:text-slate-900 transition-colors">Demo</a>
           </div>
-          <Button type="button" onClick={handleLogin} className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-6">
-            Continue with Google
+          <Button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-6">
+            Get Started
           </Button>
         </div>
       </nav>
@@ -117,14 +125,26 @@ export default function LandingPage() {
           <motion.p variants={fadeUp} custom={2} className="text-lg text-slate-500 max-w-lg leading-relaxed">
             Upload your product and create studio-quality ecommerce photos in seconds using AI. No photoshoots, no designers, no waiting.
           </motion.p>
-          <motion.div variants={fadeUp} custom={3} className="flex flex-wrap gap-4">
-            <Button type="button" onClick={handleLogin} size="lg" className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 px-8 text-base h-12">
-              <Camera className="h-5 w-5 mr-2" /> Continue with Google
-            </Button>
-            <Button asChild variant="outline" size="lg" className="rounded-full border-slate-200 hover:bg-slate-50 px-8 text-base h-12">
-              <a href="#features">See Examples <ArrowRight className="h-4 w-4 ml-2" /></a>
-            </Button>
-          </motion.div>
+          <motion.form onSubmit={handleLogin} variants={fadeUp} custom={3} className="w-full max-w-md pt-2">
+            <div className="flex flex-col gap-3">
+              <input
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                required
+                onChange={(e) => setEmail(e.target.value)}
+                className="flex h-12 w-full rounded-full border border-slate-200 bg-white px-5 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <Button type="submit" disabled={isLoading} size="lg" className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 h-12 w-full text-base font-semibold">
+                {isLoading ? "Sending..." : "Send Login Link"}
+              </Button>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-4 justify-center">
+              <Button asChild variant="ghost" size="sm" className="rounded-full text-slate-500 hover:text-slate-900 border-slate-200 hover:bg-slate-50 px-6">
+                <a href="#features">See Examples <ArrowRight className="h-4 w-4 ml-2" /></a>
+              </Button>
+            </div>
+          </motion.form>
           <motion.div variants={fadeUp} custom={4} className="flex items-center gap-3 pt-2">
             <div className="flex -space-x-2">
               {[0, 1, 2, 3].map((i) => (

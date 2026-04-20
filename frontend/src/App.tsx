@@ -18,7 +18,6 @@ import ProductsLibraryPage from "./pages/ProductsLibraryPage";
 import LandingPage from "./pages/LandingPage";
 import AdminPage from "./pages/AdminPage";
 import NotFound from "./pages/NotFound";
-import AuthCallback from "./pages/AuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -60,7 +59,6 @@ const AppContent = () => {
       <Routes>
       {/* Public Pages */}
       <Route path="/" element={<LandingPage />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<Navigate to="/" replace />} />
 
       {/* Protected App Pages */}
