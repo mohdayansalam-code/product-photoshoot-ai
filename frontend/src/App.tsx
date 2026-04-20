@@ -27,11 +27,17 @@ const AppContent = () => {
   const [globalProgress, setGlobalProgress] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session && window.location.pathname === "/") {
-        window.location.href = "/dashboard";
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_IN" && session) {
+          window.location.href = "/dashboard";
+        }
       }
-    });
+    );
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
