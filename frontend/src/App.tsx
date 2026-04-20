@@ -18,6 +18,7 @@ import ProductsLibraryPage from "./pages/ProductsLibraryPage";
 import LandingPage from "./pages/LandingPage";
 import AdminPage from "./pages/AdminPage";
 import NotFound from "./pages/NotFound";
+import AuthCallback from "./pages/AuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -26,19 +27,7 @@ import { supabase } from "./lib/supabase";
 const AppContent = () => {
   const [globalProgress, setGlobalProgress] = useState(false);
 
-  useEffect(() => {
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === "SIGNED_IN" && session) {
-          window.location.href = "/dashboard";
-        }
-      }
-    );
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     let requests = 0;
@@ -71,6 +60,7 @@ const AppContent = () => {
       <Routes>
       {/* Public Pages */}
       <Route path="/" element={<LandingPage />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<Navigate to="/" replace />} />
 
       {/* Protected App Pages */}
