@@ -1,9 +1,9 @@
 import { useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "../lib/supabase";
 
 export default function AuthCallback() {
   useEffect(() => {
-    const handleAuth = async () => {
+    const handle = async () => {
       const { data } = await supabase.auth.getSession();
 
       if (data.session) {
@@ -13,8 +13,8 @@ export default function AuthCallback() {
       }
     };
 
-    handleAuth();
+    handle();
   }, []);
 
-  return <div className="min-h-screen flex items-center justify-center">Signing you in...</div>;
+  return <div>Loading...</div>;
 }
