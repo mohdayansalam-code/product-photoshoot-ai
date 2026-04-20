@@ -26,31 +26,7 @@ import { supabase } from "./lib/supabase";
 const AppContent = () => {
   const [globalProgress, setGlobalProgress] = useState(false);
 
-  useEffect(() => {
-    // ✅ 1. Handle existing session (after redirect)
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
 
-      if (data.session && window.location.pathname === "/") {
-        window.location.href = "/dashboard";
-      }
-    };
-
-    checkSession();
-
-    // ✅ 2. Handle new login event
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === "SIGNED_IN" && session) {
-          window.location.href = "/dashboard";
-        }
-      }
-    );
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     let requests = 0;
