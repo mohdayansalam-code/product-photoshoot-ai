@@ -70,7 +70,7 @@ export default function LandingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     if (!email) return;
     
@@ -125,7 +125,7 @@ export default function LandingPage() {
           <motion.p variants={fadeUp} custom={2} className="text-lg text-slate-500 max-w-lg leading-relaxed">
             Upload your product and create studio-quality ecommerce photos in seconds using AI. No photoshoots, no designers, no waiting.
           </motion.p>
-          <motion.form onSubmit={handleLogin} variants={fadeUp} custom={3} className="w-full max-w-md pt-2">
+          <motion.div variants={fadeUp} custom={3} className="w-full max-w-md pt-2">
             <div className="flex flex-col gap-3">
               <input
                 type="email"
@@ -135,7 +135,7 @@ export default function LandingPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="flex h-12 w-full rounded-full border border-slate-200 bg-white px-5 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
-              <Button type="submit" disabled={isLoading} size="lg" className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 h-12 w-full text-base font-semibold">
+              <Button type="button" onClick={handleLogin} disabled={isLoading} size="lg" className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 h-12 w-full text-base font-semibold">
                 {isLoading ? "Sending..." : "Send Login Link"}
               </Button>
             </div>
@@ -144,7 +144,7 @@ export default function LandingPage() {
                 <a href="#features">See Examples <ArrowRight className="h-4 w-4 ml-2" /></a>
               </Button>
             </div>
-          </motion.form>
+          </motion.div>
           <motion.div variants={fadeUp} custom={4} className="flex items-center gap-3 pt-2">
             <div className="flex -space-x-2">
               {[0, 1, 2, 3].map((i) => (
