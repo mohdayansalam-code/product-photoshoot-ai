@@ -94,7 +94,10 @@ export default function Index() {
                <Camera className="w-8 h-8 text-primary" />
             </div>
             <h3 className="text-xl font-semibold mb-2">No generations yet</h3>
-            <p className="text-muted-foreground max-w-sm">Start your first AI photoshoot to see your generated images appear here.</p>
+            <p className="text-muted-foreground max-w-sm mb-6">Start your first AI photoshoot to see your generated images appear here.</p>
+            <Button onClick={() => navigate("/dashboard/create-photoshoot")} className="rounded-full px-6">
+              <Plus className="w-4 h-4 mr-2" /> Create your first photoshoot
+            </Button>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">

@@ -25,7 +25,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { CreditIndicator } from "@/components/CreditIndicator";
-import { getCredits } from "@/lib/api";
+import { getCredits, DEFAULT_CREDITS } from "@/lib/api";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -42,7 +42,7 @@ const navItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const [creditsRemaining, setCreditsRemaining] = useState(0);
+  const [credits, setCredits] = useState({ used: 0, limit: 10 });
   const [loadingCredits, setLoadingCredits] = useState(true);
   const [errorCredits, setErrorCredits] = useState(false);
   const [retryingCredits, setRetryingCredits] = useState(false);
@@ -53,12 +53,7 @@ export function AppSidebar() {
     
     setErrorCredits(false);
     try {
-      const credits = {
-        images_used: 0,
-        monthly_limit: 10
-      };
-
-      setCreditsRemaining(credits.monthly_limit - credits.images_used);
+      setCredits({ used: DEFAULT_CREDITS.images_used, limit: DEFAULT_CREDITS.monthly_limit });
     } catch (err) {
       console.error("Failed to fetch credits", err);
     } finally {
@@ -104,10 +99,10 @@ export function AppSidebar() {
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === "/"}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-accent"
+                      <NavLink
+                        to={item.url}
+                        end={item.url === "/dashboard" || item.url === "/"}
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-accent"
                       activeClassName="bg-accent text-accent-foreground"
                     >
                       <item.icon className="h-4 w-4 flex-shrink-0" />
@@ -122,7 +117,8 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-3">
         <CreditIndicator 
-          credits_remaining={creditsRemaining}
+          used={credits.used}
+          limit={credits.limit}
           collapsed={collapsed}
           loading={loadingCredits}
           error={errorCredits}

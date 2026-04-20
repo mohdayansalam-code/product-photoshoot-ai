@@ -24,8 +24,9 @@ export function TopNavbar() {
     });
   }, []);
 
-  const handleLogout = () => {
-    navigate("/landing");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/");
   };
 
   return (

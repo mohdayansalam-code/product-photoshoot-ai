@@ -62,13 +62,27 @@ const TOOL_FEATURES = [
   { label: "Projects Management", icon: Users },
 ];
 
+import { toast } from "sonner";
+
 const FOOTER_LINKS = ["Home", "Features", "Pricing", "Docs", "Contact"];
 
 export default function LandingPage() {
   const [activeTab, setActiveTab] = useState(0);
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        navigate("/dashboard");
+      } else {
+        setAuthChecking(false);
+      }
+    });
+  }, [navigate]);
 
   const handleLogin = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -82,10 +96,21 @@ export default function LandingPage() {
       }
     });
     setIsLoading(false);
-
-    if (error) alert(error.message);
-    else alert("Check your email for login link");
+    if (error) {
+      toast.error(error.message);
+    } else {
+      setEmailSent(true);
+      toast.success("Check your email for login link");
+    }
   };
+
+  if (authChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans overflow-x-hidden">
@@ -127,17 +152,38 @@ export default function LandingPage() {
           </motion.p>
           <motion.div variants={fadeUp} custom={3} className="w-full max-w-md pt-2">
             <div className="flex flex-col gap-3">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                value={email}
-                required
-                onChange={(e) => setEmail(e.target.value)}
-                className="flex h-12 w-full rounded-full border border-slate-200 bg-white px-5 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <Button type="button" onClick={handleLogin} disabled={isLoading} size="lg" className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 h-12 w-full text-base font-semibold">
-                {isLoading ? "Sending..." : "Send Login Link"}
-              </Button>
+              {emailSent ? (
+                <div className="flex flex-col items-center justify-center p-6 bg-green-50 rounded-2xl border border-green-100 text-center">
+                  <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-3">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                  <h3 className="font-bold text-green-900 mb-1">Check your email</h3>
+                  <p className="text-sm text-green-700">We sent a magic link to <strong>{email}</strong></p>
+                  <Button variant="ghost" size="sm" onClick={() => setEmailSent(false)} className="mt-4 text-green-700 hover:text-green-800 hover:bg-green-100/50">
+                    Use a different email
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    disabled={isLoading}
+                    required
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="flex h-12 w-full rounded-full border border-slate-200 bg-white px-5 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                  />
+                  <Button type="button" onClick={handleLogin} disabled={isLoading || !email} size="lg" className="rounded-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white shadow-lg shadow-blue-500/25 h-12 w-full text-base font-semibold transition-all">
+                    {isLoading ? (
+                      <span className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        Sending...
+                      </span>
+                    ) : "Send Login Link"}
+                  </Button>
+                </>
+              )}
             </div>
             <div className="mt-4 flex flex-wrap gap-4 justify-center">
               <Button asChild variant="ghost" size="sm" className="rounded-full text-slate-500 hover:text-slate-900 border-slate-200 hover:bg-slate-50 px-6">

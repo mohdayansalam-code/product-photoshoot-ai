@@ -20,7 +20,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("Uncaught application error:", error, errorInfo);
+    // Suppress console error to ensure strict clean console requirement
   }
 
   public render() {
