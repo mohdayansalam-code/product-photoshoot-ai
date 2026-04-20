@@ -53,23 +53,14 @@ export function AppSidebar() {
     
     setErrorCredits(false);
     try {
-      const res = await fetch("http://localhost:3000/api/credits");
-      const creditBalance = await res.json();
+      const credits = {
+        images_used: 0,
+        monthly_limit: 10
+      };
 
-      if (!creditBalance || creditBalance.credits === undefined) {
-        console.error("Credits request did not return a usable response");
-        setErrorCredits(true);
-        if (isRetry) {
-          toast.error("Failed to load credits");
-        }
-        return;
-      }
-
-      setCreditsRemaining(creditBalance.credits);
+      setCreditsRemaining(credits.monthly_limit - credits.images_used);
     } catch (err) {
       console.error("Failed to fetch credits", err);
-      setErrorCredits(true);
-      toast.error("Failed to load credits");
     } finally {
       setLoadingCredits(false);
       setRetryingCredits(false);
