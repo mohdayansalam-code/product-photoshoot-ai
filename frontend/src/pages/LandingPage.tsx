@@ -68,7 +68,8 @@ export default function LandingPage() {
   const [activeTab, setActiveTab] = useState(0);
   const navigate = useNavigate();
 
-  const handleLogin = async () => {
+  const handleLogin = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
     console.log("LOGIN CLICKED");
     await supabase.auth.signInWithOAuth({
       provider: "google",
