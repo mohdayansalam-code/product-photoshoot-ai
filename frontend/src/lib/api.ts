@@ -74,49 +74,12 @@ export async function fetchScenes(): Promise<Scene[]> {
   return SCENES;
 }
 
-export async function generateProduct(payload: any): Promise<{ job_id: string; image_url: string }> {
-  await new Promise((resolve) => setTimeout(resolve, 1500));
-  return { job_id: "gen_" + Date.now(), image_url: "https://via.placeholder.com/512" };
-}
-
-export async function fetchResults(jobId: string): Promise<GenerationJob> {
-  return {
-    id: jobId,
-    status: "completed",
-    progress: 100,
-    images: ["https://via.placeholder.com/512"],
-    scene: "Mocked Scene",
-    model: "AI Model",
-    created_at: new Date().toISOString(),
-  };
-}
-
 export async function getGenerations(): Promise<any[]> {
   return [];
 }
 
-export async function generateVariations(generation_id: string, image_url: string): Promise<{ job_id: string }> {
-  return { job_id: "gen_" + Date.now() };
-}
-
 export async function getDashboardStats(): Promise<DashboardStats> {
   return { credits: DEFAULT_CREDITS.monthly_limit - DEFAULT_CREDITS.images_used, images_generated: 0, active_projects: 0, storage_used: "0 MB" };
-}
-
-export async function uploadProduct(file: File, name: string): Promise<{ product_id: string; image_url: string }> {
-  return { product_id: "prod_" + Date.now(), image_url: "https://via.placeholder.com/512" };
-}
-
-export async function deleteProduct(id: string): Promise<boolean> {
-  return true;
-}
-
-export async function uploadAsset(blob: Blob): Promise<{ asset_url: string }> {
-  return { asset_url: "https://via.placeholder.com/512" };
-}
-
-export async function callImageTool(imageUrl: string, tool: string): Promise<{ job_id: string }> {
-  return { job_id: "tool_" + Date.now() };
 }
 
 export async function fetchAssets(): Promise<AssetRecord[]> {
@@ -127,21 +90,8 @@ export async function fetchProducts(): Promise<ProductRecord[]> {
   return [];
 }
 
-export async function getGeneration(id: string): Promise<{ success: boolean; image_url?: string; status?: string }> {
-  return { success: true, image_url: "https://via.placeholder.com/512", status: "completed" };
-}
-
-export async function retryGeneration(id: string) {
-  return { success: true, image_url: "https://via.placeholder.com/512" };
-}
-
-export async function markGenerationFailed(id: string) {}
-
-export async function pollImage(id: string): Promise<string> {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  return "https://via.placeholder.com/512";
-}
-
-export async function generateShoot(payload: any) {
-  return [{ request_id: "req_" + Date.now() }];
-}
+export async function retryGeneration(id: string) { return null; }
+export async function uploadAsset(b: Blob) { return null; }
+export async function uploadProduct(b: any, n: string) { return null; }
+export async function callImageTool(u: string, t: string) { return null; }
+export async function deleteProduct(id: string) { return null; }

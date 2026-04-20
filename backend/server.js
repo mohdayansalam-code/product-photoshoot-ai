@@ -1,68 +1,50 @@
-import "dotenv/config";
-import cors from "cors";
 import express from "express";
-import { createServer } from "http";
+import cors from "cors";
+import fetch from "node-fetch";
+import dotenv from "dotenv";
 
-import faceModelsRouter from "./routes/face-models.js";
-import generateRouter from "./routes/generate.js";
-import generationsRouter from "./routes/generations.js";
-import generationRouter from "./routes/generation.js";
-import adminRouter from "./routes/admin.js";
+dotenv.config();
 
-import { supabase } from "./lib/db.js";
+const app = express();
 
-const PORT = Number(process.env.PORT || 3000);
-const hostname = process.env.HOST || "0.0.0.0";
+app.use(cors({ origin: "*" }));
+app.use(express.json({ limit: "50mb" })); // Kept 50mb limit for large images
 
-async function startServer() {
-  const app = express();
-
-  app.use(cors({
-    origin: "*"
-  }));
-
-  app.use(express.json({ limit: "50mb" }));
-
-  app.get("/health", (_req, res) => {
-    res.json({ status: "ok" });
-  });
-
-  // Pure Express Routes
-  app.use("/api/face-models", faceModelsRouter);
-  app.use("/api/generate", generateRouter);
-  app.use("/api/generations", generationsRouter);
-  app.use("/api/generation", generationRouter);
-  app.use("/api/admin", adminRouter);
-
-  // Missing APIs for dashboard mock
-
-  app.get("/api/products", (req, res) => {
-    res.json([]);
-  });
-
-  // Prevent any text/html fallback
-  app.use((req, res, next) => {
-    if (req.path.startsWith("/api/")) {
-      return res.status(404).json({ success: false, error: "Not Found" });
-    }
-    next();
-  });
-
-  // Global Error Handler
-  app.use((err, req, res, next) => {
-    console.error("Global Error Handler Caught:", err);
-    res.status(500).json({
-      success: false,
-      error: "Internal Server Error"
+app.post("/api/generate", async (req, res) => {
+  try {
+    const response = await fetch("https://api.astria.ai/generate", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.ASTRIA_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(req.body)
     });
-  });
 
-  createServer(app).listen(PORT, hostname, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-}
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Generation failed" });
+  }
+});
 
-startServer().catch((error) => {
-  console.error("Failed to start server", error);
-  process.exit(1);
+app.get("/api/generate/:id", async (req, res) => {
+  try {
+    const response = await fetch(`https://api.astria.ai/generate/${req.params.id}`, {
+      headers: {
+        "Authorization": `Bearer ${process.env.ASTRIA_API_KEY}`
+      }
+    });
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: "Polling failed" });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on ${PORT}`);
 });

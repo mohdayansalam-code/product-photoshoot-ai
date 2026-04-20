@@ -14,7 +14,7 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { generateShoot, pollImage, DEFAULT_CREDITS } from "@/lib/api";
+import { DEFAULT_CREDITS } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,160 +41,12 @@ export default function CreatePhotoshootPage() {
   const [shootType, setShootType] = useState<string>("studio");
   const [prompt, setPrompt] = useState<string>("");
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeAction, setActiveAction] = useState<"generate" | "regenerate" | "angles" | "improve" | null>(null);
-  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
-  const [imagesUsed, setImagesUsed] = useState(0);
-  const [monthlyLimit, setMonthlyLimit] = useState(10);
+  const [loading, setLoading] = useState(false);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [credits, setCredits] = useState(10);
 
-  useEffect(() => {
-    setImagesUsed(DEFAULT_CREDITS.images_used);
-    setMonthlyLimit(DEFAULT_CREDITS.monthly_limit);
-  }, []);
-  
-  const [images, setImages] = useState<{url: string, angle: string}[]>([]);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [isSuccess, setIsSuccess] = useState(false);
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isPollingRef = useRef(false);
-  const recoveryAttemptsRef = useRef(0);
-
-  const isPollingStale = () => {
-    const raw = localStorage.getItem("polling_active");
-    if (!raw) return true; // doesn't exist = stale / free
-    try {
-      const obj = JSON.parse(raw);
-      if (!obj.active) return true;
-      if (Date.now() - obj.timestamp > 90 * 1000) return true; // >90s is stale
-      return false; // valid & active
-    } catch {
-      return true;
-    }
-  };
-
-  const setPollingLock = (active: boolean) => {
-    if (active) {
-      localStorage.setItem("polling_active", JSON.stringify({ active: true, timestamp: Date.now() }));
-    } else {
-      localStorage.removeItem("polling_active");
-    }
-  };
-
-  // Resume active_generation on page load
-  useEffect(() => {
-    // Safe cleanup on unload (Optional Safety Layer)
-    const handleUnload = () => {
-      if (isPollingRef.current) {
-        setPollingLock(false);
-      }
-    };
-    window.addEventListener("beforeunload", handleUnload);
-
-    const raw = localStorage.getItem("active_generation");
-    if (raw) {
-      try {
-        const stored = JSON.parse(raw);
-        // Validate timestamp (not older than 10 min)
-        if (Date.now() - stored.created_at < 10 * 60 * 1000) {
-          if (!isPollingStale()) {
-             toast.info("Your photoshoot is running in another tab");
-             return;
-          }
-          
-          isPollingRef.current = true;
-          setPollingLock(true);
-          setIsLoading(true);
-          toast.info("Resuming your photoshoot...", { description: "Please hold while we poll the results." });
-          processGenerationResults(stored.request_ids, stored.multi_angle, stored.final_prompt, stored.shoot_type);
-        } else {
-          // older than 10 minutes, timeout.
-          localStorage.removeItem("active_generation");
-          setPollingLock(false);
-        }
-      } catch (e) {
-        localStorage.removeItem("active_generation");
-        setPollingLock(false);
-      }
-    }
-    
-    return () => window.removeEventListener("beforeunload", handleUnload);
-  }, []);
-
-  const tryResumeGeneration = (isCrossTabRecovery = false) => {
-    if (isPollingRef.current) return;
-    
-    // Failsafe: Prevent Infinite Loops
-    if (recoveryAttemptsRef.current >= 3) {
-      localStorage.removeItem("active_generation");
-      localStorage.removeItem("polling_active");
-      recoveryAttemptsRef.current = 0;
-      toast.error("Something went wrong. Please retry");
-      return;
-    }
-
-    // 1. DOUBLE-CHECK LOCK BEFORE CLAIM
-    if (!isPollingStale()) {
-      if (isCrossTabRecovery) toast.info("Another tab resumed your photoshoot");
-      return;
-    }
-
-    const rawGen = localStorage.getItem("active_generation");
-    if (!rawGen) return;
-
-    try {
-      const stored = JSON.parse(rawGen);
-      
-      // Failsafe: Validate parsed data
-      if (!stored || !Array.isArray(stored.request_ids)) {
-         throw new Error("Corrupted cache");
-      }
-
-      // Validate timestamp (not older than 10 min)
-      if (Date.now() - stored.created_at < 10 * 60 * 1000) {
-        
-        recoveryAttemptsRef.current += 1;
-
-        // 3. LOCK CLAIM SAFETY (Set instantly before async logic)
-        isPollingRef.current = true;
-        setPollingLock(true);
-        setIsLoading(true);
-        toast.success("Continuing photoshoot...", { description: "Resuming unfinished generation." });
-        processGenerationResults(stored.request_ids, stored.multi_angle, stored.final_prompt, stored.shoot_type);
-      } else {
-        localStorage.removeItem("active_generation");
-      }
-    } catch {
-      localStorage.removeItem("active_generation");
-      recoveryAttemptsRef.current = 0;
-    }
-  };
-
-  // Listen for Cross-Tab Lock Removals (Auto-resumes if blocking tab crashes/closes)
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      // Trigger only when polling lock is completely freed
-      if (e.key === "polling_active" && isPollingStale()) {
-        tryResumeGeneration(true);
-      }
-    };
-    
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
-
-  // Rotate loading messages
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isLoading) {
-      interval = setInterval(() => {
-        setLoadingMsgIdx(prev => (prev + 1) % LOADING_MESSAGES.length);
-      }, 1500);
-    } else {
-      setLoadingMsgIdx(0);
-    }
-    return () => clearInterval(interval);
-  }, [isLoading]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -206,8 +58,6 @@ export default function CreatePhotoshootPage() {
       const reader = new FileReader();
       reader.onloadend = () => {
          setProductImage(reader.result as string);
-         setImages([]);
-         setSelectedImage(null);
          
          // Smart Prompt Auto-Fill
          const fname = file.name.toLowerCase();
@@ -223,155 +73,102 @@ export default function CreatePhotoshootPage() {
     }
   };
 
-  const handleGenerate = async (
-    actionType: "generate" | "regenerate" | "angles" | "improve", 
-    options: { multiAngle?: boolean; improveQuality?: boolean } = {}
-  ) => {
-    if (!productImage || !shootType) {
-      alert("Complete setup first");
-      return;
-    }
-    
-    if (imagesUsed >= monthlyLimit) {
-      alert("Limit reached");
-      return;
-    }
+  const pollJob = async (id: string) => {
+    let attempts = 0;
 
-    if (isPollingRef.current) return;
-    if (!isPollingStale()) {
-      toast.info("Your photoshoot is running in another tab");
-      return;
-    }
+    while (attempts < 30) {
+      await new Promise(r => setTimeout(r, 2000));
+      attempts++;
 
-    isPollingRef.current = true;
-    setPollingLock(true);
+      try {
+        const API = import.meta.env.VITE_API_BASE_URL;
+        const res = await fetch(`${API}/api/generate/${id}`);
+        const data = await res.json();
 
-    setIsLoading(true);
-    setActiveAction(actionType);
-    setIsSuccess(false);
-    
-    // Clear previous if not regenerating or adding more angles
-    if (!options.multiAngle && !options.improveQuality) {
-       setImages([]);
-       setSelectedImage(null);
-    }
-    
-    recoveryAttemptsRef.current = 0;
+        if (data.status === "completed") {
+          setGeneratedImages(data.images);
+          setLoading(false);
+          toast.success("Photoshoot ready!");
+          setTimeout(() => {
+            document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 300);
+          return;
+        }
 
-    try {
-      let finalPrompt = prompt || `A beautiful product photo in ${SHOOT_STYLES.find(s => s.id === shootType)?.name || shootType} style`;
-      if (options.improveQuality) {
-        finalPrompt += ", masterpiece, 8k resolution, photorealistic, premium quality, ultra-detailed textures";
+        if (data.status === "failed") {
+          throw new Error("Generation failed");
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
       }
-      if (actionType === "regenerate") {
-        finalPrompt += ", different angle, variation";
-      }
-
-      const generateResponse = await generateShoot({
-        product_image: productImage || imageUrl,
-        user_prompt: finalPrompt,
-        shoot_type: shootType,
-        gender: mode === "model" ? gender : "female", // Provide fallback gender
-        multi_angle: options.multiAngle || false
-      });
-
-      const requestData = generateResponse;
-      if (!requestData || requestData.length === 0) {
-        throw new Error("No valid request IDs returned");
-      }
-
-      // 1. SAVE GENERATION: Map state resilience
-      localStorage.setItem("active_generation", JSON.stringify({
-        request_ids: requestData,
-        multi_angle: options.multiAngle || false,
-        final_prompt: finalPrompt,
-        shoot_type: shootType,
-        created_at: Date.now()
-      }));
-
-      await processGenerationResults(requestData, options.multiAngle || false, finalPrompt, shootType);
-
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Something went wrong generating the photoshoot");
-      setIsLoading(false);
-      setActiveAction(null);
-      isPollingRef.current = false;
-      setPollingLock(false);
-      
-      // Attempt recovery recursively if generation still suspended
-      setTimeout(() => tryResumeGeneration(), 100);
     }
+
+    setLoading(false);
+    toast.error("Timeout. Try again.");
   };
 
-  const processGenerationResults = async (requestData: any[], multiAngle: boolean, finalPrompt: string, shootType: string) => {
+  const handleGenerate = async () => {
+    console.log("🔥 BUTTON CLICKED");
+    if (!productImage) {
+      alert("Upload image first");
+      return;
+    }
+    
+    if (credits <= 0) {
+      toast.error("No credits remaining!");
+      return;
+    }
+    
+    if (loading) return;
+    
     try {
+      setLoading(true);
+      setGeneratedImages([]);
 
-      const finalImages = await Promise.all(
-        requestData.map(async (req) => {
-          if (!req.request_id) return null;
-          const url = await pollImage(req.request_id);
-          return { url, angle: req.angle || "Standard View" };
+      // Decrease frontend mockup credits
+      setCredits(prev => prev - 1);
+
+      const finalPrompt = prompt || `${shootType} product photoshoot, perfect lighting, professional style, high quality, ecommerce, ultra realistic`;
+
+      console.log("🔥 INITIATING FETCH");
+      const API = import.meta.env.VITE_API_BASE_URL;
+      const res = await fetch(`${API}/api/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          prompt: finalPrompt,
+          image: productImage || imageUrl,
+          num_images: 4
         })
-      );
+      });
 
-      const validImages = finalImages.filter(Boolean) as {url: string, angle: string}[];
-      
-      if (validImages.length === 0) {
-         toast.error("Generation failed. Please try again.");
-         localStorage.removeItem("active_generation");
-         return;
+      console.log("🔥 RESPONSE:", res);
+      const data = await res.json();
+      console.log("🔥 DATA:", data);
+
+      if (data.images) {
+        setGeneratedImages(data.images);
+        setLoading(false);
+        toast.success("Photoshoot ready!");
+        setTimeout(() => {
+          document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 300);
+        return;
       }
-      
-      setImages(prev => multiAngle ? [...prev, ...validImages] : validImages);
-      
-      if (validImages.length > 0 && !multiAngle) {
-         setSelectedImage(validImages[0].url);
+
+      if (data.job_id) {
+        setJobId(data.job_id);
+        pollJob(data.job_id);
+      } else {
+         throw new Error("No valid response from API");
       }
 
-      setIsSuccess(true);
-      toast.success(`Photoshoot ready!`);
-      
-      // Reset failsafe layer globally
-      recoveryAttemptsRef.current = 0;
-      
-      // Refresh image usages natively
-      setImagesUsed(DEFAULT_CREDITS.images_used);
-
-      // Remove from storage after full completion
-      localStorage.removeItem("active_generation");
-
-      // Save History (Frontend State)
-      const generationRecord = {
-        id: "gen_" + Date.now(),
-        image_urls: validImages.map(img => img.url),
-        images: validImages.map(img => img.url),
-        prompt: finalPrompt,
-        model: shootType,
-        created_at: new Date().toISOString(),
-        status: "completed"
-      };
-      const existing = JSON.parse(localStorage.getItem("recent_generations") || "[]");
-      localStorage.setItem("recent_generations", JSON.stringify([generationRecord, ...existing]));
-
-      // Scroll to results smoothly
-      setTimeout(() => {
-        document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 300);
-
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Polling failed. Something went wrong resuming the photoshoot.");
-      localStorage.removeItem("active_generation");
-    } finally {
-      isPollingRef.current = false;
-      setPollingLock(false);
-      setIsLoading(false);
-      setActiveAction(null);
-      setTimeout(() => setIsSuccess(false), 4000);
-
-      // Attempt recovery on same tab if queued overlapping generations exist
-      setTimeout(() => tryResumeGeneration(), 100);
+    } catch (err) {
+      console.error("🔥 ERROR:", err);
+      toast.error("Generation failed");
+      setLoading(false);
     }
   };
 
@@ -391,11 +188,10 @@ export default function CreatePhotoshootPage() {
   };
 
   const handleDownloadAll = async () => {
-    if (images.length === 0) return;
-    toast.success(`Downloading ${images.length} images...`);
-    for (const img of images) {
-      await downloadImage(img.url);
-      // slight delay between downloads
+    if (generatedImages.length === 0) return;
+    toast.success(`Downloading ${generatedImages.length} images...`);
+    for (const img of generatedImages) {
+      await downloadImage(img);
       await new Promise(r => setTimeout(r, 300));
     }
   };
@@ -426,7 +222,7 @@ export default function CreatePhotoshootPage() {
                 className={cn(
                   "max-h-[85%] max-w-[85%] object-contain z-10 transition-transform duration-500",
                   shootType === "outdoor" ? "drop-shadow-[0_20px_35px_rgba(0,0,0,0.2)]" : "drop-shadow-2xl",
-                  isLoading && "animate-pulse brightness-110"
+                  loading && "animate-pulse brightness-110"
                 )} 
               />
             ) : (
@@ -477,7 +273,7 @@ export default function CreatePhotoshootPage() {
             </div>
 
              {/* Change Product Button (Overlayed when hovered) */}
-             {productImage && !isLoading && (
+             {productImage && !loading && (
                <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-8 z-20">
                  <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="shadow-xl rounded-full px-6 backdrop-blur-md bg-white/90 text-black hover:bg-white border-0">
                     <RefreshCw className="w-4 h-4 mr-2" /> Change Product
@@ -630,47 +426,20 @@ export default function CreatePhotoshootPage() {
 
                 <div className="pt-6 border-t border-border/50">
                   <div className="space-y-4">
-                    {(productImage || imageUrl) && shootType && !isLoading && (
-                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm font-medium text-muted-foreground italic flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-primary" /> Preview: {SHOOT_STYLES.find(s=>s.id === shootType)?.name} lighting with clean background and product focus
-                      </motion.p>
-                    )}
                     <div className="flex flex-col md:flex-row gap-4">
                       <Button 
                         size="lg" 
-                        onClick={() => handleGenerate("generate", { multiAngle: false })} 
-                        disabled={isLoading || !(productImage || imageUrl) || !shootType || (imagesUsed >= monthlyLimit)}
-                        className="bg-black text-white px-6 py-3 rounded-xl hover:bg-gray-900 active:scale-95 transition transform hover:scale-[1.02] h-16 w-full md:w-auto text-xl font-bold disabled:opacity-50 disabled:hover:scale-100"
+                        onClick={handleGenerate} 
+                        disabled={loading || !productImage || !shootType}
+                        className="bg-black text-white px-6 py-3 rounded-xl hover:bg-gray-900 active:scale-95 transition transform hover:scale-[1.02] h-16 w-full md:w-auto text-xl font-bold disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
                       >
-                        {isLoading && activeAction === "generate" ? (
-                          <span className="flex items-center gap-3">
-                             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                             {LOADING_MESSAGES[loadingMsgIdx]}
-                          </span>
-                        ) : (imagesUsed >= monthlyLimit) ? (
-                          <span className="flex items-center gap-3 opacity-90 text-red-300">
-                             Image Limit Reached
-                          </span>
-                        ) : !(productImage || imageUrl) || !shootType ? (
-                          <span className="flex items-center gap-3 opacity-90">
-                             Complete setup to generate
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-3">
-                             <Sparkles className="w-6 h-6"/> Generate Images
-                          </span>
-                        )}
+                        {loading ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <span>Generating...</span>
+                          </>
+                        ) : "Generate Images"}
                       </Button>
-                      
-                      {imagesUsed >= monthlyLimit && (
-                        <Button 
-                          size="lg" 
-                          onClick={() => window.location.href = "/dashboard/billing"} 
-                          className="bg-primary text-white border-none shadow-md px-6 py-3 rounded-xl hover:bg-primary/90 active:scale-95 transition transform hover:scale-[1.02] h-16 w-full md:w-auto text-xl font-bold"
-                        >
-                          <span className="flex items-center gap-2">Upgrade Plan</span>
-                        </Button>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -680,7 +449,7 @@ export default function CreatePhotoshootPage() {
 
         {/* --- SECTION 4: RESULTS REVEAL --- */}
         <AnimatePresence>
-          {(isLoading || images.length > 0) && (
+          {(loading || generatedImages.length > 0) && (
             <motion.div 
               id="results"
               initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} 
@@ -701,165 +470,58 @@ export default function CreatePhotoshootPage() {
                   
                   <div className="pt-1 hidden md:block">
                     <h1 className="text-3xl font-semibold">Your Photoshoot</h1>
-                    <AnimatePresence>
-                      {isSuccess && (
-                        <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2 mt-2 text-green-600 dark:text-green-500 font-medium">
-                          <CheckCircle2 className="w-5 h-5 fill-green-100" /> Your photoshoot is ready
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
                   </div>
                 </div>
-                
-                {/* Removed Action Controls top block */}
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-                {/* RESULTS */}
-                <AnimatePresence mode="popLayout">
-                  {images.map((img, i) => (
-                     <motion.div 
-                       initial={{ opacity: 0, scale: 0.95 }}
-                       animate={{ opacity: 1, scale: 1 }}
-                       transition={{ duration: 0.5, delay: i * 0.15 }}
-                       key={`img-${img.url}-${i}`}
-                       onClick={() => setSelectedImage(img.url)}
-                       className={cn(
-                         "group relative aspect-[4/5] rounded-[2rem] overflow-hidden bg-secondary shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 cursor-pointer",
-                         selectedImage === img.url ? "ring-4 ring-primary ring-offset-2 border-transparent" : "border border-border/50"
-                       )}
-                     >
-                       {/* ANGLE INTELLIGENCE BADGE */}
-                       <div className="absolute top-4 left-4 z-20 flex flex-col items-start gap-2">
-                         <div className="flex gap-2">
-                           <span className="backdrop-blur-md bg-black/40 text-white text-[11px] uppercase tracking-wider px-3 py-1.5 rounded-full font-bold shadow-sm border border-white/10">
-                             {getAngleLabel(img.angle)}
-                           </span>
-                           <span className="backdrop-blur-md bg-black/40 text-amber-300 text-[11px] uppercase tracking-wider px-3 py-1.5 rounded-full font-bold shadow-sm border border-white/10">
-                             {i === 0 ? "HD" : i === 1 ? "Best Angle" : "Close-up"}
-                           </span>
-                         </div>
-                         {selectedImage === img.url && (
-                           <motion.span 
-                             initial={{ scale: 0 }} animate={{ scale: 1 }} 
-                             className="bg-primary text-primary-foreground text-[11px] uppercase tracking-wider px-3 py-1.5 rounded-full font-bold shadow-md flex items-center gap-1"
+              <div>
+                {loading && (
+                   <p className="text-muted-foreground animate-pulse text-lg py-4">
+                     Generating photoshoot... This takes about 10-20 seconds.
+                   </p>
+                )}
+
+                {generatedImages.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+                    {generatedImages.map((img, i) => (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.5, delay: i * 0.15 }}
+                        key={i}
+                        className="group relative aspect-[4/5] rounded-[2rem] overflow-hidden bg-secondary shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 cursor-pointer"
+                      >
+                        <img 
+                          src={img} 
+                          alt="Generated result" 
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                        />
+                        <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center">
+                           <Button 
+                             variant="secondary" 
+                             className="w-full shadow-xl rounded-full bg-white text-black hover:bg-neutral-200 font-bold"
+                             onClick={(e) => { e.stopPropagation(); downloadImage(img); }}
                            >
-                              <CheckCircle2 className="w-3 h-3" /> Selected
-                           </motion.span>
-                         )}
-                       </div>
-
-                       <img 
-                         src={img.url} 
-                         alt={`Generated result ${i}`} 
-                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-                       />
-                       
-                       <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center">
-                          <Button 
-                            variant="secondary" 
-                            className="w-full shadow-xl rounded-full bg-white text-black hover:bg-neutral-200 font-bold"
-                            onClick={(e) => { e.stopPropagation(); downloadImage(img.url); }}
-                          >
-                            <Download className="w-4 h-4 mr-2" /> Download Image
-                          </Button>
-                       </div>
-                     </motion.div>
-                  ))}
-
-                  {/* SKELETON LOADERS - MAGICAL CONCEPT */}
-                  {isLoading && Array.from({ length: images.length > 0 ? 2 : 4 }).map((_, i) => (
-                     <motion.div 
-                       initial={{ opacity: 0, scale: 0.95 }}
-                       animate={{ opacity: 1, scale: 1 }}
-                       exit={{ opacity: 0, scale: 0.9 }}
-                       key={`skel-${i}`} 
-                       className="relative aspect-[4/5] rounded-[2rem] border-2 border-primary/20 bg-card overflow-hidden"
-                     >
-                       <div className="absolute inset-0 bg-gradient-to-tr from-secondary via-primary/5 to-secondary animate-pulse opacity-50" />
-                       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/10 to-transparent h-1/2 w-full animate-[scan_2s_ease-in-out_infinite]" />
-
-                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10">
-                          <motion.div 
-                            animate={{ rotate: 360 }} 
-                            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                          >
-                             <Sparkles className="w-8 h-8 text-primary opacity-80" />
-                          </motion.div>
-                       </div>
-                     </motion.div>
-                  ))}
-                </AnimatePresence>
+                             <Download className="w-4 h-4 mr-2" /> Download
+                           </Button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
               </div>
               
-              {/* ACTION CONTROLS (MOVED TO BOTTOM) */}
-              {images.length > 0 && (
+              {generatedImages.length > 0 && (
                   <div className="flex flex-wrap items-center justify-center gap-4 mt-8 pt-6">
                     <Button 
                       variant="outline" 
-                      onClick={() => handleGenerate("regenerate", { multiAngle: false })} 
-                      disabled={isLoading}
-                      className="rounded-xl shadow-sm hover:shadow-md transition transform hover:scale-[1.02] h-12 px-6"
+                      onClick={handleDownloadAll} 
+                      className="rounded-xl shadow-sm hover:shadow-md transition h-12 px-6"
                     >
-                      {isLoading && activeAction === "regenerate" ? (
-                         <div className="w-4 h-4 mr-2 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
-                      ) : (
-                         <RefreshCw className="w-4 h-4 mr-2 text-muted-foreground" />
-                      )}
-                      Regenerate
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => handleGenerate("improve", { improveQuality: true })} 
-                      disabled={isLoading}
-                      className="rounded-xl shadow-sm hover:shadow-md transition transform hover:scale-[1.02] h-12 px-6 text-amber-600 border-amber-200 hover:bg-amber-50"
-                    >
-                      {isLoading && activeAction === "improve" ? (
-                         <div className="w-4 h-4 mr-2 border-2 border-amber-600/30 border-t-amber-600 rounded-full animate-spin" />
-                      ) : (
-                         <Sparkles className="w-4 h-4 mr-2" />
-                      )}
-                      Improve Quality
-                    </Button>
-                    <Button 
-                      onClick={() => handleGenerate("angles", { multiAngle: true })} 
-                      disabled={isLoading}
-                      className="bg-black text-white px-6 py-3 rounded-xl hover:bg-gray-900 active:scale-95 transition transform hover:scale-[1.02] shadow-sm h-12"
-                    >
-                      {isLoading && activeAction === "angles" ? (
-                         <div className="w-4 h-4 mr-2 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                      ) : (
-                         <Focus className="w-4 h-4 mr-2" />
-                      )}
-                      More Angles
+                      Download All
                     </Button>
                   </div>
               )}
-              
-              {/* Generation Progress Bar */}
-              <AnimatePresence mode="wait">
-                {isLoading && (
-                   <motion.div 
-                     key={loadingMsgIdx}
-                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-                     className="w-full max-w-md mx-auto space-y-3 pt-4"
-                   >
-                     <div className="flex justify-between items-center text-sm font-bold text-primary">
-                       <span>{LOADING_MESSAGES[loadingMsgIdx]}</span>
-                       <span>{Math.min(((loadingMsgIdx + 1) / LOADING_MESSAGES.length) * 100, 100)}%</span>
-                     </div>
-                     <div className="w-full h-2.5 bg-secondary rounded-full overflow-hidden shadow-inner">
-                       <motion.div 
-                         className="h-full bg-primary"
-                         initial={{ width: "0%" }}
-                         animate={{ width: `${Math.min(((loadingMsgIdx + 1) / LOADING_MESSAGES.length) * 100, 100)}%` }}
-                         transition={{ duration: 0.5, ease: "easeInOut" }}
-                       />
-                     </div>
-                   </motion.div>
-                )}
-              </AnimatePresence>
-
             </motion.div>
           )}
         </AnimatePresence>
