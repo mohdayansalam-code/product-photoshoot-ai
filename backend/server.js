@@ -14,7 +14,7 @@ app.get("/", (req, res) => {
 
 // ✅ MAIN ROUTE (THIS IS YOUR FIX)
 app.post("/api/generate", (req, res) => {
-  console.log("🔥 HIT /api/generate");
+  console.log("🔥 GENERATE HIT");
 
   return res.status(200).json({
     job_id: "job_" + Date.now(),
@@ -22,19 +22,26 @@ app.post("/api/generate", (req, res) => {
   });
 });
 
+const activeJobs = new Set();
+
 app.get("/api/status/:job_id", (req, res) => {
   const { job_id } = req.params;
 
-  console.log("📡 POLLING:", job_id);
+  console.log("📡 STATUS HIT:", job_id);
 
-  // Temporary mock response (simulate completed job)
+  if (!activeJobs.has(job_id)) {
+    activeJobs.add(job_id);
+    return res.json({ status: "processing" });
+  }
+
+  activeJobs.delete(job_id);
   return res.json({
     status: "completed",
     images: [
-      "https://via.placeholder.com/500",
-      "https://via.placeholder.com/500",
-      "https://via.placeholder.com/500",
-      "https://via.placeholder.com/500"
+      "https://picsum.photos/500?1",
+      "https://picsum.photos/500?2",
+      "https://picsum.photos/500?3",
+      "https://picsum.photos/500?4"
     ]
   });
 });

@@ -83,7 +83,21 @@ export default function CreatePhotoshootPage() {
       try {
         const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://product-photoshoot-ai.onrender.com";
         const res = await fetch(`${API_BASE}/api/status/${id}`);
-        const data = await res.json();
+        
+        let data;
+        try {
+          data = await res.json();
+        } catch (jsonErr) {
+          console.error("JSON parse error during polling", jsonErr);
+          continue;
+        }
+
+        if (!data) {
+          console.error("Empty response during polling");
+          continue;
+        }
+
+        console.log("📡 POLL DATA:", data);
 
         if (data.status === "completed") {
           console.log("✅ JOB DONE:", data);
@@ -454,7 +468,7 @@ export default function CreatePhotoshootPage() {
 
         {/* --- SECTION 4: RESULTS REVEAL --- */}
         <AnimatePresence>
-          {(loading || generatedImages.length > 0) && (
+          {(loading || generatedImages.length > 0 || jobId) && (
             <motion.div 
               id="results"
               initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} 
@@ -486,31 +500,21 @@ export default function CreatePhotoshootPage() {
                    </p>
                 )}
 
+                {!loading && generatedImages.length === 0 && (
+                   <p className="text-muted-foreground text-lg py-4">
+                     No results yet.
+                   </p>
+                )}
+
                 {generatedImages.length > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-                    {generatedImages.map((img, i) => (
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.5, delay: i * 0.15 }}
+                    {generatedImages?.map((img, i) => (
+                      <img
                         key={i}
-                        className="group relative aspect-[4/5] rounded-[2rem] overflow-hidden bg-secondary shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 cursor-pointer"
-                      >
-                        <img 
-                          src={img} 
-                          alt="Generated result" 
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-                        />
-                        <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center">
-                           <Button 
-                             variant="secondary" 
-                             className="w-full shadow-xl rounded-full bg-white text-black hover:bg-neutral-200 font-bold"
-                             onClick={(e) => { e.stopPropagation(); downloadImage(img); }}
-                           >
-                             <Download className="w-4 h-4 mr-2" /> Download
-                           </Button>
-                        </div>
-                      </motion.div>
+                        src={img}
+                        alt="Generated result"
+                        style={{ width: "100%", borderRadius: "12px" }}
+                      />
                     ))}
                   </div>
                 )}
