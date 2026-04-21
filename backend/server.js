@@ -28,32 +28,34 @@ app.post("/api/generate", async (req, res) => {
 
     console.log("📥 REQUEST:", { prompt, image });
 
-    const response = await fetch("https://api.astria.ai/generate", {
+    const response = await fetch("https://api.astria.ai/v1/generate", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.ASTRIA_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        prompt,
+        prompt: prompt || "product photo",
         input_image: image,
-        num_images: 4
+        num_outputs: 4
       })
     });
 
     const data = await response.json();
 
-    console.log("🔥 ASTRIA RESPONSE:", data);
+    console.log("🔥 ASTRIA FULL RESPONSE:", data);
 
-    // ✅ SAFE EXTRACTION
+    // 🔥 IMPORTANT: log error clearly
+    if (data.error) {
+      console.error("❌ ASTRIA ERROR:", data.error);
+    }
+
     const jobId =
       data?.id ||
       data?.job_id ||
-      data?.task_id ||
       data?.prediction_id;
 
     if (!jobId) {
-      console.error("❌ NO JOB ID:", data);
       return res.status(500).json({
         error: "No job_id returned",
         raw: data
