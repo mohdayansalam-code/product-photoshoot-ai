@@ -1,12 +1,21 @@
 import express from "express";
+import cors from "cors";
+
 const app = express();
 
+app.use(cors());
 app.use(express.json());
 
-app.post("/api/generate", async (req, res) => {
-  console.log("HIT /api/generate");
+// ✅ ROOT ROUTE (optional but useful)
+app.get("/", (req, res) => {
+  res.send("API is running...");
+});
 
-  return res.json({
+// ✅ MAIN ROUTE (THIS IS YOUR FIX)
+app.post("/api/generate", (req, res) => {
+  console.log("🔥 HIT /api/generate");
+
+  return res.status(200).json({
     job_id: "job_" + Date.now(),
     status: "queued"
   });
