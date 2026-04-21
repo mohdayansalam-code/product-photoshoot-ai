@@ -22,6 +22,23 @@ app.post("/api/generate", (req, res) => {
   });
 });
 
+app.get("/api/status/:job_id", (req, res) => {
+  const { job_id } = req.params;
+
+  console.log("📡 POLLING:", job_id);
+
+  // Temporary mock response (simulate completed job)
+  return res.json({
+    status: "completed",
+    images: [
+      "https://via.placeholder.com/500",
+      "https://via.placeholder.com/500",
+      "https://via.placeholder.com/500",
+      "https://via.placeholder.com/500"
+    ]
+  });
+});
+
 app.listen(10000, () => {
   console.log("Server running on 10000");
 });
