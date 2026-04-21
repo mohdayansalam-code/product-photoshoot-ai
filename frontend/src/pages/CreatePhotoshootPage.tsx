@@ -158,22 +158,12 @@ export default function CreatePhotoshootPage() {
       const data = await res.json();
       console.log("🔥 DATA:", data);
 
-      if (data.images) {
-        setGeneratedImages(data.images);
-        setLoading(false);
-        toast.success("Photoshoot ready!");
-        setTimeout(() => {
-          document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 300);
-        return;
+      if (!data || !data.job_id) {
+        throw new Error("No valid response from API");
       }
 
-      if (data.job_id) {
-        setJobId(data.job_id);
-        pollJob(data.job_id);
-      } else {
-         throw new Error("No valid response from API");
-      }
+      setJobId(data.job_id);
+      pollJob(data.job_id);
 
     } catch (err: any) {
       console.error("🔥 ERROR:", err);
