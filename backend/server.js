@@ -7,8 +7,23 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors({ origin: "*" }));
-app.use(express.json({ limit: "50mb" })); // Kept 50mb limit for large images
+// 1. Fix CORS fully
+app.use(cors({
+  origin: "*", 
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+// 2. Add OPTIONS handler for preflight
+app.options("*", cors());
+
+// 3. Ensure JSON parsing works
+app.use(express.json({ limit: "50mb" }));
+
+// 4. GET / health check
+app.get("/", (req, res) => {
+  res.json({ success: true, message: "Backend is live!" });
+});
 
 app.post("/api/generate", async (req, res) => {
   try {
@@ -24,7 +39,7 @@ app.post("/api/generate", async (req, res) => {
     const data = await response.json();
     res.json(data);
   } catch (error) {
-    console.error(error);
+    console.error("Error in POST /api/generate:", error);
     res.status(500).json({ error: "Generation failed" });
   }
 });
@@ -40,11 +55,12 @@ app.get("/api/generate/:id", async (req, res) => {
     const data = await response.json();
     res.json(data);
   } catch (error) {
+    console.error("Error in GET /api/generate/:id :", error);
     res.status(500).json({ error: "Polling failed" });
   }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

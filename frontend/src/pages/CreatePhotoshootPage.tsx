@@ -81,8 +81,8 @@ export default function CreatePhotoshootPage() {
       attempts++;
 
       try {
-        const API = import.meta.env.VITE_API_BASE_URL;
-        const res = await fetch(`${API}/api/generate/${id}`);
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://product-photoshoot-ai.onrender.com";
+        const res = await fetch(`${API_BASE}/api/generate/${id}`);
         const data = await res.json();
 
         if (data.status === "completed") {
@@ -96,10 +96,10 @@ export default function CreatePhotoshootPage() {
         }
 
         if (data.status === "failed") {
-          throw new Error("Generation failed");
+          throw new Error("Generation failed on backend");
         }
       } catch (err) {
-        console.error("Polling error:", err);
+        console.error("🔥 ERROR in polling:", err);
       }
     }
 
@@ -130,9 +130,14 @@ export default function CreatePhotoshootPage() {
 
       const finalPrompt = prompt || `${shootType} product photoshoot, perfect lighting, professional style, high quality, ecommerce, ultra realistic`;
 
-      console.log("🔥 INITIATING FETCH");
-      const API = import.meta.env.VITE_API_BASE_URL;
-      const res = await fetch(`${API}/api/generate`, {
+      // Remove localhost completely, fallback strictly to exact production URL
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://product-photoshoot-ai.onrender.com";
+      const exactFetchUrl = `${API_BASE}/api/generate`;
+
+      console.log("API BASE:", API_BASE);
+      console.log("FULL URL:", exactFetchUrl);
+      
+      const res = await fetch(exactFetchUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -144,7 +149,12 @@ export default function CreatePhotoshootPage() {
         })
       });
 
-      console.log("🔥 RESPONSE:", res);
+      console.log("🔥 RESPONSE STATUS:", res.status, res.statusText);
+      
+      if (!res.ok) {
+         throw new Error(`Server returned status ${res.status}`);
+      }
+
       const data = await res.json();
       console.log("🔥 DATA:", data);
 
@@ -165,9 +175,9 @@ export default function CreatePhotoshootPage() {
          throw new Error("No valid response from API");
       }
 
-    } catch (err) {
+    } catch (err: any) {
       console.error("🔥 ERROR:", err);
-      toast.error("Generation failed");
+      toast.error(`Generation failed: ${err.message || "Unknown network error"}`);
       setLoading(false);
     }
   };

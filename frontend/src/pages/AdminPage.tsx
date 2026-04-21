@@ -30,7 +30,9 @@ export default function AdminPage() {
            }
         }
 
-        const res = await fetch("/api/admin/stats", {
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://product-photoshoot-ai.onrender.com";
+        console.log("API BASE:", API_BASE);
+        const res = await fetch(`${API_BASE}/api/admin/stats`, {
            headers: { 
              "x-admin-secret": secret || "", 
              "x-admin-email": email || "",
