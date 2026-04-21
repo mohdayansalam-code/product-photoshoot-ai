@@ -99,13 +99,10 @@ export default function CreatePhotoshootPage() {
 
         console.log("📡 POLL DATA:", data);
 
-        if (data.status === "completed") {
+        if (data.status === "completed" && data.images?.length) {
           console.log("✅ JOB DONE:", data);
-
-          if (data.images && data.images.length > 0) {
-            setGeneratedImages(data.images);   // 🔥 IMPORTANT
-            setLoading(false);                 // stop loader
-          }
+          setGeneratedImages(data.images);
+          setLoading(false);
 
           toast.success("Photoshoot ready!");
           setTimeout(() => {
@@ -177,10 +174,13 @@ export default function CreatePhotoshootPage() {
       const data = await res.json();
       console.log("API RESPONSE:", data);
 
+      // ❌ STRICT VALIDATION
       if (!data || !data.job_id) {
+        console.error("❌ INVALID RESPONSE:", data);
         throw new Error("No valid response from API");
       }
 
+      // ✅ START FLOW
       setJobId(data.job_id);
       pollJob(data.job_id);
 
