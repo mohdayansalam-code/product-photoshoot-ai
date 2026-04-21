@@ -34,10 +34,10 @@ app.post("/api/generate", async (req, res) => {
 
     const data = await response.json();
 
-    console.log("🔥 ASTRIA GENERATE:", data);
+    console.log("🔥 ASTRIA RAW RESPONSE:", data);
 
     return res.json({
-      job_id: data.id || data.job_id,
+      job_id: data.id || data.job_id || data.task_id,
       status: "queued"
     });
 

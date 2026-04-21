@@ -175,7 +175,7 @@ export default function CreatePhotoshootPage() {
       }
 
       const data = await res.json();
-      console.log("🔥 DATA:", data);
+      console.log("API RESPONSE:", data);
 
       if (!data || !data.job_id) {
         throw new Error("No valid response from API");
