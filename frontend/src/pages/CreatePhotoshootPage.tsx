@@ -125,8 +125,8 @@ export default function CreatePhotoshootPage() {
 
   const handleGenerate = async () => {
     console.log("🔥 BUTTON CLICKED");
-    if (!productImage) {
-      alert("Upload image first");
+    if (!productImage && !imageUrl) {
+      alert("Please upload an image first");
       return;
     }
     
