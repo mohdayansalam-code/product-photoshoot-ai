@@ -1,6 +1,8 @@
 console.log("🚀 CORRECT SERVER FILE IS RUNNING");
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import fetch from "node-fetch";
 
 const app = express();
 
@@ -13,37 +15,66 @@ app.get("/", (req, res) => {
 });
 
 // ✅ MAIN ROUTE (THIS IS YOUR FIX)
-app.post("/api/generate", (req, res) => {
-  console.log("🔥 GENERATE HIT");
+app.post("/api/generate", async (req, res) => {
+  try {
+    const { prompt, image } = req.body;
 
-  return res.status(200).json({
-    job_id: "job_" + Date.now(),
-    status: "queued"
-  });
+    const response = await fetch("https://api.astria.ai/generate", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.ASTRIA_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        prompt: prompt,
+        input_image: image,
+        num_images: 4
+      })
+    });
+
+    const data = await response.json();
+
+    console.log("🔥 ASTRIA GENERATE:", data);
+
+    return res.json({
+      job_id: data.id || data.job_id,
+      status: "queued"
+    });
+
+  } catch (err) {
+    console.error("❌ GENERATE ERROR:", err);
+    res.status(500).json({ error: "Generation failed" });
+  }
 });
 
-const activeJobs = new Set();
+app.get("/api/status/:job_id", async (req, res) => {
+  try {
+    const { job_id } = req.params;
 
-app.get("/api/status/:job_id", (req, res) => {
-  const { job_id } = req.params;
+    const response = await fetch(`https://api.astria.ai/generate/${job_id}`, {
+      headers: {
+        "Authorization": `Bearer ${process.env.ASTRIA_API_KEY}`
+      }
+    });
 
-  console.log("📡 STATUS HIT:", job_id);
+    const data = await response.json();
 
-  if (!activeJobs.has(job_id)) {
-    activeJobs.add(job_id);
+    console.log("📡 ASTRIA STATUS:", data);
+
+    // Adjust based on Astria response
+    if (data.status === "completed" || data.images) {
+      return res.json({
+        status: "completed",
+        images: data.images || data.output || []
+      });
+    }
+
     return res.json({ status: "processing" });
-  }
 
-  activeJobs.delete(job_id);
-  return res.json({
-    status: "completed",
-    images: [
-      "https://picsum.photos/500?1",
-      "https://picsum.photos/500?2",
-      "https://picsum.photos/500?3",
-      "https://picsum.photos/500?4"
-    ]
-  });
+  } catch (err) {
+    console.error("❌ STATUS ERROR:", err);
+    res.status(500).json({ error: "Status failed" });
+  }
 });
 
 app.listen(10000, () => {
