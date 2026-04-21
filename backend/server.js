@@ -1,3 +1,4 @@
+console.log("🚀 CORRECT SERVER FILE IS RUNNING");
 import express from "express";
 import cors from "cors";
 
