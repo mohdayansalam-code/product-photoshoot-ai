@@ -82,17 +82,22 @@ export default function CreatePhotoshootPage() {
 
       try {
         const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://product-photoshoot-ai.onrender.com";
-        const res = await fetch(`${API_BASE}/api/generate/${id}`);
+        const res = await fetch(`${API_BASE}/api/status/${id}`);
         const data = await res.json();
 
         if (data.status === "completed") {
-          setGeneratedImages(data.images);
-          setLoading(false);
+          console.log("✅ JOB DONE:", data);
+
+          if (data.images && data.images.length > 0) {
+            setGeneratedImages(data.images);   // 🔥 IMPORTANT
+            setLoading(false);                 // stop loader
+          }
+
           toast.success("Photoshoot ready!");
           setTimeout(() => {
             document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
           }, 300);
-          return;
+          return; // stop polling
         }
 
         if (data.status === "failed") {
