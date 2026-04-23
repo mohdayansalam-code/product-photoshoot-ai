@@ -3,15 +3,15 @@ import React from "react";
 const steps = [
   {
     number: "1",
-    title: "Upload your selfies",
+    title: "Upload product",
     description:
-      "Share a few recent photos. Our AI analyzes them to capture your most photogenic qualities and unique style, usually takes 1-2 minutes.",
+      "Upload a clean image of your product. Our AI analyzes it to prepare for integration into stunning realistic scenes, usually takes just a few seconds.",
   },
   {
     number: "2",
-    title: "Download headshots (Studio Quality)",
+    title: "Generate Product Photos",
     description:
-      "In minutes, get 100+ studio-quality headshots in various styles. No photographer or studio visit needed. It's that simple!",
+      "In minutes, get high-quality product lifestyle photos in various scenes. No studio or photographer needed. It's that simple!",
   },
 ];
 

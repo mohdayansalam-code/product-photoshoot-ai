@@ -8,13 +8,13 @@ const people = [
     name: "Karin",
     review:
       "What a fun experience! Turned out amazing and saved me money from expensive photographer",
-    selfieUrl: "/democard/demo2-selfie.webp",
+    productUrl: "/democard/demo2-selfie.webp",
     aiImages: "/democard/demo2-ai.webp",
   },
   {
     name: "Rasmus",
     review: "Loved the variety and styling. Very happy with the images!",
-    selfieUrl: "/democard/demo6-selfie.webp",
+    productUrl: "/democard/demo6-selfie.webp",
     aiImages: "/democard/demo6-ai.webp",
   },
   // Add more people as needed
@@ -105,8 +105,8 @@ const ImageGallery = () => {
                   />
                   <div className="absolute bottom-4 left-4 w-1/4 aspect-square">
                     <Image
-                      src={person.selfieUrl}
-                      alt={`${person.name}&apos;s selfie`}
+                      src={person.productUrl}
+                      alt={`${person.name}&apos;s product image`}
                       fill
                       className="rounded-md select-none object-cover"
                       draggable="false"

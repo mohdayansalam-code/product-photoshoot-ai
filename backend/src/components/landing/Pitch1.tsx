@@ -9,7 +9,7 @@ export default function Pitch1() {
           <h1 className="text-3xl font-semibold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl mb-4 leading-tight text-mainBlack">
             92% of Customers
             <span className="block mt-2 md:mt-4">
-              Recommend Our AI Headshots
+              Recommend Our AI Product Photos
             </span>
           </h1>
         </div>
@@ -42,14 +42,14 @@ export default function Pitch1() {
               <ol className="space-y-6">
                 {[
                   [
-                    "Upload your images",
+                    "Upload your products",
                     "2 minutes",
-                    "Choose from your existing photos or capture new selfies on the spot.",
+                    "Upload clean images of your products.",
                   ],
                   [
                     "Our AI works its magic",
-                    "1-2 hours",
-                    "Our AI will pull your most photogenic qualities from the photos you uploaded.",
+                    "1-2 minutes",
+                    "Our AI will generate stunning realistic scenes for your products.",
                   ],
                   [
                     "Select your top picks",
@@ -130,7 +130,7 @@ export default function Pitch1() {
             href="/signup"
             className="inline-block bg-gradient-to-br from-mainGreen to-[#91b34a] text-mainBlack px-8 py-3 rounded-full font-semibold animated-gradient"
           >
-            Generate Your AI Headshots Now
+            Generate Your AI Product Photos Now
           </Link>
         </div>
 

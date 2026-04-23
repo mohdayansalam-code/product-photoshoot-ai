@@ -23,7 +23,7 @@ export const useImageUpload = () => {
 
       for (const { file } of images) {
         const fileName = `${Date.now()}-${file.name}`;
-        const filePath = `${user.id}/selfies/${fileName}`;
+        const filePath = `${user.id}/products/${fileName}`;
 
         const { error } = await supabase.storage
           .from("userphotos")
@@ -43,7 +43,7 @@ export const useImageUpload = () => {
       }
 
       // Update the user's data with the new image URLs
-      await updateUser({ userPhotos: { userSelfies: uploadedUrls } });
+      await updateUser({ userPhotos: { userProducts: uploadedUrls } });
 
       return true;
     } catch (error: any) {

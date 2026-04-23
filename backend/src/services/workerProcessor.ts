@@ -5,7 +5,7 @@ import { monitoring } from "./monitoring";
 import { retryManager } from "./retryManager";
 import { config } from "../config/env";
 import { metrics } from "./metrics";
-
+import { generateImageWithFal } from "./falProcessor";
 export const workerProcessor = {
     classifyError: (error: any): "TEMPORARY" | "PERMANENT" => {
         const msg = error.message?.toLowerCase() || "";
@@ -100,7 +100,6 @@ export const workerProcessor = {
             
             await supabaseAdmin.from("generation_jobs").update({ processing_started_at: new Date().toISOString() }).eq("id", job.id);
             
-            const astriaEndpoint = `https://api.astria.ai/tunes/690204/prompts`;
             let resultImages: string[] = [];
             let providerFailed = true;
 
@@ -112,57 +111,29 @@ export const workerProcessor = {
 
             const attemptModels = modelsToTry.filter((v, i, a) => a.indexOf(v) === i).filter(m => config.models.allowed.includes(m)).slice(0, 2);
 
-            const apiKey = config.astria.apiKey;
+            for (const activeModel of attemptModels) {
+                logger.info(`[Job ${job.id}] Attempting generation with model: ${activeModel}...`);
+                providerFailed = false;
+                resultImages = [];
 
-            if (apiKey && apiKey !== "") {
-                for (const activeModel of attemptModels) {
-                    logger.info(`[Job ${job.id}] Attempting generation with model: ${activeModel}...`);
-                    providerFailed = false;
-                    resultImages = [];
-
+                try {
                     for (let i = 0; i < image_count; i++) {
-                        const response = await fetch(astriaEndpoint, {
-                            method: "POST",
-                            headers: {
-                                "Authorization": `Bearer ${apiKey}`,
-                                "Content-Type": "application/json",
-                            },
-                            body: JSON.stringify({ 
-                                prompt: {
-                                    text: prompt,
-                                    image_url: image_url,
-                                    num_images: 1,
-                                    model: activeModel,
-                                    seed: seed + i
-                                } 
-                            }),
-                        });
-
-                        if (!response.ok) {
-                            const errorText = await response.text();
-                            logger.error(`Provider error for job ${job.id} [${activeModel}]`, { error: errorText });
+                        const urls = await generateImageWithFal({ prompt, productImage: image_url });
+                        if (urls && urls.length > 0) {
+                            resultImages.push(urls[0]);
+                        } else {
                             providerFailed = true;
                             break;
-                        } else {
-                            const astriaData = await response.json() as any;
-                            const images = astriaData?.images || [];
-                            if (images.length > 0) {
-                                resultImages.push(images[0]);
-                            } else {
-                                providerFailed = true;
-                                break;
-                            }
                         }
                     }
-
-                    if (!providerFailed && resultImages.length === image_count) break;
-                    logger.warn(`Model ${activeModel} failed. Attempting fallback if available...`);
+                } catch (e: any) {
+                    logger.error(`Provider error for job ${job.id} [${activeModel}]`, { error: e.message });
                     providerFailed = true;
                 }
-            } else {
-                logger.warn(`ASTRIA_API_KEY missing. Mocking success for dev.`);
-                for(let i=0; i<image_count; i++) resultImages.push(image_url);
-                providerFailed = false;
+
+                if (!providerFailed && resultImages.length === image_count) break;
+                logger.warn(`Model ${activeModel} failed. Attempting fallback if available...`);
+                providerFailed = true;
             }
 
             if (providerFailed) {

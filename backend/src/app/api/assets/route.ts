@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSupabaseAdminClient, requireAuthenticatedUser } from "@/lib/routeAuth";
+import { requireAuthenticatedUser } from "@/lib/routeAuth";
 
 export async function GET(req: NextRequest) {
     try {
@@ -8,8 +8,7 @@ export async function GET(req: NextRequest) {
             return new Response(JSON.stringify({ success: false, data: [] }), { status: 401, headers: { "Content-Type": "application/json" } });
         }
 
-        const { user } = await requireAuthenticatedUser(authHeader);
-        const supabaseAdmin = getSupabaseAdminClient();
+        const { user, supabaseAdmin } = await requireAuthenticatedUser(authHeader);
 
         if (!user) {
             return new Response(JSON.stringify({ success: false, data: [] }), { status: 401, headers: { "Content-Type": "application/json" } });

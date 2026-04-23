@@ -45,7 +45,7 @@ export default function Faq() {
           />
           <FaqItem
             question="What do you do with my uploaded photos?"
-            answer="The photos you upload are used to train our AI model so it can create realistic AI headshots. These input photos are deleted within 7 days, but you can instantly delete them at any time with our 'Delete' button."
+            answer="The photos you upload are used to generate stunning product images. These input photos are deleted within 7 days, but you can instantly delete them at any time with our 'Delete' button."
           />
           <FaqItem
             question="Who owns my AI photos?"

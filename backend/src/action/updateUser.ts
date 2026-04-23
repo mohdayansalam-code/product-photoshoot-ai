@@ -13,6 +13,7 @@ interface UserFormData {
   gender?: string;
   userPhotos?: {
     userSelfies?: string[];
+    userProducts?: string[];
   };
   promptsResult?: any[];
 }

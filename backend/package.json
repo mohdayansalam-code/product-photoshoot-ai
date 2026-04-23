@@ -4,13 +4,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node server.js --dev",
+    "dev": "tsx server.ts --dev",
     "build": "next build",
-    "start": "node server.js",
+    "start": "tsx server.ts",
     "lint": "next lint",
     "worker": "tsx src/worker/processGenerations.ts"
   },
   "dependencies": {
+    "@fal-ai/client": "^1.9.5",
     "@next/third-parties": "^14.2.5",
     "@radix-ui/react-avatar": "^1.0.4",
     "@radix-ui/react-dialog": "^1.1.1",

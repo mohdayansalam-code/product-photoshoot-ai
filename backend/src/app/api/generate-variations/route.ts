@@ -3,7 +3,6 @@ import { logger } from "@/utils/logger";
 import { standardResponse, ApiError } from "@/lib/apiError";
 import { config } from "@/config/env";
 import { rateLimiter } from "@/services/rateLimiter";
-import { creditSystem } from "@/services/creditSystem";
 import { requireAuthenticatedUser } from "@/lib/routeAuth";
 
 export async function POST(req: NextRequest) {

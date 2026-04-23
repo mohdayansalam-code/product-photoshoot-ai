@@ -4,8 +4,8 @@ import { logger } from "@/utils/logger";
 import { standardResponse, ApiError } from "@/lib/apiError";
 import { config } from "@/config/env";
 import { rateLimiter } from "@/services/rateLimiter";
-import { creditSystem } from "@/services/creditSystem";
 import { requireAuthenticatedUser } from "@/lib/routeAuth";
+import { generateImageWithFal } from "@/services/falProcessor";
 
 export async function POST(req: NextRequest) {
     try {
@@ -24,54 +24,22 @@ export async function POST(req: NextRequest) {
              throw new ApiError(403, "Product Fix is currently disabled");
         }
 
-        const ASTRIA_API_KEY = config.astria.apiKey;
+        const FAL_API_KEY = config.fal?.apiKey || "";
         let credits_cost = 1;
         if (tool === 'upscale_v4') credits_cost = 4;
         else if (tool === 'super_resolution' || tool === 'face_correction') credits_cost = 2;
         else if (tool === 'product_fix') credits_cost = config.features.productFix.credits;
 
         await rateLimiter.checkLimit(supabaseAdmin, user.id, 10, 60000, "image_tools");
-        await creditSystem.deductCredits(supabaseAdmin, user.id, credits_cost, "image_tools");
 
-        if (!ASTRIA_API_KEY || ASTRIA_API_KEY === "") {
-            // Mock response if no API key
-            await new Promise(r => setTimeout(r, 1500));
-            return standardResponse.success({
-                image_url: imageUrl, 
-            });
-        }
+        let promptText = 'A product photo';
+        if (tool === 'remove_bg') promptText += ', transparent background, remove background';
+        if (tool === 'white_bg') promptText += ', pure white ecommerce background';
+        if (tool === 'upscale_v4' || tool === 'super_resolution') promptText += ', high resolution, 4k upscaled detail';
+        if (tool === 'product_fix') promptText += ', fix product label distortions, correct packaging defects, improve text clarity, high quality';
 
-        const astriaEndpoint = `https://api.astria.ai/tunes/690204/prompts`;
-
-        let promptText = "A product photo";
-        if (tool === 'remove_bg') promptText += ", transparent background, remove background";
-        if (tool === 'white_bg') promptText += ", pure white ecommerce background";
-        if (tool === 'upscale_v4' || tool === 'super_resolution') promptText += ", high resolution, 4k upscaled detail";
-        if (tool === 'product_fix') promptText += ", fix product label distortions, correct packaging defects, improve text clarity, high quality";
-
-        const response = await fetch(astriaEndpoint, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${ASTRIA_API_KEY}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                prompt: {
-                    text: promptText,
-                    image_url: imageUrl,
-                    num_images: 1,
-                    model: "seedream-4.5"
-                }
-            }),
-        });
-
-        if (!response.ok) {
-            const errLog = await response.text();
-            throw new ApiError(500, `Astria API failed: ${errLog}`);
-        }
-
-        const astriaData = await response.json() as any;
-        const resultUrl = astriaData?.images?.[0];
+        const falUrls = await generateImageWithFal({ prompt: promptText, productImage: imageUrl });
+        const resultUrl = falUrls && falUrls.length > 0 ? falUrls[0] : null;
 
         if (!resultUrl) {
            throw new ApiError(500, "No image generated from tool.");
@@ -90,7 +58,6 @@ export async function POST(req: NextRequest) {
             });
 
         if (uploadError) {
-            await supabaseAdmin.rpc("refund_credits", { p_user_id: user.id, p_amount: credits_cost }).then(({ error }) => { if (error) logger.error(error.message) });
             logger.error("Image Tool upload failed", { error: uploadError });
             throw new ApiError(500, "Failed to upload result to storage");
         }

@@ -16,7 +16,7 @@ export default function GenerationsPage() {
     try {
       const backendGens = await getGenerations();
       const formattedBackend = (backendGens || []).map((dbGen: any) => ({
-         id: dbGen.astria_request_id, // Pin atomic hooks directly preventing false duplicates
+         id: dbGen.id, // Pin atomic hooks directly preventing false duplicates
          prompt: dbGen.prompt,
          model: dbGen.shoot_type || dbGen.ai_model,
          created_at: dbGen.created_at,

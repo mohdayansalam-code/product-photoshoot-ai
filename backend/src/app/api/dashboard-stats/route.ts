@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { standardResponse, ApiError } from "@/lib/apiError";
-import { creditSystem } from "@/services/creditSystem";
 import { requireAuthenticatedUser } from "@/lib/routeAuth";
 
 export async function GET(req: NextRequest) {
@@ -9,8 +8,7 @@ export async function GET(req: NextRequest) {
             req.headers.get("authorization")
         );
 
-        const creditsData = await creditSystem.getOrCreateCredits(supabaseAdmin, user.id);
-        const credits = creditsData.credits_remaining || 0;
+        const credits = "Unlimited";
 
         const { data: generations } = await supabaseAdmin
             .from("generations")

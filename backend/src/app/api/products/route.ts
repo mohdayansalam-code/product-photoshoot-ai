@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/utils/logger";
 import { standardResponse, ApiError } from "@/lib/apiError";
-import { getSupabaseAdminClient, requireAuthenticatedUser } from "@/lib/routeAuth";
-
-const supabaseAdmin = getSupabaseAdminClient();
+import { requireAuthenticatedUser } from "@/lib/routeAuth";
 
 export async function POST(req: NextRequest) {
     try {
-        const { user } = await requireAuthenticatedUser(
+        const { user, supabaseAdmin } = await requireAuthenticatedUser(
             req.headers.get("authorization")
         );
 
@@ -87,7 +85,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
     try {
-        const { user } = await requireAuthenticatedUser(
+        const { user, supabaseAdmin } = await requireAuthenticatedUser(
             req.headers.get("authorization")
         );
 
@@ -112,7 +110,7 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
     try {
-        const { user } = await requireAuthenticatedUser(
+        const { user, supabaseAdmin } = await requireAuthenticatedUser(
             req.headers.get("authorization")
         );
 

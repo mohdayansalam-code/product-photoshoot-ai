@@ -17,8 +17,8 @@ export const config = {
         anonKey: requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
         serviceRoleKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
     },
-    astria: {
-        apiKey: process.env.ASTRIA_API_KEY || "", // Optional if falling back to mocks
+    fal: {
+        apiKey: process.env.FAL_API_KEY || "", // Optional if falling back to mocks
     },
     models: {
         defaultGeneration: requireEnv("DEFAULT_GENERATION_MODEL", "seedream-5-lite"),
