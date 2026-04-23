@@ -232,7 +232,13 @@ export default function CreatePhotoshootPage() {
       try {
         setUploadingState(prev => ({ ...prev, [type]: true }));
         
-        const fileExt = file.name.split('.').pop();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          alert("Please login first");
+          setUploadingState(prev => ({ ...prev, [type]: false }));
+          return;
+        }
+
         const filePath = `${Date.now()}-${file.name}`;
 
         const { data, error: uploadError } = await supabase.storage
@@ -259,7 +265,8 @@ export default function CreatePhotoshootPage() {
         
         toast.success(`${type} image uploaded successfully`);
       } catch (err: any) {
-        toast.error("Failed to upload image.");
+        console.error("UPLOAD ERROR:", err);
+        alert(err.message || "Failed to upload image.");
       } finally {
         setUploadingState(prev => ({ ...prev, [type]: false }));
       }
