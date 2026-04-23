@@ -378,7 +378,9 @@ export default function CreatePhotoshootPage() {
 
       console.log("🚀 SENDING PAYLOAD:", payload);
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "https://product-photoshoot-ai.onrender.com"}/api/generate`, {
+      const API_URL = import.meta.env.VITE_API_URL;
+
+      const res = await fetch(`${API_URL}/api/generate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

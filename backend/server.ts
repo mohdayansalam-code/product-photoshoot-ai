@@ -7,8 +7,20 @@ import { runFalGeneration } from "./src/services/falProcessor";
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
+app.options("*", cors());
+
 app.use(express.json({ limit: "10mb" }));
+
+app.use((req, res, next) => {
+  console.log(`🌍 INCOMING: ${req.method} ${req.url}`);
+  next();
+});
 
 // ✅ SUPABASE INIT
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "https://gbwhgpslkpreghfvaubk.supabase.co";
