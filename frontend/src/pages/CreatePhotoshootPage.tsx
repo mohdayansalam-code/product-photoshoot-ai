@@ -133,30 +133,36 @@ export default function CreatePhotoshootPage() {
 
   // Status & Limits
   const [isGenerating, setIsGenerating] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Generating images...");
   const [error, setError] = useState<string>("");
   const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<string[]>([]);
   const [imagesUsed, setImagesUsed] = useState(0);
+
+  // Safety & Recovery Refs
+  const lastRequestRef = useRef<any>(null);
 
   // Refs
   const productInputRef = useRef<HTMLInputElement>(null);
   const faceInputRef = useRef<HTMLInputElement>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
 
-  // Local Storage Load
+  // 1. Local Storage Safe Load
   useEffect(() => {
     const saved = localStorage.getItem("photoshoot_settings");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.template) setSelectedTemplateId(parsed.template);
+        if (parsed.template && TEMPLATES.some(t => t.id === parsed.template)) {
+          setSelectedTemplateId(parsed.template);
+        }
         if (parsed.aspectRatio) setAspectRatio(parsed.aspectRatio);
         if (parsed.modelType) setModelType(parsed.modelType);
       } catch (e) {}
     }
   }, []);
 
-  // Local Storage Save
+  // 2. Local Storage Safe Save
   useEffect(() => {
     localStorage.setItem("photoshoot_settings", JSON.stringify({
       template: selectedTemplateId,
@@ -237,26 +243,15 @@ export default function CreatePhotoshootPage() {
     }
   };
 
-  const executeGeneration = async () => {
-    if (!isGenerateReady()) return;
-    
-    // Check Limits First
-    if (imagesUsed + imageCount > IMAGE_LIMIT) {
-      setError(`You have reached your monthly image limit of ${IMAGE_LIMIT}.`);
-      toast.error("Monthly image limit reached");
-      return;
-    }
-    
-    try {
-      setIsGenerating(true);
-      setError("");
-      setResults([]);
-      if (isMobilePanelOpen) setIsMobilePanelOpen(false);
+  const executeGeneration = async (useLastRequest: boolean = false) => {
+    let payload;
 
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://product-photoshoot-ai.onrender.com";
-      const exactFetchUrl = `${API_BASE}/api/generate`;
-
-      const payload = {
+    if (useLastRequest && lastRequestRef.current) {
+      payload = lastRequestRef.current;
+    } else {
+      if (!isGenerateReady()) return;
+      
+      payload = {
         template: selectedTemplateId,
         productImage,
         faceImage: useModel ? faceImage : null,
@@ -264,8 +259,40 @@ export default function CreatePhotoshootPage() {
         aspectRatio,
         imageCount,
         customPrompt,
-        modelType
+        modelType,
+        userId: "demo_user" // Fixed mock user id for backend rate limiting
       };
+      // 3. Save Payload Guarantee for Regenerate
+      lastRequestRef.current = payload;
+    }
+
+    // Check Limits First (Frontend Double Check)
+    if (imagesUsed + payload.imageCount > IMAGE_LIMIT) {
+      setError(`You have reached your monthly image limit of ${IMAGE_LIMIT}.`);
+      toast.error("Monthly image limit reached");
+      return;
+    }
+    
+    try {
+      setIsGenerating(true);
+      setLoadingMessage("Generating images...");
+      setError("");
+      setResults([]);
+      
+      // Mobile UX Fix: Close drawer immediately
+      if (isMobilePanelOpen) setIsMobilePanelOpen(false);
+
+      // 4. Soft Messaging via Timers
+      const coldStartTimer = setTimeout(() => {
+        setLoadingMessage("Waking up server, please wait...");
+      }, 5000);
+      
+      const slowTimer = setTimeout(() => {
+        setLoadingMessage("This is taking longer than usual...");
+      }, 20000);
+
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://product-photoshoot-ai.onrender.com";
+      const exactFetchUrl = `${API_BASE}/api/generate`;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout
@@ -278,7 +305,12 @@ export default function CreatePhotoshootPage() {
       });
 
       clearTimeout(timeoutId);
+      clearTimeout(coldStartTimer);
+      clearTimeout(slowTimer);
 
+      if (res.status === 403) {
+        throw new Error("Monthly image limit reached");
+      }
       if (!res.ok) throw new Error(`API failure: ${res.status}`);
 
       const data = await res.json();
@@ -287,7 +319,9 @@ export default function CreatePhotoshootPage() {
       }
 
       setResults(data.images);
-      setImagesUsed(prev => prev + imageCount);
+      
+      // 5. Safe Usage Increment
+      setImagesUsed(prev => prev + payload.imageCount);
       toast.success("Images generated successfully!");
       
       setTimeout(() => {
@@ -298,25 +332,12 @@ export default function CreatePhotoshootPage() {
       console.error("🔥 ERROR:", err);
       let errorMsg = "Generation failed, try again";
       if (err.name === 'AbortError') errorMsg = "Generation timed out. Please try again.";
+      if (err.message) errorMsg = err.message;
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  const downloadImage = async (url: string) => {
-    try {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = objectUrl;
-      link.download = `generation-${Date.now()}.png`;
-      link.click();
-      URL.revokeObjectURL(objectUrl);
-    } catch {
-      toast.error("Failed to download");
+      setLoadingMessage("Generating images...");
     }
   };
 
@@ -385,7 +406,7 @@ export default function CreatePhotoshootPage() {
         </aside>
 
         {/* MAIN CONTENT: Template Grid */}
-        <main className="flex-1 p-4 lg:p-10 overflow-y-auto lg:h-[calc(100vh-4rem)] custom-scrollbar bg-gray-50/50 pb-32 lg:pb-10">
+        <main className="flex-1 p-4 lg:p-10 overflow-y-auto lg:h-[calc(100vh-4rem)] custom-scrollbar bg-gray-50/50 pb-32 lg:pb-10 relative">
           <div className="max-w-5xl mx-auto space-y-6 lg:space-y-8">
             <div>
               <h2 className="text-2xl font-bold">{activeCategory} Templates</h2>
@@ -425,12 +446,27 @@ export default function CreatePhotoshootPage() {
               ))}
             </div>
 
-            {/* ERROR STATE */}
+            {/* 6. ERROR UX IMPROVEMENT */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <p className="font-medium text-sm">{error}</p>
+              <div className="bg-red-50 border border-red-200 px-4 py-4 rounded-xl flex items-center justify-between shadow-sm">
+                <div className="flex items-center gap-3 text-red-600">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <p className="font-medium text-sm">{error}</p>
+                </div>
+                {lastRequestRef.current && (
+                   <Button onClick={() => executeGeneration(true)} variant="outline" size="sm" className="bg-white border-red-200 text-red-600 hover:bg-red-50 font-bold">
+                     <RefreshCw className="w-3 h-3 mr-2" /> Retry
+                   </Button>
+                )}
               </div>
+            )}
+
+            {/* EMPTY STATE */}
+            {!isGenerating && results.length === 0 && !error && (
+               <div className="pt-16 pb-12 flex flex-col items-center justify-center text-center opacity-60">
+                 <ImageIcon className="w-12 h-12 text-gray-300 mb-3" />
+                 <h3 className="text-gray-500 font-medium">No images yet — generate your first photoshoot</h3>
+               </div>
             )}
 
             {/* Results Section */}
@@ -439,27 +475,30 @@ export default function CreatePhotoshootPage() {
                 <motion.div 
                   id="results"
                   initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} 
-                  className="pt-10 lg:pt-16 border-t border-gray-200 mt-10 lg:mt-16 pb-10"
+                  className="pt-10 lg:pt-12 border-t border-gray-200 mt-10 pb-10"
                 >
                   <h3 className="text-2xl font-bold mb-6">Generated Results</h3>
                   
                   {isGenerating && (
-                    <div className="py-20 flex flex-col items-center justify-center space-y-5 bg-white rounded-3xl border border-gray-100 shadow-sm">
-                      <div className="w-10 h-10 border-4 border-gray-200 border-t-black rounded-full animate-spin" />
-                      <p className="text-gray-500 animate-pulse font-medium">Generating images...</p>
+                    <div className="py-24 flex flex-col items-center justify-center space-y-6 bg-white rounded-3xl border border-gray-100 shadow-sm">
+                      <div className="w-12 h-12 border-4 border-gray-200 border-t-black rounded-full animate-spin" />
+                      <p className="text-gray-500 animate-pulse font-medium text-lg">{loadingMessage}</p>
                     </div>
                   )}
 
                   {!isGenerating && results.length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-6">
                       {results.map((img, i) => (
-                        <div key={i} className="relative group rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
-                          <img src={img} alt="Generated result" className="w-full h-auto object-cover" />
+                        <div key={i} className="relative group rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100 aspect-square sm:aspect-auto">
+                          <img src={img} alt="Generated result" className="w-full h-full sm:h-auto object-cover" />
                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4">
-                            <Button onClick={() => downloadImage(img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold px-6 w-48 shadow-lg">
-                              <Download className="w-4 h-4 mr-2" /> Download
-                            </Button>
-                            <Button onClick={executeGeneration} className="bg-blue-600 text-white hover:bg-blue-500 rounded-full font-bold px-6 w-48 shadow-lg">
+                            {/* 7. Download Reliability (Direct Anchor tags inside buttons for clean styling) */}
+                            <a href={img} download={`photo-${selectedTemplateId || 'generation'}.png`} target="_blank" rel="noreferrer" className="w-48">
+                              <Button className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-full shadow-lg">
+                                <Download className="w-4 h-4 mr-2" /> Download
+                              </Button>
+                            </a>
+                            <Button onClick={() => executeGeneration(true)} className="bg-blue-600 text-white hover:bg-blue-500 rounded-full font-bold w-48 shadow-lg">
                               <RefreshCw className="w-4 h-4 mr-2" /> Regenerate
                             </Button>
                           </div>
@@ -481,7 +520,7 @@ export default function CreatePhotoshootPage() {
 
         {/* MOBILE FLOATING BUTTON */}
         <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
-          <Button onClick={() => setIsMobilePanelOpen(true)} className="rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.3)] px-6 py-6 bg-black text-white hover:bg-gray-800 text-base font-bold">
+          <Button onClick={() => setIsMobilePanelOpen(true)} className="rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.3)] px-6 py-6 bg-black text-white hover:bg-gray-800 text-base font-bold whitespace-nowrap">
              <Settings className="w-5 h-5 mr-2" /> Configure
           </Button>
         </div>
@@ -497,7 +536,7 @@ export default function CreatePhotoshootPage() {
             <button onClick={() => setIsMobilePanelOpen(false)} className="p-1 rounded-md hover:bg-white/10 transition-colors"><X className="w-5 h-5 text-gray-400" /></button>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-7 relative">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-7 relative pb-10">
             
             {/* OVERLAY for disabled state */}
             {!selectedTemplate && (
@@ -510,7 +549,7 @@ export default function CreatePhotoshootPage() {
               </div>
             )}
 
-            {/* 1. MODEL SELECTOR */}
+            {/* MODEL SELECTOR */}
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Model</label>
               <div className="relative">
@@ -529,7 +568,7 @@ export default function CreatePhotoshootPage() {
               </div>
             </div>
 
-            {/* 2. REFERENCES SECTION */}
+            {/* REFERENCES SECTION */}
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">References</label>
               
@@ -591,7 +630,7 @@ export default function CreatePhotoshootPage() {
               </div>
             </div>
 
-            {/* 3. PROMPT INPUT */}
+            {/* PROMPT INPUT */}
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Prompt (Optional)</label>
               <textarea 
@@ -603,7 +642,7 @@ export default function CreatePhotoshootPage() {
               />
             </div>
 
-            {/* 4. SETTINGS SECTION */}
+            {/* SETTINGS SECTION */}
             <div className="space-y-4 pt-2">
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Settings</label>
               
@@ -644,7 +683,7 @@ export default function CreatePhotoshootPage() {
           </div>
 
           {/* LIMIT UI & GENERATE BUTTON (Sticky Bottom) */}
-          <div className="p-5 border-t border-white/10 bg-[#050505]">
+          <div className="p-5 border-t border-white/10 bg-[#050505] shrink-0 mt-auto">
             <div className="mb-4">
               <div className="flex items-center justify-between text-xs font-medium mb-1.5">
                 <span className="text-gray-400">Monthly Usage</span>
@@ -661,7 +700,7 @@ export default function CreatePhotoshootPage() {
             </div>
             
             <Button 
-              onClick={executeGeneration}
+              onClick={() => executeGeneration()}
               disabled={isGenerating || !isGenerateReady()}
               className="w-full h-12 text-sm tracking-wide font-bold rounded-xl shadow-lg transition-all disabled:opacity-50"
               style={{
@@ -672,7 +711,7 @@ export default function CreatePhotoshootPage() {
               {isGenerating ? (
                  <span className="flex items-center gap-2">
                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                   Generating images...
+                   Generating...
                  </span>
               ) : (
                 <span className="flex items-center gap-2">

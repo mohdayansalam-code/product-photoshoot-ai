@@ -16,12 +16,27 @@ app.get("/", (req, res) => {
 
 import { generateImageWithFal } from "./src/services/falProcessor";
 
+// Mock user usage tracking (Replace with DB later)
+const mockUserUsage: Record<string, number> = {};
+const IMAGE_LIMIT = 30;
+
 // ✅ MAIN ROUTE
 app.post("/api/generate", async (req, res) => {
   try {
-    const { template, prompt, productImage, faceImage, backgroundImage, aspectRatio, imageCount, customPrompt, modelType } = req.body;
+    const { template, prompt, productImage, faceImage, backgroundImage, aspectRatio, imageCount, customPrompt, modelType, userId } = req.body;
 
     const input = template || prompt;
+    const requestedCount = imageCount || 2;
+    const uid = userId || "anonymous_user";
+
+    // ✅ IMAGE LIMIT VALIDATION (MOCK)
+    const currentUsage = mockUserUsage[uid] || 0;
+    if (currentUsage + requestedCount > IMAGE_LIMIT) {
+      return res.status(403).json({
+        success: false,
+        error: "Monthly image limit reached"
+      });
+    }
 
     // ✅ VALIDATION
     if (!productImage) {
@@ -50,6 +65,11 @@ app.post("/api/generate", async (req, res) => {
       customPrompt,
       modelType
     });
+
+    // ✅ INCREMENT USAGE AFTER SUCCESS
+    if (images && images.length > 0) {
+      mockUserUsage[uid] = currentUsage + requestedCount;
+    }
 
     return res.json({
       success: true,
