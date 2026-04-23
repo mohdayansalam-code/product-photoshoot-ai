@@ -22,73 +22,65 @@ const TEMPLATES = [
   {
     id: "fashion_editorial",
     category: "Fashion",
-    label: "Editorial Shoot",
+    name: "Editorial Shoot",
     description: "High-end magazine style, dramatic lighting",
     requiresModel: true,
-    premium: true,
     image: "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=600&q=80"
   },
   {
     id: "fashion_streetwear",
     category: "Fashion",
-    label: "Streetwear",
+    name: "Streetwear",
     description: "Urban environment, edgy style",
     requiresModel: true,
-    premium: false,
     image: "https://images.unsplash.com/photo-1550614000-4b95d4662d5f?auto=format&fit=crop&w=600&q=80"
   },
   {
     id: "cosmetics_luxury_skincare",
     category: "Cosmetics",
-    label: "Luxury Skincare",
+    name: "Luxury Skincare",
     description: "Soft lighting, premium aesthetic",
     requiresModel: false,
-    premium: true,
     image: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=600&q=80"
   },
   {
     id: "cosmetics_white_studio",
     category: "Cosmetics",
-    label: "Clean White Studio",
+    name: "Clean White Studio",
     description: "Minimal shadows, ecommerce style",
     requiresModel: false,
-    premium: false,
     image: "https://images.unsplash.com/photo-1598452963314-b09f397a5c48?auto=format&fit=crop&w=600&q=80"
   },
   {
     id: "jewelry_dark_luxury",
     category: "Jewelry",
-    label: "Dark Luxury",
+    name: "Dark Luxury",
     description: "Dark background, gold reflections",
     requiresModel: false,
-    premium: true,
     image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=600&q=80"
   },
   {
     id: "jewelry_marble",
     category: "Jewelry",
-    label: "Marble Surface",
+    name: "Marble Surface",
     description: "Elegant marble, natural light",
     requiresModel: false,
-    premium: false,
     image: "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=600&q=80"
   },
   {
     id: "campaign_cosmetics_model",
     category: "Model Campaigns",
-    label: "Cosmetics Model Shoot",
+    name: "Cosmetics Model Shoot",
     description: "Model interacting with skincare product",
     requiresModel: true,
-    premium: true,
     image: "https://images.unsplash.com/photo-1515688594390-b649af70d282?auto=format&fit=crop&w=600&q=80"
   },
   {
     id: "campaign_premium_ad",
     category: "Model Campaigns",
-    label: "Premium Campaign Ad",
+    name: "Premium Campaign Ad",
     description: "High budget commercial look",
     requiresModel: true,
-    premium: true,
     image: "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?auto=format&fit=crop&w=600&q=80"
   }
 ];
@@ -169,12 +161,21 @@ export default function CreatePhotoshootPage() {
         const parsed = JSON.parse(saved);
         if (parsed.template && TEMPLATES.some(t => t.id === parsed.template)) {
           setSelectedTemplateId(parsed.template);
+        } else {
+          setSelectedTemplateId("");
         }
         if (parsed.aspectRatio) setAspectRatio(parsed.aspectRatio);
         if (parsed.modelType) setModelType(parsed.modelType);
       } catch (e) {}
     }
   }, []);
+
+  // 1b. Strict Template Match
+  useEffect(() => {
+    if (selectedTemplateId && !TEMPLATES.find(t => t.id === selectedTemplateId)) {
+      setSelectedTemplateId("");
+    }
+  }, [selectedTemplateId]);
 
   // 2. Local Storage Safe Save
   useEffect(() => {
@@ -257,7 +258,17 @@ export default function CreatePhotoshootPage() {
     }
   };
 
+  const handleDownload = (imgUrl: string) => {
+    try {
+      window.open(imgUrl, "_blank");
+    } catch {
+      toast.error("Download failed");
+    }
+  };
+
   const executeGeneration = async (useLastRequest: boolean = false) => {
+    if (isGenerating) return;
+
     let payload;
 
     if (useLastRequest && lastRequestRef.current) {
@@ -274,6 +285,11 @@ export default function CreatePhotoshootPage() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       
+      if (!token) {
+        toast.error("Session expired. Please login again.");
+        return;
+      }
+
       payload = {
         template: selectedTemplateId,
         productImage,
@@ -360,9 +376,9 @@ export default function CreatePhotoshootPage() {
 
     } catch (err: any) {
       console.error("🔥 ERROR:", err);
-      let errorMsg = "Generation failed, try again";
+      let errorMsg = "Network error. Try again.";
       if (err.name === 'AbortError') errorMsg = "Generation timed out. Please try again.";
-      if (err.message) errorMsg = err.message;
+      else if (err.message) errorMsg = err.message;
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -440,38 +456,34 @@ export default function CreatePhotoshootPage() {
           <div className="max-w-5xl mx-auto space-y-6 lg:space-y-8">
             <div>
               <h2 className="text-2xl font-bold">{activeCategory} Templates</h2>
-              <p className={cn("mt-1 text-sm font-medium", selectedTemplate ? "text-blue-600" : "text-gray-500")}>
-                {selectedTemplate ? `Selected: ${selectedTemplate.label}` : "Select a style for your product photoshoot"}
-              </p>
+              {selectedTemplate && (
+                <p className="text-sm text-blue-500 mb-2">
+                  Selected: {selectedTemplate.name}
+                </p>
+              )}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
+            <div className="mb-4 text-sm text-gray-500">
+              <span className="font-medium text-black">Step 1:</span> Select a style &rarr;
+              <span className="font-medium text-black ml-2">Step 2:</span> Upload images &rarr;
+              <span className="font-medium text-black ml-2">Step 3:</span> Generate
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredTemplates.map(template => (
                 <div 
                   key={template.id}
                   onClick={() => { setSelectedTemplateId(template.id); setError(""); }}
                   className={cn(
-                    "group relative bg-white rounded-2xl overflow-hidden border-2 cursor-pointer transition-all duration-300 hover:shadow-xl",
-                    selectedTemplateId === template.id 
-                      ? "border-black shadow-lg ring-4 ring-black/5 scale-[1.02]" 
-                      : "border-transparent shadow-sm hover:border-gray-200"
+                    "p-3 rounded-xl cursor-pointer transition duration-200 hover:shadow-xl hover:-translate-y-1 hover:scale-105",
+                    selectedTemplateId === template.id ? "border-2 border-blue-500 shadow-md" : "border"
                   )}
                 >
-                  <div className="aspect-[4/3] w-full overflow-hidden relative bg-gray-100">
-                    <img src={template.image} alt={template.label} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                    {template.premium && (
-                      <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md text-yellow-400 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded flex items-center gap-1 uppercase tracking-wider">
-                        <Crown className="w-3 h-3" /> Pro
-                      </div>
-                    )}
-                    {selectedTemplateId === template.id && (
-                       <div className="absolute inset-0 bg-black/10 border-4 border-black rounded-xl transition-all" />
-                    )}
-                  </div>
-                  <div className="p-3 sm:p-4">
-                    <h3 className="font-bold text-gray-900 text-sm sm:text-base leading-tight">{template.label}</h3>
-                    <p className="text-[10px] sm:text-xs text-gray-500 mt-1 line-clamp-2">{template.description}</p>
-                  </div>
+                  <img src={template.image} className="rounded-lg mb-2 w-full object-cover aspect-[4/3]" />
+                  <h3 className="font-semibold">{template.name}</h3>
+                  <p className="text-xs text-gray-500 line-clamp-2">
+                    {template.description}
+                  </p>
                 </div>
               ))}
             </div>
@@ -493,10 +505,12 @@ export default function CreatePhotoshootPage() {
 
             {/* EMPTY STATE */}
             {!isGenerating && results.length === 0 && !error && (
-               <div className="pt-16 pb-12 flex flex-col items-center justify-center text-center opacity-60">
-                 <ImageIcon className="w-12 h-12 text-gray-300 mb-3" />
-                 <h3 className="text-gray-500 font-medium">No images yet — generate your first photoshoot</h3>
-               </div>
+              <div className="text-center text-gray-400 mt-10">
+                <p className="text-lg">No images yet</p>
+                <p className="text-sm">
+                  Select a template and generate your first photoshoot
+                </p>
+              </div>
             )}
 
             {/* Results Section */}
@@ -510,10 +524,9 @@ export default function CreatePhotoshootPage() {
                   <h3 className="text-2xl font-bold mb-6">Generated Results</h3>
                   
                   {isGenerating && (
-                    <div className="py-24 flex flex-col items-center justify-center space-y-6 bg-white rounded-3xl border border-gray-100 shadow-sm">
-                      <div className="w-12 h-12 border-4 border-gray-200 border-t-black rounded-full animate-spin" />
-                      <p className="text-gray-500 animate-pulse font-medium text-lg">{loadingMessage}</p>
-                    </div>
+                    <p className="text-sm text-blue-500 mt-4 text-center">
+                      Generating images...
+                    </p>
                   )}
 
                   {!isGenerating && results.length > 0 && (
@@ -522,12 +535,10 @@ export default function CreatePhotoshootPage() {
                         <div key={i} className="relative group rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100 aspect-square sm:aspect-auto">
                           <img src={img} alt="Generated result" className="w-full h-full sm:h-auto object-cover" />
                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4">
-                            {/* 7. Download Reliability (Direct Anchor tags inside buttons for clean styling) */}
-                            <a href={img} download={`photo-${selectedTemplateId || 'generation'}.png`} target="_blank" rel="noreferrer" className="w-48">
-                              <Button className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-full shadow-lg">
-                                <Download className="w-4 h-4 mr-2" /> Download
-                              </Button>
-                            </a>
+                            {/* 7. Download Reliability */}
+                            <Button onClick={() => handleDownload(img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-48 shadow-lg">
+                              <Download className="w-4 h-4 mr-2" /> Download
+                            </Button>
                             <Button onClick={() => executeGeneration(true)} className="bg-blue-600 text-white hover:bg-blue-500 rounded-full font-bold w-48 shadow-lg">
                               <RefreshCw className="w-4 h-4 mr-2" /> Regenerate
                             </Button>
@@ -566,17 +577,13 @@ export default function CreatePhotoshootPage() {
             <button onClick={() => setIsMobilePanelOpen(false)} className="p-1 rounded-md hover:bg-white/10 transition-colors"><X className="w-5 h-5 text-gray-400" /></button>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-7 relative pb-10">
+          <div className={cn("flex-1 overflow-y-auto custom-scrollbar p-6 space-y-7 relative pb-10", selectedTemplate ? "" : "opacity-70 pointer-events-none")}>
             
             {/* OVERLAY for disabled state */}
             {!selectedTemplate && (
-              <div className="absolute inset-0 bg-[#0A0A0A]/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mb-3">
-                  <ImageIcon className="w-5 h-5 text-gray-400" />
-                </div>
-                <h3 className="text-white font-medium mb-1">Select a Template</h3>
-                <p className="text-sm text-gray-400">Choose a style from the gallery to begin configuring your photoshoot.</p>
-              </div>
+              <p className="text-sm text-gray-400 text-center mt-6">
+                Select a template to start
+              </p>
             )}
 
             {/* MODEL SELECTOR */}
@@ -616,36 +623,40 @@ export default function CreatePhotoshootPage() {
                 <input ref={productInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'product')} />
                 
                 {/* Model Face Toggle + Box */}
-                <div className="bg-white/5 border border-white/5 rounded-xl p-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium flex items-center gap-2 text-gray-300">
-                      <UserCircle2 className="w-4 h-4 text-gray-400" /> Add Model Face
-                    </span>
-                    <button 
-                      onClick={() => setUseModel(!useModel)}
-                      className={cn("w-10 h-5 rounded-full relative transition-colors border border-white/10", useModel ? "bg-blue-600 border-blue-500" : "bg-white/10")}
-                    >
-                      <div className={cn("w-3.5 h-3.5 bg-white rounded-full absolute top-[2px] transition-transform shadow-sm", useModel ? "translate-x-5" : "translate-x-[2px]")} />
-                    </button>
+                {selectedTemplate?.requiresModel && (
+                  <div className="bg-white/5 border border-white/5 rounded-xl p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium flex items-center gap-2 text-gray-300">
+                        <UserCircle2 className="w-4 h-4 text-gray-400" /> Add Model Face
+                      </span>
+                      <button 
+                        onClick={() => setUseModel(!useModel)}
+                        className={cn("w-10 h-5 rounded-full relative transition-colors border border-white/10", useModel ? "bg-blue-600 border-blue-500" : "bg-white/10")}
+                      >
+                        <div className={cn("w-3.5 h-3.5 bg-white rounded-full absolute top-[2px] transition-transform shadow-sm", useModel ? "translate-x-5" : "translate-x-[2px]")} />
+                      </button>
+                    </div>
+                    
+                    <AnimatePresence mode="popLayout">
+                      {useModel && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                          <CompactUploadBox 
+                            label="Upload Face" 
+                            image={faceImage} 
+                            required={selectedTemplate?.requiresModel}
+                            icon={UserCircle2}
+                            onUpload={() => faceInputRef.current?.click()} 
+                            onClear={() => setFaceImage(null)}
+                            uploading={uploadingState.face}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                  
-                  <AnimatePresence mode="popLayout">
-                    {useModel && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                        <CompactUploadBox 
-                          label="Upload Face" 
-                          image={faceImage} 
-                          required={selectedTemplate?.requiresModel}
-                          icon={UserCircle2}
-                          onUpload={() => faceInputRef.current?.click()} 
-                          onClear={() => setFaceImage(null)}
-                          uploading={uploadingState.face}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-                <input ref={faceInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'face')} />
+                )}
+                {selectedTemplate?.requiresModel && (
+                  <input ref={faceInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'face')} />
+                )}
 
                 {/* Background Box */}
                 <CompactUploadBox 
@@ -715,43 +726,23 @@ export default function CreatePhotoshootPage() {
           {/* LIMIT UI & GENERATE BUTTON (Sticky Bottom) */}
           <div className="p-5 border-t border-white/10 bg-[#050505] shrink-0 mt-auto">
             <div className="mb-4">
-              <div className="flex items-center justify-between text-xs font-medium mb-1.5">
-                <span className="text-gray-400">Monthly Usage</span>
-                <span className={imagesUsed >= IMAGE_LIMIT ? "text-red-400 font-bold" : "text-gray-300"}>
-                  {imagesUsed} / {IMAGE_LIMIT} images
-                </span>
-              </div>
-              <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                  <div 
-                    className={cn("h-full rounded-full transition-all duration-500", imagesUsed >= IMAGE_LIMIT ? "bg-red-500" : "bg-blue-500")} 
-                    style={{ width: `${Math.min(100, (imagesUsed/IMAGE_LIMIT)*100)}%` }} 
-                  />
-              </div>
+              <p className="text-sm text-gray-500">
+                {imagesUsed} / 30 images used
+              </p>
             </div>
             
             <Button 
               onClick={() => executeGeneration()}
-              disabled={isGenerating || !isGenerateReady()}
-              className="w-full h-12 text-sm tracking-wide font-bold rounded-xl shadow-lg transition-all disabled:opacity-50"
-              style={{
-                background: isGenerateReady() && !isGenerating ? 'linear-gradient(135deg, #2563EB, #1D4ED8)' : '#1F2937',
-                color: isGenerateReady() && !isGenerating ? 'white' : '#9CA3AF'
-              }}
+              disabled={!productImage || !selectedTemplate || isGenerating}
+              className="w-full h-12 text-sm tracking-wide font-bold rounded-xl shadow-lg transition-all disabled:opacity-50 bg-blue-600 text-white hover:bg-blue-700"
             >
-              {isGenerating ? (
-                 <span className="flex items-center gap-2">
-                   <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                   Generating...
-                 </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4" /> Generate Photoshoot
-                </span>
-              )}
+              <span className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4" /> {isGenerating ? "Generating..." : "Generate Photoshoot"}
+              </span>
             </Button>
-            {!isGenerateReady() && selectedTemplate && (
-              <p className="text-center text-[11px] text-red-400 mt-3 font-medium">
-                 Upload all required references to begin
+            {!productImage && (
+              <p className="text-xs text-red-400 mt-2 text-center">
+                Upload required images to continue
               </p>
             )}
           </div>

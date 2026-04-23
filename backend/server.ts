@@ -46,7 +46,7 @@ function checkRateLimit(userId: string) {
 app.post("/api/generate", async (req, res) => {
   try {
     // ✅ 1. SECURE USER ID
-    const token = req.headers.authorization?.replace("Bearer ", "");
+    const token = req.headers.authorization?.split(" ")[1];
     if (!token) {
       return res.status(401).json({ error: "Unauthorized - No token provided" });
     }
@@ -72,6 +72,7 @@ app.post("/api/generate", async (req, res) => {
     if (!productImage) return res.status(400).json({ error: "Product image is required" });
     if (!input) return res.status(400).json({ error: "Template is required" });
     if (requiresModel && !faceImage) return res.status(400).json({ error: "Face image is required for this template" });
+    if (requestedCount < 1 || requestedCount > 4) return res.status(400).json({ error: "Invalid image count" });
 
     // ✅ 2. SAFE USAGE ROW (NO OVERWRITE)
     const { data: existingUsage } = await supabase
@@ -138,8 +139,8 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    if (!images || images.length === 0) {
-      return res.status(500).json({ error: "Generation failed - No images returned" });
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return res.status(500).json({ error: "No images generated" });
     }
 
     // ✅ 5. SAFE INCREMENT (AFTER SUCCESS ONLY)

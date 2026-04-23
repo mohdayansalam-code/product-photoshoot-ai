@@ -27,10 +27,39 @@ const TEMPLATE_MAP: Record<string, string> = {
   editorial fashion shoot,
   high-end magazine style, dramatic lighting
   `,
+  fashion_streetwear: `
+  streetwear fashion shoot,
+  urban environment, edgy style, dramatic shadows
+  `,
   jewelry_dark_luxury: `
   luxury jewelry shoot,
   dark background, gold reflections, premium brand style
   `,
+  jewelry_marble: `
+  elegant jewelry shoot on marble surface,
+  natural light, soft reflections
+  `,
+  campaign_cosmetics_model: `
+  cosmetics model interacting with skincare product,
+  beauty campaign, high-end skin texture
+  `,
+  campaign_premium_ad: `
+  premium campaign ad,
+  high budget commercial look, cinematic lighting
+  `
+};
+
+const aspectMap: Record<string, string> = {
+  "1:1": "square",
+  "16:9": "landscape_16_9",
+  "9:16": "portrait_9_16",
+  "2:3": "portrait_2_3",
+  "3:4": "portrait_3_4",
+  "1:2": "portrait_1_2",
+  "2:1": "landscape_2_1",
+  "4:5": "portrait_4_5",
+  "3:2": "landscape_3_2",
+  "4:3": "landscape_4_3"
 };
 
 export async function generateImageWithFal(options: FalGenerationOptions): Promise<string[]> {
@@ -42,18 +71,15 @@ export async function generateImageWithFal(options: FalGenerationOptions): Promi
         userPrompt = userPrompt.substring(0, 200);
     }
 
+    if (!TEMPLATE_MAP[userPrompt]) {
+      throw new Error("Invalid template");
+    }
+
     let basePrompt = TEMPLATE_MAP[userPrompt];
 
-    if (!basePrompt && userPrompt) {
-      basePrompt = userPrompt; // fallback for old system
-    }
-
-    if (!basePrompt) {
-      basePrompt = "clean studio product shot";
-    }
-
-    if (customPrompt && customPrompt.trim() !== "") {
-      basePrompt = basePrompt + ", " + customPrompt.trim();
+    const safePrompt = customPrompt?.trim().slice(0, 200) || "";
+    if (safePrompt) {
+      basePrompt = basePrompt + ", " + safePrompt;
     }
 
     // Enforce prompt template
@@ -97,18 +123,11 @@ Style:
             );
 
             // Determine image size mapping
-            let mappedSize = "auto_2K";
-            if (aspectRatio === "1:1") mappedSize = "square_hd";
-            if (aspectRatio === "16:9") mappedSize = "landscape_16_9";
-            if (aspectRatio === "9:16") mappedSize = "portrait_16_9";
-            if (aspectRatio === "2:3") mappedSize = "portrait_4_3";
-            if (aspectRatio === "3:4") mappedSize = "portrait_4_3";
-            if (aspectRatio === "4:3") mappedSize = "landscape_4_3";
-            if (aspectRatio === "3:2") mappedSize = "landscape_4_3";
-            if (aspectRatio === "4:5") mappedSize = "portrait_4_3";
+            const mappedSize = aspectMap[aspectRatio || "1:1"] || "square";
             
             // Optional model switch
-            const falEndpoint = modelType === "flux" ? "fal-ai/flux-pro/v1.1" : "fal-ai/bytedance/seedream/v4.5/edit";
+            const safeModel = ["auto", "flux", "seedream"].includes(modelType || "") ? modelType : "auto";
+            const falEndpoint = safeModel === "flux" ? "fal-ai/flux-pro/v1.1" : "fal-ai/bytedance/seedream/v4.5/edit";
 
             const resultPromise = fal.subscribe(falEndpoint, {
                 input: {
