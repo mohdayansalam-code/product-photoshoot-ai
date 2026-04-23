@@ -368,20 +368,21 @@ export default function CreatePhotoshootPage() {
         setLoadingMessage("This is taking longer than usual...");
       }, 20000);
 
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://product-photoshoot-ai.onrender.com";
-      const exactFetchUrl = `${API_BASE}/api/generate`;
-
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout
 
       const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      if (!session) {
+        throw new Error("Session expired");
+      }
 
-      const res = await fetch(exactFetchUrl, {
+      console.log("🚀 SENDING PAYLOAD:", payload);
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "https://product-photoshoot-ai.onrender.com"}/api/generate`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "Authorization": token ? `Bearer ${token}` : ""
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify(payload),
         signal: controller.signal

@@ -4,6 +4,7 @@ import { config } from "../config/env";
 
 export interface FalGenerationOptions {
     prompt: string;
+    template?: string;
     productImage: string;
     faceImage?: string;
     backgroundImage?: string;
@@ -62,11 +63,13 @@ const aspectMap: Record<string, string> = {
   "4:3": "landscape_4_3"
 };
 
-export async function generateImageWithFal(options: FalGenerationOptions): Promise<string[]> {
-    const { prompt, productImage, faceImage, backgroundImage, aspectRatio, imageCount, customPrompt, modelType } = options;
+export async function runFalGeneration(options: FalGenerationOptions): Promise<string[]> {
+  try {
+    console.log("FAL INPUT:", options);
+    const { prompt, template, productImage, faceImage, backgroundImage, aspectRatio, imageCount, customPrompt, modelType } = options;
     
     // Sanitize user input
-    let userPrompt = prompt?.trim() || "";
+    let userPrompt = (template || prompt)?.trim() || "";
     if (userPrompt.length > 200) {
         userPrompt = userPrompt.substring(0, 200);
     }
@@ -149,7 +152,7 @@ Style:
             // Race against 60s timeout
             const result: any = await Promise.race([resultPromise, timeoutPromise]);
             
-            console.log("FAL RESULT:", result);
+            console.log("FAL RAW RESULT:", result);
             
             if (result && result.images && result.images.length > 0) {
                 const urls = result.images.map((img: any) => img.url);
@@ -173,5 +176,12 @@ Style:
     }
 
     throw new Error("Generation failed after retries.");
+  } catch (err) {
+    console.error("❌ FAL ERROR:", err);
+    throw err;
+  }
 }
+
+// Backward compatibility alias for other files
+export const generateImageWithFal = runFalGeneration;
 
