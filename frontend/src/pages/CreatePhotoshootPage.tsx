@@ -233,17 +233,16 @@ export default function CreatePhotoshootPage() {
         setUploadingState(prev => ({ ...prev, [type]: true }));
         
         const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `generated/${fileName}`;
+        const filePath = `${Date.now()}-${file.name}`;
 
         const { error: uploadError } = await supabase.storage
-          .from("generated-images")
+          .from("images")
           .upload(filePath, file);
 
         if (uploadError) throw uploadError;
 
         const { data } = supabase.storage
-          .from("generated-images")
+          .from("images")
           .getPublicUrl(filePath);
 
         if (type === 'product') setProductImage(data.publicUrl);
@@ -398,100 +397,84 @@ export default function CreatePhotoshootPage() {
     }
   };
 
-  // Compact Upload UI Component
   const CompactUploadBox = ({ label, image, onClear, onUpload, uploading, icon: Icon, required }: any) => (
-    <div className="w-full">
+    <div className="w-full mb-3">
       {image ? (
-        <div className="w-full h-[60px] bg-white/5 border border-white/10 rounded-xl flex items-center p-2 relative overflow-hidden group">
-          <img src={image} className="w-11 h-11 rounded-lg object-cover mr-3 bg-black" />
-          <div className="flex-1 overflow-hidden pr-2">
-            <span className="text-sm font-medium text-white truncate block">{label}</span>
-            <span className="text-[11px] text-green-400 font-medium">Uploaded successfully</span>
-          </div>
-          <button onClick={onClear} className="p-2 text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-lg backdrop-blur-sm mr-1">
-            <X className="w-4 h-4" />
+        <div className="relative group">
+          <img src={image} className="w-full h-32 object-cover rounded-md" />
+          <button onClick={(e) => { e.stopPropagation(); onClear(); }} className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-500 rounded-md opacity-0 group-hover:opacity-100 transition-opacity">
+            <X className="w-4 h-4 text-white" />
           </button>
         </div>
       ) : (
-        <button 
+        <div 
           onClick={onUpload}
-          disabled={uploading}
-          className="w-full h-12 bg-white/5 border border-white/10 border-dashed rounded-xl flex items-center justify-center gap-2 hover:bg-white/10 transition-colors hover:border-white/30 text-gray-400 hover:text-white group disabled:opacity-50"
+          className="border border-dashed border-gray-600 rounded-lg p-4 text-center hover:border-blue-500 cursor-pointer flex flex-col items-center justify-center min-h-[100px] transition-colors"
         >
           {uploading ? (
-            <div className="w-4 h-4 border-2 border-gray-400 border-t-white rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-gray-400 border-t-white rounded-full animate-spin mb-2" />
           ) : (
             <>
-              <Icon className="w-4 h-4" />
-              <span className="text-sm font-medium">{label} {required && <span className="text-red-400 ml-0.5">*</span>}</span>
+              <Icon className="w-6 h-6 text-gray-400 mb-2" />
+              <span className="text-gray-300 text-sm">{label} {required && <span className="text-red-400">*</span>}</span>
             </>
           )}
-        </button>
+        </div>
       )}
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#FDFCFB] text-slate-900 font-sans flex flex-col relative">
+    <div className="min-h-screen bg-[#FDFCFB] text-slate-900 font-sans flex flex-col relative overflow-hidden">
       {/* Header */}
-      <header className="h-16 border-b bg-white flex items-center justify-between px-6 lg:px-10 shrink-0 sticky top-0 z-30 transition-all duration-200 ease-in-out">
-        <h1 className="font-bold text-xl tracking-tight">Create Photoshoot</h1>
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-gray-500 hidden sm:block">Niche:</label>
+      <header className="h-[70px] border-b bg-white flex items-center justify-between px-6 shrink-0 z-30">
+        <h2 className="font-bold text-xl tracking-tight text-black">PhotoAI</h2>
+        <div className="flex items-center gap-3 ml-auto">
+          <label className="text-sm font-medium text-gray-500">Niche:</label>
           <select 
             value={activeCategory} 
             onChange={(e) => { setActiveCategory(e.target.value); setSelectedTemplateId(""); setError(""); }}
-            className="bg-gray-50 border border-gray-200 rounded-lg text-sm px-4 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer hover:bg-gray-100 transition-colors duration-200"
+            className="bg-gray-50 border border-gray-200 rounded-lg text-sm px-4 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
             {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
           </select>
         </div>
       </header>
 
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
-        
-        {/* LEFT SIDEBAR REMOVED */}
+      <div className="flex h-[calc(100vh-70px)]">
+        {/* MAIN CONTENT */}
+        <div className="flex-1 overflow-y-auto p-6 max-w-6xl mx-auto w-full custom-scrollbar">
+          <h1 className="text-2xl font-semibold mb-4">Create Photoshoot</h1>
 
-        {/* MAIN CONTENT: Template Grid */}
-        <main className="flex-1 p-4 lg:p-10 overflow-y-auto lg:h-[calc(100vh-4rem)] custom-scrollbar bg-gray-50/50 pb-32 lg:pb-10 relative">
-          <div className="max-w-5xl mx-auto space-y-6 lg:space-y-8">
-            <div>
-              <h2 className="text-2xl font-bold">{activeCategory} Templates</h2>
-              {selectedTemplate && (
-                <p className="text-sm text-blue-500 mb-2">
-                  Selected: {selectedTemplate.name}
-                </p>
-              )}
-            </div>
-
+          {/* Template Section */}
+          <div className="mb-6">
             <div className="mb-4 text-sm text-gray-500">
               <span className="font-medium text-black">Step 1:</span> Select a style &rarr;
               <span className="font-medium text-black ml-2">Step 2:</span> Upload images &rarr;
               <span className="font-medium text-black ml-2">Step 3:</span> Generate
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {filteredTemplates.map(template => (
                 <div 
                   key={template.id}
                   onClick={() => { setSelectedTemplateId(template.id); setError(""); }}
                   className={cn(
-                    "p-3 rounded-xl cursor-pointer transition-all duration-200 ease-in-out hover:shadow-lg hover:scale-105",
-                    selectedTemplateId === template.id ? "border-2 border-blue-500 shadow-md" : "border"
+                    "rounded-xl border p-3 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 bg-white",
+                    selectedTemplateId === template.id ? "border-blue-500 shadow-md" : "border-gray-200"
                   )}
                 >
                   <img src={template.image} className="rounded-lg mb-2 w-full object-cover aspect-[4/3]" />
-                  <h3 className="font-semibold">{template.name}</h3>
+                  <h3 className="font-semibold text-sm">{template.name}</h3>
                   <p className="text-xs text-gray-500 line-clamp-2">
                     {template.description}
                   </p>
                 </div>
               ))}
             </div>
-
-            {/* 6. ERROR UX IMPROVEMENT */}
+            
             {error && (
-              <div className="bg-red-50 border border-red-200 px-4 py-4 rounded-xl flex items-center justify-between shadow-sm">
+              <div className="bg-red-50 border border-red-200 px-4 py-4 rounded-xl flex items-center justify-between shadow-sm mt-4">
                 <div className="flex items-center gap-3 text-red-600">
                   <AlertCircle className="w-5 h-5 flex-shrink-0" />
                   <p className="font-medium text-sm">{error}</p>
@@ -503,26 +486,24 @@ export default function CreatePhotoshootPage() {
                 )}
               </div>
             )}
-
-            {/* EMPTY STATE */}
+            
             {!isGenerating && results.length === 0 && !error && (
               <div className="text-center text-gray-400 mt-10">
-                <p className="text-lg">No images yet</p>
-                <p className="text-sm">
-                  Generate your first AI photoshoot
-                </p>
+                <p className="text-lg">No images yet — generate your first photoshoot</p>
               </div>
             )}
+          </div>
 
-            {/* Results Section */}
+          {/* Results */}
+          <div>
             <AnimatePresence>
               {(isGenerating || results.length > 0) && (
                 <motion.div 
                   id="results"
                   initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} 
-                  className="pt-10 lg:pt-12 border-t border-gray-200 mt-10 pb-10"
+                  className="pt-8 border-t border-gray-200 pb-10"
                 >
-                  <h3 className="text-2xl font-bold mb-6">Generated Results</h3>
+                  <h3 className="text-2xl font-semibold mb-6">Generated Results</h3>
                   
                   {successMessage && (
                     <div className="mb-4 px-4 py-2 rounded-lg bg-green-50 text-green-600 text-sm font-medium transition-opacity duration-300">
@@ -537,12 +518,11 @@ export default function CreatePhotoshootPage() {
                   )}
 
                   {!isGenerating && results.length > 0 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
                       {results.map((img, i) => (
-                        <div key={i} className="relative group rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100 aspect-square sm:aspect-auto">
-                          <img src={img} alt="Generated result" className="w-full h-full sm:h-auto object-cover" />
+                        <div key={i} className="relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
+                          <img src={img} alt="Generated result" className="w-full h-auto object-cover" />
                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4">
-                            {/* 7. Download Reliability */}
                             <Button onClick={() => handleDownload(img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-48 shadow-lg">
                               <Download className="w-4 h-4 mr-2" /> Download
                             </Button>
@@ -558,66 +538,36 @@ export default function CreatePhotoshootPage() {
               )}
             </AnimatePresence>
           </div>
-        </main>
-
-        {/* MOBILE OVERLAY */}
-        <div 
-          className={cn("fixed inset-0 bg-black/60 z-40 lg:hidden transition-opacity backdrop-blur-sm", isMobilePanelOpen ? "opacity-100" : "opacity-0 pointer-events-none")} 
-          onClick={() => setIsMobilePanelOpen(false)} 
-        />
-
-        {/* MOBILE FLOATING BUTTON */}
-        <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-30">
-          <Button onClick={() => setIsMobilePanelOpen(true)} className="rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.3)] px-6 py-6 bg-black text-white hover:bg-gray-800 text-base font-bold whitespace-nowrap">
-             <Settings className="w-5 h-5 mr-2" /> Configure
-          </Button>
         </div>
 
-        {/* RIGHT PANEL: Compact Control System */}
-        <aside className={cn(
-          "fixed lg:sticky top-0 right-0 h-full lg:h-[calc(100vh-4rem)] z-50 lg:z-20 w-[85vw] sm:w-[360px] lg:w-[340px] xl:w-[360px] bg-[#0A0A0A] text-gray-200 flex flex-col shrink-0 shadow-[-10px_0_30px_rgba(0,0,0,0.15)] border-l border-white/5 transition-transform duration-300",
-          isMobilePanelOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
-        )}>
+        {/* RIGHT PANEL */}
+        <div className="w-[380px] border-l bg-[#0A0A0A] p-4 sticky top-0 h-screen flex flex-col justify-between shrink-0">
           
-          <div className="flex items-center justify-between p-4 lg:hidden border-b border-white/10 bg-[#050505]">
-            <span className="font-bold text-white flex items-center gap-2"><Settings className="w-4 h-4" /> Configuration</span>
-            <button onClick={() => setIsMobilePanelOpen(false)} className="p-1 rounded-md hover:bg-white/10 transition-colors"><X className="w-5 h-5 text-gray-400" /></button>
-          </div>
-
-          <div className={cn("flex-1 overflow-y-auto custom-scrollbar p-6 space-y-7 relative pb-10 transition-opacity duration-200 ease-in-out", selectedTemplate ? "opacity-100" : "opacity-60 pointer-events-none")}>
+          <div className={cn("flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-6 transition-opacity duration-200", selectedTemplate ? "opacity-100" : "opacity-60 pointer-events-none")}>
             
-            {/* OVERLAY for disabled state */}
             {!selectedTemplate && (
-              <p className="text-sm text-gray-400 text-center mt-6">
+              <p className="text-sm text-gray-400 text-center mt-4">
                 Select a template to start
               </p>
             )}
 
-            {/* MODEL SELECTOR */}
-            <div className="space-y-2">
+            <div className="space-y-2 mt-4">
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Model</label>
-              <div className="relative">
-                <select 
-                  value={modelType} 
-                  onChange={(e) => setModelType(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl text-sm px-4 py-2.5 text-white focus:outline-none focus:border-white/30 appearance-none transition-colors cursor-pointer"
-                >
-                  <option value="auto" className="bg-[#0A0A0A] text-white">Auto (Default)</option>
-                  <option value="flux" className="bg-[#0A0A0A] text-white">Flux (Product-focused)</option>
-                  <option value="seedream" className="bg-[#0A0A0A] text-white">Seedream (Model-focused)</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                </div>
-              </div>
+              <select 
+                value={modelType} 
+                onChange={(e) => setModelType(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg text-gray-300 text-sm px-3 py-2 focus:outline-none focus:border-white/30 cursor-pointer"
+              >
+                <option value="auto" className="bg-[#0A0A0A] text-white">Auto (Default)</option>
+                <option value="flux" className="bg-[#0A0A0A] text-white">Flux (Product-focused)</option>
+                <option value="seedream" className="bg-[#0A0A0A] text-white">Seedream (Model-focused)</option>
+              </select>
             </div>
 
-            {/* REFERENCES SECTION */}
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">References</label>
               
               <div className="space-y-2.5">
-                {/* Product Image Box */}
                 <CompactUploadBox 
                   label="Upload Product" 
                   image={productImage} 
@@ -629,11 +579,10 @@ export default function CreatePhotoshootPage() {
                 />
                 <input ref={productInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'product')} />
                 
-                {/* Model Face Toggle + Box */}
                 {selectedTemplate?.requiresModel && (
-                  <div className="bg-white/5 border border-white/5 rounded-xl p-3 space-y-3">
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium flex items-center gap-2 text-gray-300">
+                      <span className="text-gray-300 text-sm flex items-center gap-2">
                         <UserCircle2 className="w-4 h-4 text-gray-400" /> Add Model Face
                       </span>
                       <button 
@@ -665,7 +614,6 @@ export default function CreatePhotoshootPage() {
                   <input ref={faceInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'face')} />
                 )}
 
-                {/* Background Box */}
                 <CompactUploadBox 
                   label="Upload Background" 
                   image={backgroundImage} 
@@ -678,7 +626,6 @@ export default function CreatePhotoshootPage() {
               </div>
             </div>
 
-            {/* PROMPT INPUT */}
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Prompt (Optional)</label>
               <textarea 
@@ -686,74 +633,58 @@ export default function CreatePhotoshootPage() {
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder="Customize your scene..."
                 rows={2}
-                className="w-full bg-white/5 border border-white/10 rounded-xl text-sm px-4 py-3 text-white focus:outline-none focus:border-white/30 resize-none placeholder:text-gray-500 transition-colors"
+                className="w-full bg-white/5 border border-white/10 rounded-xl text-gray-300 text-sm px-4 py-3 focus:outline-none focus:border-white/30 resize-none"
               />
             </div>
 
-            {/* SETTINGS SECTION */}
-            <div className="space-y-4 pt-2">
+            <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Settings</label>
-              
-              <div className="bg-white/5 border border-white/5 rounded-xl p-1">
-                {/* Image Size */}
-                <div className="flex items-center justify-between p-2">
-                  <span className="text-sm text-gray-300 pl-1">Aspect Ratio</span>
-                  <div className="relative w-40">
-                    <select 
-                      value={aspectRatio} 
-                      onChange={(e) => setAspectRatio(e.target.value)}
-                      className="w-full bg-[#111111] border border-white/10 rounded-lg text-sm px-3 py-1.5 text-white focus:outline-none focus:border-white/30 appearance-none cursor-pointer"
-                    >
-                      {SIZES.map(s => (
-                        <option key={s.label} value={s.label} className="bg-[#0A0A0A]">{s.label} — {s.name}</option>
-                      ))}
-                    </select>
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                    </div>
-                  </div>
+              <div className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-300 text-sm">Aspect Ratio</span>
+                  <select 
+                    value={aspectRatio} 
+                    onChange={(e) => setAspectRatio(e.target.value)}
+                    className="bg-[#111111] border border-white/10 rounded-lg text-gray-300 text-sm px-2 py-1 w-32 focus:outline-none cursor-pointer"
+                  >
+                    {SIZES.map(s => (
+                      <option key={s.label} value={s.label} className="bg-[#0A0A0A]">{s.label} — {s.name}</option>
+                    ))}
+                  </select>
                 </div>
-
-                <div className="h-px bg-white/5 mx-2" />
-
-                {/* Image Count */}
-                <div className="flex items-center justify-between p-2">
-                  <span className="text-sm text-gray-300 pl-1">Image Count</span>
-                  <div className="flex items-center bg-[#111111] border border-white/10 rounded-lg overflow-hidden h-8 w-40">
-                    <button onClick={() => setImageCount(Math.max(1, imageCount - 1))} className="flex-1 hover:bg-white/10 transition-colors text-gray-400 hover:text-white flex items-center justify-center">-</button>
-                    <span className="w-10 text-sm font-medium text-center border-x border-white/10 text-white flex items-center justify-center h-full">{imageCount}</span>
-                    <button onClick={() => setImageCount(Math.max(1, Math.min(4, imageCount + 1)))} className="flex-1 hover:bg-white/10 transition-colors text-gray-400 hover:text-white flex items-center justify-center">+</button>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-300 text-sm">Image Count</span>
+                  <div className="flex items-center bg-[#111111] border border-white/10 rounded-lg overflow-hidden h-7 w-24">
+                    <button onClick={() => setImageCount(Math.max(1, imageCount - 1))} className="flex-1 hover:bg-white/10 text-gray-400 hover:text-white">-</button>
+                    <span className="w-8 text-sm text-center border-x border-white/10 text-white flex items-center justify-center h-full">{imageCount}</span>
+                    <button onClick={() => setImageCount(Math.max(1, Math.min(4, imageCount + 1)))} className="flex-1 hover:bg-white/10 text-gray-400 hover:text-white">+</button>
                   </div>
                 </div>
               </div>
             </div>
-
           </div>
 
-          {/* LIMIT UI & GENERATE BUTTON (Sticky Bottom) */}
-          <div className="p-5 border-t border-white/10 bg-[#050505] shrink-0 mt-auto">
-            <div className="mb-4">
-              <p className="text-sm text-gray-500">
+          <div className="pt-4 border-t border-white/10 mt-2 shrink-0 pb-16">
+            <div className="mb-3 text-center">
+              <p className="text-gray-300 text-sm">
                 {imagesUsed} / 30 images used
               </p>
             </div>
             
-            <Button 
+            <button 
               onClick={() => executeGeneration()}
               disabled={!selectedTemplate || !productImage || (selectedTemplate?.requiresModel && !faceImage) || isGenerating}
-              className="w-full h-12 text-sm tracking-wide font-bold rounded-xl shadow-lg transition-all duration-200 ease-in-out disabled:opacity-50 bg-blue-600 text-white hover:bg-blue-700"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-3 font-medium disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
             >
-              <span className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4" /> {isGenerating ? "Generating..." : "Generate Photoshoot"}
-              </span>
-            </Button>
+              <Sparkles className="w-4 h-4" /> {isGenerating ? "Generating..." : "Generate Photoshoot"}
+            </button>
             {!productImage && (
               <p className="text-xs text-red-400 mt-2 text-center">
                 Upload required images to continue
               </p>
             )}
           </div>
-        </aside>
+        </div>
 
       </div>
     </div>
