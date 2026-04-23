@@ -16,16 +16,14 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL ||
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// ✅ HEALTH CHECK (Render Stability)
-app.get("/health", (req, res) => {
-  res.send("ok");
-});
+// ✅ 10. HEALTH CHECK ROUTE
+app.get("/health", (req, res) => res.send("ok"));
 
 app.get("/", (req, res) => {
   res.send("API is running...");
 });
 
-// ✅ RATE LIMITING
+// ✅ 9. BASIC RATE LIMIT
 const rateLimitCache: Record<string, { count: number; resetTime: number }> = {};
 function checkRateLimit(userId: string) {
   const now = Date.now();
@@ -47,72 +45,80 @@ function checkRateLimit(userId: string) {
 // ✅ MAIN GENERATION ROUTE
 app.post("/api/generate", async (req, res) => {
   try {
-    const { template, prompt, productImage, faceImage, backgroundImage, aspectRatio, imageCount, customPrompt, modelType, userId } = req.body;
+    // ✅ 1. SECURE USER ID
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized - No token provided" });
+    }
 
-    // ✅ AUTH & VALIDATION
-    if (!userId) {
-      return res.status(401).json({ success: false, error: "Unauthorized. Please log in." });
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return res.status(401).json({ error: "Unauthorized - Invalid token" });
     }
-    
-    if (!checkRateLimit(userId)) {
-      return res.status(429).json({ success: false, error: "Rate limit exceeded. Please wait a minute." });
+
+    const user_id = user.id;
+
+    if (!checkRateLimit(user_id)) {
+      return res.status(429).json({ error: "Too many requests" });
     }
+
+    const { template, prompt, productImage, faceImage, backgroundImage, aspectRatio, imageCount, customPrompt, modelType, requiresModel } = req.body;
 
     const input = template || prompt;
     const requestedCount = imageCount || 2;
 
-    if (!productImage) return res.status(400).json({ success: false, error: "productImage is required" });
-    if (!input) return res.status(400).json({ success: false, error: "No template or prompt provided" });
+    // ✅ 7. BACKEND VALIDATION
+    if (!productImage) return res.status(400).json({ error: "Product image is required" });
+    if (!input) return res.status(400).json({ error: "Template is required" });
+    if (requiresModel && !faceImage) return res.status(400).json({ error: "Face image is required for this template" });
 
-    // ✅ USAGE CHECK & INITIALIZATION
-    let usage;
-    try {
-      const { data } = await supabase
-        .from("users_usage")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
-      usage = data;
-    } catch (e) {
-      // Ignored, will be handled below
-    }
+    // ✅ 2. SAFE USAGE ROW (NO OVERWRITE)
+    const { data: existingUsage } = await supabase
+      .from("users_usage")
+      .select("*")
+      .eq("user_id", user_id)
+      .single();
 
+    let usage = existingUsage;
     const nextMonth = new Date();
     nextMonth.setMonth(nextMonth.getMonth() + 1);
 
     if (!usage) {
-      // Upsert Initial Usage Row
-      const { data: newUsage, error: upsertErr } = await supabase.from("users_usage").upsert({
-        user_id: userId,
+      const { data: newUsage, error: insertErr } = await supabase.from("users_usage").insert({
+        user_id,
         images_used: 0,
         plan_limit: 30,
         reset_date: nextMonth.toISOString()
       }).select().single();
       
-      if (upsertErr) {
-        console.error("Usage initialization failed:", upsertErr);
-        return res.status(500).json({ success: false, error: "Failed to initialize account usage." });
+      if (insertErr) {
+        console.error("Usage initialization failed:", insertErr);
+        return res.status(500).json({ error: "Failed to initialize account usage." });
       }
       usage = newUsage;
     }
 
-    // ✅ MONTHLY RESET LOGIC
+    // ✅ 3. MONTHLY RESET
     if (new Date() > new Date(usage.reset_date)) {
       const { data: resetUsage } = await supabase.from("users_usage").update({
         images_used: 0,
         reset_date: nextMonth.toISOString()
-      }).eq("user_id", userId).select().single();
+      }).eq("user_id", user_id).select().single();
+      
       if (resetUsage) usage = resetUsage;
     }
 
-    // ✅ IMAGE LIMIT VALIDATION
+    // ✅ 4. LIMIT CHECK
     if (usage.images_used + requestedCount > usage.plan_limit) {
-      return res.status(403).json({ success: false, error: "Monthly image limit reached" });
+      return res.status(403).json({
+        error: "Monthly image limit reached"
+      });
     }
 
-    console.log("📥 REQUEST:", { userId, template: input, status: "processing" });
+    console.log("📥 REQUEST:", { user_id, template: input, status: "processing" });
 
-    // ✅ FAIL-SAFE GENERATION
+    // ✅ 8. FAIL-SAFE FAL CALL
     let images: string[] = [];
     try {
       images = await generateImageWithFal({
@@ -121,35 +127,38 @@ app.post("/api/generate", async (req, res) => {
         faceImage,
         backgroundImage,
         aspectRatio,
-        imageCount,
+        imageCount: requestedCount,
         customPrompt,
         modelType
       });
     } catch (falErr: any) {
       console.error("Fal API Error:", falErr);
-      return res.status(500).json({ success: false, error: "Generation failed" });
+      return res.status(500).json({
+        error: "Generation failed"
+      });
     }
 
     if (!images || images.length === 0) {
-      return res.status(500).json({ success: false, error: "No images were returned" });
+      return res.status(500).json({ error: "Generation failed - No images returned" });
     }
 
-    // ✅ SUCCESS: INCREMENT USAGE
-    await supabase.rpc('increment_images_used', { row_id: userId, amount: requestedCount }).catch(async () => {
-       // Fallback if RPC doesn't exist
-       await supabase.from("users_usage").update({
-         images_used: usage.images_used + requestedCount
-       }).eq("user_id", userId);
-    });
+    // ✅ 5. SAFE INCREMENT (AFTER SUCCESS ONLY)
+    if (images?.length) {
+      await supabase.from("users_usage").update({
+        images_used: usage.images_used + requestedCount
+      }).eq("user_id", user_id);
+    }
 
-    // ✅ SAVE GENERATION HISTORY
-    await supabase.from("generations").insert({
-      user_id: userId,
-      template: input,
-      image_urls: images
-    });
+    // ✅ 6. SAVE GENERATIONS (ONLY ON SUCCESS)
+    if (images?.length) {
+      await supabase.from("generations").insert({
+        user_id,
+        template: input,
+        image_urls: images
+      });
+    }
 
-    console.log("✅ SUCCESS:", { user_id: userId, template: input, status: "success" });
+    console.log("✅ SUCCESS:", { user_id, template: input, status: "success" });
 
     return res.json({
       success: true,
@@ -159,8 +168,7 @@ app.post("/api/generate", async (req, res) => {
   } catch (err: any) {
     console.error("❌ SERVER ERROR:", err);
     return res.status(500).json({
-      success: false,
-      error: err.message || "Internal server error"
+      error: "Internal server error"
     });
   }
 });

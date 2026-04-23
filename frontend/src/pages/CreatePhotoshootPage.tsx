@@ -271,6 +271,9 @@ export default function CreatePhotoshootPage() {
         return;
       }
       
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
       payload = {
         template: selectedTemplateId,
         productImage,
@@ -280,6 +283,7 @@ export default function CreatePhotoshootPage() {
         imageCount,
         customPrompt,
         modelType,
+        requiresModel: selectedTemplate?.requiresModel || false,
         userId: currentUser.id
       };
       // 3. Save Payload Guarantee for Regenerate
@@ -317,9 +321,15 @@ export default function CreatePhotoshootPage() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout
 
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const res = await fetch(exactFetchUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": token ? `Bearer ${token}` : ""
+        },
         body: JSON.stringify(payload),
         signal: controller.signal
       });
