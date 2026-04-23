@@ -44,6 +44,12 @@ function checkRateLimit(userId: string) {
 // ✅ MAIN GENERATION ROUTE
 app.post("/api/generate", async (req, res) => {
   try {
+    console.log("=== GENERATE START ===")
+    console.log("BODY:", req.body)
+
+    if (!process.env.FAL_API_KEY) {
+      throw new Error("FAL API key missing");
+    }
     // ✅ 1. SECURE USER ID
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) {
@@ -68,10 +74,10 @@ app.post("/api/generate", async (req, res) => {
     const requestedCount = imageCount || 2;
 
     // ✅ 7. BACKEND VALIDATION
-    if (!productImage) return res.status(400).json({ error: "Product image is required" });
-    if (!input) return res.status(400).json({ error: "Template is required" });
-    if (requiresModel && !faceImage) return res.status(400).json({ error: "Face image is required for this template" });
-    if (requestedCount < 1 || requestedCount > 4) return res.status(400).json({ error: "Invalid image count" });
+    if (!productImage) throw new Error("Missing product image");
+    if (!input) throw new Error("Missing template");
+    if (requiresModel && !faceImage) throw new Error("Face image required");
+    if (requestedCount < 1 || requestedCount > 4) throw new Error("Invalid image count");
 
     // ✅ 2. SAFE USAGE ROW (NO OVERWRITE)
     const { data: existingUsage } = await supabase
@@ -129,13 +135,11 @@ app.post("/api/generate", async (req, res) => {
         modelType
       });
     } catch (falErr: any) {
-      return res.status(500).json({
-        error: "Generation failed"
-      });
+      throw falErr;
     }
 
     if (!images || !Array.isArray(images) || images.length === 0) {
-      return res.status(500).json({ error: "No images generated" });
+      throw new Error("Fal returned empty result");
     }
 
     // ✅ 5. SAFE INCREMENT (AFTER SUCCESS ONLY)
@@ -160,8 +164,10 @@ app.post("/api/generate", async (req, res) => {
     });
 
   } catch (err: any) {
+    console.error("❌ GENERATE ERROR:", err);
+
     return res.status(500).json({
-      error: "Internal server error"
+      error: err.message || "Generation failed"
     });
   }
 });

@@ -125,15 +125,19 @@ Style:
             const safeModel = ["auto", "flux", "seedream"].includes(modelType || "") ? modelType : "auto";
             const falEndpoint = safeModel === "flux" ? "fal-ai/flux-pro/v1.1" : "fal-ai/bytedance/seedream/v4.5/edit";
 
+            const payload = {
+                prompt: finalPrompt,
+                image_urls,
+                image_url: productImage, // some models use image_url instead of image_urls
+                num_images: imageCount || 2,
+                max_images: imageCount || 2,
+                image_size: mappedSize
+            };
+            
+            console.log("FAL INPUT:", payload);
+
             const resultPromise = fal.subscribe(falEndpoint, {
-                input: {
-                    prompt: finalPrompt,
-                    image_urls,
-                    image_url: productImage, // some models use image_url instead of image_urls
-                    num_images: imageCount || 2,
-                    max_images: imageCount || 2,
-                    image_size: mappedSize
-                },
+                input: payload,
                 logs: true,
                 onQueueUpdate: (update) => {
                     if (update.status === "IN_PROGRESS") {
@@ -144,6 +148,8 @@ Style:
 
             // Race against 60s timeout
             const result: any = await Promise.race([resultPromise, timeoutPromise]);
+            
+            console.log("FAL RESULT:", result);
             
             if (result && result.images && result.images.length > 0) {
                 const urls = result.images.map((img: any) => img.url);
