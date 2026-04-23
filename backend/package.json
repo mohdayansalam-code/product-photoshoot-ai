@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@fal-ai/client": "^1.9.5",
+    "@fal-ai/serverless-client": "^0.15.0",
     "@next/third-parties": "^14.2.5",
     "@radix-ui/react-avatar": "^1.0.4",
     "@radix-ui/react-dialog": "^1.1.1",

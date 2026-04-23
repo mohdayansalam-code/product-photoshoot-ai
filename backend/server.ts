@@ -3,7 +3,11 @@ import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
 import { createClient } from "@supabase/supabase-js";
-import { runFalGeneration } from "./src/services/falProcessor";
+import * as fal from "@fal-ai/serverless-client";
+
+fal.config({
+  credentials: process.env.FAL_API_KEY,
+});
 
 const app = express();
 
@@ -57,67 +61,35 @@ app.post("/api/generate", async (req, res) => {
     console.log("=== GENERATE START ===");
     console.log("BODY:", req.body);
 
-    const {
-      productImage,
-      faceImage,
-      backgroundImage,
-      prompt,
-      template,
-      imageCount,
-    } = req.body;
+    const { productImage, prompt } = req.body;
 
-    // 🔴 STRICT VALIDATION
-    if (!productImage) throw new Error("Product image missing");
-    if (!template) throw new Error("Template missing");
-    if (!imageCount) throw new Error("Image count missing");
-
-    if (!process.env.FAL_API_KEY) {
-      throw new Error("FAL API key missing");
-    }
+    if (!productImage) throw new Error("Missing product image");
 
     //--------------------------------------------------
 
-    const payload = {
-      prompt: prompt || "high quality product photoshoot",
-      image_url: productImage,
-    };
-
-    console.log("FAL INPUT:", payload);
-
-    //--------------------------------------------------
-
-    const response = await fetch(
-      "https://fal.run/fal-ai/fast-sdxl",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Key ${process.env.FAL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-
-    const result = await response.json();
+    const result: any = await fal.subscribe("fal-ai/fast-sdxl", {
+      input: {
+        prompt: prompt || "high quality product photography",
+        image_url: productImage,
+      },
+    });
 
     console.log("FAL RESULT:", result);
 
     //--------------------------------------------------
 
-    if (!result || !result.images || result.images.length === 0) {
+    if (!result?.images || result.images.length === 0) {
       throw new Error("Fal returned empty result");
     }
 
-    //--------------------------------------------------
-
-    res.json({
+    return res.json({
       images: result.images.map((img: any) => img.url),
     });
 
   } catch (err: any) {
     console.error("❌ GENERATE ERROR:", err);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: err.message || "Generation failed",
     });
   }
