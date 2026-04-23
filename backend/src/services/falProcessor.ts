@@ -7,6 +7,10 @@ export interface FalGenerationOptions {
     productImage: string;
     faceImage?: string;
     backgroundImage?: string;
+    aspectRatio?: string;
+    imageCount?: number;
+    customPrompt?: string;
+    modelType?: string;
 }
 
 const TEMPLATE_MAP: Record<string, string> = {
@@ -30,7 +34,7 @@ const TEMPLATE_MAP: Record<string, string> = {
 };
 
 export async function generateImageWithFal(options: FalGenerationOptions): Promise<string[]> {
-    const { prompt, productImage, faceImage, backgroundImage } = options;
+    const { prompt, productImage, faceImage, backgroundImage, aspectRatio, imageCount, customPrompt, modelType } = options;
     
     // Sanitize user input
     let userPrompt = prompt?.trim() || "";
@@ -46,6 +50,10 @@ export async function generateImageWithFal(options: FalGenerationOptions): Promi
 
     if (!basePrompt) {
       basePrompt = "clean studio product shot";
+    }
+
+    if (customPrompt && customPrompt.trim() !== "") {
+      basePrompt = basePrompt + ", " + customPrompt.trim();
     }
 
     // Enforce prompt template
@@ -88,13 +96,28 @@ Style:
                 setTimeout(() => reject(new Error("FAL_TIMEOUT")), 60000)
             );
 
-            const resultPromise = fal.subscribe("fal-ai/bytedance/seedream/v4.5/edit", {
+            // Determine image size mapping
+            let mappedSize = "auto_2K";
+            if (aspectRatio === "1:1") mappedSize = "square_hd";
+            if (aspectRatio === "16:9") mappedSize = "landscape_16_9";
+            if (aspectRatio === "9:16") mappedSize = "portrait_16_9";
+            if (aspectRatio === "2:3") mappedSize = "portrait_4_3";
+            if (aspectRatio === "3:4") mappedSize = "portrait_4_3";
+            if (aspectRatio === "4:3") mappedSize = "landscape_4_3";
+            if (aspectRatio === "3:2") mappedSize = "landscape_4_3";
+            if (aspectRatio === "4:5") mappedSize = "portrait_4_3";
+            
+            // Optional model switch
+            const falEndpoint = modelType === "flux" ? "fal-ai/flux-pro/v1.1" : "fal-ai/bytedance/seedream/v4.5/edit";
+
+            const resultPromise = fal.subscribe(falEndpoint, {
                 input: {
                     prompt: finalPrompt,
                     image_urls,
-                    num_images: 2,
-                    max_images: 2,
-                    image_size: "auto_2K"
+                    image_url: productImage, // some models use image_url instead of image_urls
+                    num_images: imageCount || 2,
+                    max_images: imageCount || 2,
+                    image_size: mappedSize
                 },
                 logs: true,
                 onQueueUpdate: (update) => {

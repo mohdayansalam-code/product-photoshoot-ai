@@ -19,7 +19,7 @@ import { generateImageWithFal } from "./src/services/falProcessor";
 // ✅ MAIN ROUTE
 app.post("/api/generate", async (req, res) => {
   try {
-    const { template, prompt, productImage, faceImage, backgroundImage } = req.body;
+    const { template, prompt, productImage, faceImage, backgroundImage, aspectRatio, imageCount, customPrompt, modelType } = req.body;
 
     const input = template || prompt;
 
@@ -38,13 +38,17 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    console.log("📥 REQUEST:", { input, hasProductImage: !!productImage });
+    console.log("📥 REQUEST:", { input, hasProductImage: !!productImage, aspectRatio, imageCount, modelType });
 
     const images = await generateImageWithFal({
       prompt: input, // We pass input as prompt, falProcessor will handle mapping
       productImage,
       faceImage,
-      backgroundImage
+      backgroundImage,
+      aspectRatio,
+      imageCount,
+      customPrompt,
+      modelType
     });
 
     return res.json({
