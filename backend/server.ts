@@ -1,4 +1,3 @@
-console.log("🚀 CORRECT SERVER FILE IS RUNNING");
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -94,7 +93,6 @@ app.post("/api/generate", async (req, res) => {
       }).select().single();
       
       if (insertErr) {
-        console.error("Usage initialization failed:", insertErr);
         return res.status(500).json({ error: "Failed to initialize account usage." });
       }
       usage = newUsage;
@@ -117,8 +115,6 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    console.log("📥 REQUEST:", { user_id, template: input, status: "processing" });
-
     // ✅ 8. FAIL-SAFE FAL CALL
     let images: string[] = [];
     try {
@@ -133,7 +129,6 @@ app.post("/api/generate", async (req, res) => {
         modelType
       });
     } catch (falErr: any) {
-      console.error("Fal API Error:", falErr);
       return res.status(500).json({
         error: "Generation failed"
       });
@@ -159,15 +154,12 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    console.log("✅ SUCCESS:", { user_id, template: input, status: "success" });
-
     return res.json({
       success: true,
       images
     });
 
   } catch (err: any) {
-    console.error("❌ SERVER ERROR:", err);
     return res.status(500).json({
       error: "Internal server error"
     });

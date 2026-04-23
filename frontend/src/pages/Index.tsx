@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
-import { getGenerations, DEFAULT_CREDITS } from "@/lib/api";
+import { getGenerations } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 export default function Index() {
   const navigate = useNavigate();
@@ -14,8 +15,14 @@ export default function Index() {
   const [monthlyLimit, setMonthlyLimit] = useState(10);
 
   const getUsageUrl = async () => {
-    setImagesUsed(DEFAULT_CREDITS.images_used);
-    setMonthlyLimit(DEFAULT_CREDITS.monthly_limit);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const { data } = await supabase.from('users_usage').select('images_used, plan_limit').eq('user_id', session.user.id).single();
+      if (data) {
+        setImagesUsed(data.images_used);
+        setMonthlyLimit(data.plan_limit || 30);
+      }
+    }
   };
 
   useEffect(() => {

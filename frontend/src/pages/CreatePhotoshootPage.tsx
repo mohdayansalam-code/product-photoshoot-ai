@@ -131,6 +131,7 @@ export default function CreatePhotoshootPage() {
   const [results, setResults] = useState<string[]>([]);
   const [imagesUsed, setImagesUsed] = useState(0);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [successMessage, setSuccessMessage] = useState("");
 
   // Auth & Usage Fetch
   useEffect(() => {
@@ -147,6 +148,7 @@ export default function CreatePhotoshootPage() {
 
   // Safety & Recovery Refs
   const lastRequestRef = useRef<any>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Refs
   const productInputRef = useRef<HTMLInputElement>(null);
@@ -250,7 +252,6 @@ export default function CreatePhotoshootPage() {
         
         toast.success(`${type} image uploaded successfully`);
       } catch (err: any) {
-        console.error("Upload error:", err);
         toast.error("Failed to upload image.");
       } finally {
         setUploadingState(prev => ({ ...prev, [type]: false }));
@@ -370,15 +371,25 @@ export default function CreatePhotoshootPage() {
       setImagesUsed(prev => prev + payload.imageCount);
       toast.success("Images generated successfully!");
       
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      setSuccessMessage("");
+      setTimeout(() => {
+        setSuccessMessage("Generated successfully ✓");
+      }, 50);
+
+      timeoutRef.current = setTimeout(() => {
+        setSuccessMessage("");
+      }, 3000);
+      
       setTimeout(() => {
         document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 300);
 
     } catch (err: any) {
-      console.error("🔥 ERROR:", err);
-      let errorMsg = "Network error. Try again.";
-      if (err.name === 'AbortError') errorMsg = "Generation timed out. Please try again.";
-      else if (err.message) errorMsg = err.message;
+      let errorMsg = "Generation failed. Try again.";
+      if (err.message === "Monthly image limit reached") errorMsg = err.message;
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -423,33 +434,23 @@ export default function CreatePhotoshootPage() {
   return (
     <div className="min-h-screen bg-[#FDFCFB] text-slate-900 font-sans flex flex-col relative">
       {/* Header */}
-      <header className="h-16 border-b bg-white flex items-center px-6 lg:px-10 shrink-0 sticky top-0 z-30">
+      <header className="h-16 border-b bg-white flex items-center justify-between px-6 lg:px-10 shrink-0 sticky top-0 z-30 transition-all duration-200 ease-in-out">
         <h1 className="font-bold text-xl tracking-tight">Create Photoshoot</h1>
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-gray-500 hidden sm:block">Niche:</label>
+          <select 
+            value={activeCategory} 
+            onChange={(e) => { setActiveCategory(e.target.value); setSelectedTemplateId(""); setError(""); }}
+            className="bg-gray-50 border border-gray-200 rounded-lg text-sm px-4 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer hover:bg-gray-100 transition-colors duration-200"
+          >
+            {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+          </select>
+        </div>
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
         
-        {/* LEFT SIDEBAR: Category Navigation */}
-        <aside className="w-full lg:w-64 border-b lg:border-b-0 lg:border-r bg-white p-4 lg:p-6 shrink-0 lg:h-[calc(100vh-4rem)] lg:sticky top-16 overflow-y-auto custom-scrollbar">
-          <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 hidden lg:block">Categories</h2>
-          <nav className="flex flex-row lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 scrollbar-hide">
-            {CATEGORIES.map(cat => (
-              <button
-                key={cat}
-                onClick={() => { setActiveCategory(cat); setSelectedTemplateId(""); setError(""); }}
-                className={cn(
-                  "px-4 py-2.5 lg:py-3 rounded-xl text-sm font-medium transition-all text-left whitespace-nowrap flex items-center justify-between shrink-0",
-                  activeCategory === cat 
-                    ? "bg-black text-white shadow-md" 
-                    : "text-gray-600 hover:bg-gray-100"
-                )}
-              >
-                {cat}
-                {cat === "Model Campaigns" && <Sparkles className={cn("w-4 h-4 ml-2", activeCategory === cat ? "text-yellow-400" : "text-amber-500")} />}
-              </button>
-            ))}
-          </nav>
-        </aside>
+        {/* LEFT SIDEBAR REMOVED */}
 
         {/* MAIN CONTENT: Template Grid */}
         <main className="flex-1 p-4 lg:p-10 overflow-y-auto lg:h-[calc(100vh-4rem)] custom-scrollbar bg-gray-50/50 pb-32 lg:pb-10 relative">
@@ -475,7 +476,7 @@ export default function CreatePhotoshootPage() {
                   key={template.id}
                   onClick={() => { setSelectedTemplateId(template.id); setError(""); }}
                   className={cn(
-                    "p-3 rounded-xl cursor-pointer transition duration-200 hover:shadow-xl hover:-translate-y-1 hover:scale-105",
+                    "p-3 rounded-xl cursor-pointer transition-all duration-200 ease-in-out hover:shadow-lg hover:scale-105",
                     selectedTemplateId === template.id ? "border-2 border-blue-500 shadow-md" : "border"
                   )}
                 >
@@ -508,7 +509,7 @@ export default function CreatePhotoshootPage() {
               <div className="text-center text-gray-400 mt-10">
                 <p className="text-lg">No images yet</p>
                 <p className="text-sm">
-                  Select a template and generate your first photoshoot
+                  Generate your first AI photoshoot
                 </p>
               </div>
             )}
@@ -523,9 +524,15 @@ export default function CreatePhotoshootPage() {
                 >
                   <h3 className="text-2xl font-bold mb-6">Generated Results</h3>
                   
+                  {successMessage && (
+                    <div className="mb-4 px-4 py-2 rounded-lg bg-green-50 text-green-600 text-sm font-medium transition-opacity duration-300">
+                      {successMessage}
+                    </div>
+                  )}
+                  
                   {isGenerating && (
                     <p className="text-sm text-blue-500 mt-4 text-center">
-                      Generating images...
+                      Generating images... This may take a few seconds
                     </p>
                   )}
 
@@ -577,7 +584,7 @@ export default function CreatePhotoshootPage() {
             <button onClick={() => setIsMobilePanelOpen(false)} className="p-1 rounded-md hover:bg-white/10 transition-colors"><X className="w-5 h-5 text-gray-400" /></button>
           </div>
 
-          <div className={cn("flex-1 overflow-y-auto custom-scrollbar p-6 space-y-7 relative pb-10", selectedTemplate ? "" : "opacity-70 pointer-events-none")}>
+          <div className={cn("flex-1 overflow-y-auto custom-scrollbar p-6 space-y-7 relative pb-10 transition-opacity duration-200 ease-in-out", selectedTemplate ? "opacity-100" : "opacity-60 pointer-events-none")}>
             
             {/* OVERLAY for disabled state */}
             {!selectedTemplate && (
@@ -733,8 +740,8 @@ export default function CreatePhotoshootPage() {
             
             <Button 
               onClick={() => executeGeneration()}
-              disabled={!productImage || !selectedTemplate || isGenerating}
-              className="w-full h-12 text-sm tracking-wide font-bold rounded-xl shadow-lg transition-all disabled:opacity-50 bg-blue-600 text-white hover:bg-blue-700"
+              disabled={!selectedTemplate || !productImage || (selectedTemplate?.requiresModel && !faceImage) || isGenerating}
+              className="w-full h-12 text-sm tracking-wide font-bold rounded-xl shadow-lg transition-all duration-200 ease-in-out disabled:opacity-50 bg-blue-600 text-white hover:bg-blue-700"
             >
               <span className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4" /> {isGenerating ? "Generating..." : "Generate Photoshoot"}

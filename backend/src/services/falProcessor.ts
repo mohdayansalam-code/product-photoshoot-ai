@@ -101,10 +101,6 @@ Style:
 * sharp focus
 * 4K quality`;
 
-    console.log("USER PROMPT/TEMPLATE:", userPrompt);
-    console.log("BASE PROMPT:", basePrompt);
-    console.log("FINAL PROMPT:", finalPrompt);
-
     // Build image_urls dynamically
     const image_urls = [productImage];
     if (faceImage) image_urls.push(faceImage);

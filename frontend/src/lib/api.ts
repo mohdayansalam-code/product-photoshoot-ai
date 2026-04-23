@@ -74,8 +74,21 @@ export async function fetchScenes(): Promise<Scene[]> {
   return SCENES;
 }
 
+import { supabase } from "./supabase";
+
 export async function getGenerations(): Promise<any[]> {
-  return [];
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return [];
+  const { data, error } = await supabase
+    .from("generations")
+    .select("*")
+    .eq("user_id", session.user.id)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("Failed to fetch generations:", error);
+    return [];
+  }
+  return data || [];
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
