@@ -53,55 +53,71 @@ function checkRateLimit(userId: string) {
 
 // ✅ MAIN GENERATION ROUTE
 app.post("/api/generate", async (req, res) => {
-  console.log("=== GENERATE START ===");
-
   try {
-    const body = req.body;
-    console.log("BODY:", body);
+    console.log("=== GENERATE START ===");
+    console.log("BODY:", req.body);
 
     const {
       productImage,
       faceImage,
       backgroundImage,
-      template,
       prompt,
+      template,
       imageCount,
-      aspectRatio,
-      modelType,
-    } = body;
+    } = req.body;
 
-    // ✅ VALIDATION
-    if (!productImage) throw new Error("Missing product image");
-    if (!template) throw new Error("Missing template");
-    if (imageCount < 1 || imageCount > 4) throw new Error("Invalid image count");
+    // 🔴 STRICT VALIDATION
+    if (!productImage) throw new Error("Product image missing");
+    if (!template) throw new Error("Template missing");
+    if (!imageCount) throw new Error("Image count missing");
 
     if (!process.env.FAL_API_KEY) {
       throw new Error("FAL API key missing");
     }
 
-    // ✅ CALL FAL
-    const result = await runFalGeneration({
-      productImage,
-      faceImage,
-      backgroundImage,
-      template,
-      prompt,
-      imageCount,
-      aspectRatio,
-      modelType,
-    });
+    //--------------------------------------------------
+
+    const payload = {
+      prompt: prompt || "high quality product photoshoot",
+      image_url: productImage,
+    };
+
+    console.log("FAL INPUT:", payload);
+
+    //--------------------------------------------------
+
+    const response = await fetch(
+      "https://fal.run/fal-ai/fast-sdxl",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Key ${process.env.FAL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const result = await response.json();
 
     console.log("FAL RESULT:", result);
 
-    if (!result || result.length === 0) {
+    //--------------------------------------------------
+
+    if (!result || !result.images || result.images.length === 0) {
       throw new Error("Fal returned empty result");
     }
 
-    return res.json({ images: result });
+    //--------------------------------------------------
+
+    res.json({
+      images: result.images.map((img: any) => img.url),
+    });
 
   } catch (err: any) {
     console.error("❌ GENERATE ERROR:", err);
-    return res.status(500).json({
+
+    res.status(500).json({
       error: err.message || "Generation failed",
     });
   }
