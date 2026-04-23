@@ -222,55 +222,77 @@ export default function CreatePhotoshootPage() {
     return true;
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'product' | 'face' | 'bg') => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error("File size must be under 10MB");
-        return;
+  const handleFileUpload = async (file: File) => {
+    try {
+      console.log("=== UPLOAD START ===")
+      console.log("File:", file)
+
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log("Session:", session)
+
+      if (!session) {
+        throw new Error("User not authenticated")
       }
-      try {
-        setUploadingState(prev => ({ ...prev, [type]: true }));
-        
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          alert("Please login first");
-          setUploadingState(prev => ({ ...prev, [type]: false }));
-          return;
-        }
 
-        const filePath = `${Date.now()}-${file.name}`;
+      const filePath = `${Date.now()}-${file.name}`
+      console.log("Uploading to:", filePath)
 
-        const { data, error: uploadError } = await supabase.storage
-          .from("images")
-          .upload(filePath, file, {
-            cacheControl: "3600",
-            upsert: false,
-          });
+      const { data, error } = await supabase.storage
+        .from("images")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false
+        })
 
-        if (uploadError) {
-          console.error(uploadError);
-          throw new Error("Upload failed");
-        }
+      console.log("Upload response:", data)
 
-        const { data: publicUrlData } = supabase.storage
-          .from("images")
-          .getPublicUrl(filePath);
-
-        const url = publicUrlData.publicUrl;
-
-        if (type === 'product') setProductImage(url);
-        if (type === 'face') setFaceImage(url);
-        if (type === 'bg') setBackgroundImage(url);
-        
-        toast.success(`${type} image uploaded successfully`);
-      } catch (err: any) {
-        console.error("UPLOAD ERROR:", err);
-        alert(err.message || "Failed to upload image.");
-      } finally {
-        setUploadingState(prev => ({ ...prev, [type]: false }));
+      if (error) {
+        console.error("SUPABASE ERROR FULL:", error)
+        throw error
       }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("images")
+        .getPublicUrl(filePath)
+
+      console.log("Public URL:", publicUrlData.publicUrl)
+
+      return publicUrlData.publicUrl
+
+    } catch (err: any) {
+      console.error("FINAL UPLOAD ERROR:", err)
+
+      alert(
+        err?.message ||
+        JSON.stringify(err) ||
+        "Upload failed"
+      )
+
+      return null
     }
+  }
+
+  const handleInputUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'product' | 'face' | 'bg') => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      alert("No file selected");
+      return;
+    }
+    
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File size must be under 10MB");
+      return;
+    }
+
+    setUploadingState(prev => ({ ...prev, [type]: true }));
+    const url = await handleFileUpload(file);
+    if (url) {
+      if (type === 'product') setProductImage(url);
+      if (type === 'face') setFaceImage(url);
+      if (type === 'bg') setBackgroundImage(url);
+      toast.success(`${type} image uploaded successfully`);
+    }
+    setUploadingState(prev => ({ ...prev, [type]: false }));
   };
 
   const handleDownload = (imgUrl: string) => {
@@ -495,7 +517,7 @@ export default function CreatePhotoshootPage() {
                   onClear={() => setProductImage(null)}
                   uploading={uploadingState.product}
                 />
-                <input ref={productInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'product')} />
+                <input ref={productInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleInputUpload(e, 'product')} />
                 
                 {selectedTemplate?.requiresModel && (
                   <div className="bg-[#111] border border-gray-700 rounded-xl p-3 space-y-3">
@@ -529,7 +551,7 @@ export default function CreatePhotoshootPage() {
                   </div>
                 )}
                 {selectedTemplate?.requiresModel && (
-                  <input ref={faceInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'face')} />
+                  <input ref={faceInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleInputUpload(e, 'face')} />
                 )}
 
                 <CompactUploadBox 
@@ -540,7 +562,7 @@ export default function CreatePhotoshootPage() {
                   onClear={() => setBackgroundImage(null)}
                   uploading={uploadingState.bg}
                 />
-                <input ref={bgInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'bg')} />
+                <input ref={bgInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleInputUpload(e, 'bg')} />
               </div>
             </div>
 
