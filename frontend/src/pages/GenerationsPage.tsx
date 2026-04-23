@@ -6,34 +6,43 @@ import { Button } from "@/components/ui/button";
 import { Download, Eye, Images, RefreshCw, FolderOpen, Loader2 } from "lucide-react";
 import { retryGeneration, uploadAsset } from "@/lib/api";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 export default function GenerationsPage() {
   const [generations, setGenerations] = useState<any[]>([]);
-
+  const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState<Record<string, boolean>>({});
 
   const fetchGens = async () => {
     try {
-      const backendGens = await getGenerations();
-      const formattedBackend = (backendGens || []).map((dbGen: any) => ({
-         id: dbGen.id, // Pin atomic hooks directly preventing false duplicates
-         prompt: dbGen.prompt,
-         model: dbGen.shoot_type || dbGen.ai_model,
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      const formatted = (data || []).map(dbGen => ({
+         id: dbGen.id,
+         prompt: dbGen.template,
+         model: "Photoshoot", // Or extract from payload if saved
          created_at: dbGen.created_at,
-         status: dbGen.status,
-         image_urls: dbGen.image_url ? [dbGen.image_url] : [],
-         images: dbGen.image_url ? [dbGen.image_url] : []
+         status: "completed",
+         image_urls: dbGen.image_urls || [],
+         images: dbGen.image_urls || []
       }));
 
-      const localGens = JSON.parse(localStorage.getItem("recent_generations") || "[]");
-      // Merge unique IDs safely
-      const merged = [...localGens, ...formattedBackend].filter((gen, index, self) => 
-         index === self.findIndex((t) => t.id === gen.id)
-      );
-      
-      setGenerations(merged);
+      setGenerations(formatted);
     } catch (err) {
       console.error(err);
+      toast.error("Failed to load generations");
+    } finally {
+      setLoading(false);
     }
   };
 

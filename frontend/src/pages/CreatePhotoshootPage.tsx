@@ -138,6 +138,20 @@ export default function CreatePhotoshootPage() {
   const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<string[]>([]);
   const [imagesUsed, setImagesUsed] = useState(0);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Auth & Usage Fetch
+  useEffect(() => {
+    const fetchAuthAndUsage = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setCurrentUser(session.user);
+        const { data } = await supabase.from('users_usage').select('images_used').eq('user_id', session.user.id).single();
+        if (data) setImagesUsed(data.images_used);
+      }
+    };
+    fetchAuthAndUsage();
+  }, []);
 
   // Safety & Recovery Refs
   const lastRequestRef = useRef<any>(null);
@@ -251,6 +265,12 @@ export default function CreatePhotoshootPage() {
     } else {
       if (!isGenerateReady()) return;
       
+      if (!currentUser) {
+        setError("You must be logged in to generate images.");
+        toast.error("Please log in first");
+        return;
+      }
+      
       payload = {
         template: selectedTemplateId,
         productImage,
@@ -260,7 +280,7 @@ export default function CreatePhotoshootPage() {
         imageCount,
         customPrompt,
         modelType,
-        userId: "demo_user" // Fixed mock user id for backend rate limiting
+        userId: currentUser.id
       };
       // 3. Save Payload Guarantee for Regenerate
       lastRequestRef.current = payload;
