@@ -12,7 +12,7 @@ fal.config({
 const app = express();
 
 app.use(cors({
-  origin: "*",
+  origin: ["https://product-photoshoot-ai.vercel.app", "http://localhost:5173"],
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
@@ -57,39 +57,45 @@ function checkRateLimit(userId: string) {
 
 // ✅ MAIN GENERATION ROUTE
 app.post("/api/generate", async (req, res) => {
+  console.log("=== GENERATE START ===");
+  console.log("BODY:", req.body);
+
   try {
-    console.log("=== GENERATE START ===");
-    console.log("BODY:", req.body);
-
-    const { productImage, prompt } = req.body;
-
-    if (!productImage) throw new Error("Missing product image");
-
-    //--------------------------------------------------
+    const { prompt } = req.body;
 
     const result: any = await fal.subscribe("fal-ai/fast-sdxl", {
       input: {
-        prompt: prompt || "high quality product photography",
-        image_url: productImage,
+        prompt: prompt || "studio product photoshoot",
+        image_size: "square_hd",
       },
     });
 
-    console.log("FAL RESULT:", result);
+    console.log("FAL RAW RESULT:", JSON.stringify(result, null, 2));
 
-    //--------------------------------------------------
+    // 🔥 SAFE EXTRACTION (handles all Fal formats)
+    const images =
+      result?.data?.images ||
+      result?.images ||
+      (result?.image ? [{ url: result.image }] : []);
 
-    if (!result?.images || result.images.length === 0) {
-      throw new Error("Fal returned empty result");
+    if (!images || images.length === 0) {
+      throw new Error("No images returned from Fal");
     }
 
-    return res.json({
-      images: result.images.map((img: any) => img.url),
+    const imageUrls = images.map((img: any) => img.url || img);
+
+    console.log("✅ FINAL IMAGES:", imageUrls);
+
+    return res.status(200).json({
+      success: true,
+      images: imageUrls,
     });
 
   } catch (err: any) {
     console.error("❌ GENERATE ERROR:", err);
 
     return res.status(500).json({
+      success: false,
       error: err.message || "Generation failed",
     });
   }

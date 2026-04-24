@@ -125,7 +125,7 @@ export default function CreatePhotoshootPage() {
 
   // Status & Limits
   const [isGenerating, setIsGenerating] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState("Generating images...");
+  const [loadingMessage, setLoadingMessage] = useState("Generating images... This may take a few seconds");
   const [error, setError] = useState<string>("");
   const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<string[]>([]);
@@ -352,7 +352,7 @@ export default function CreatePhotoshootPage() {
     
     try {
       setIsGenerating(true);
-      setLoadingMessage("Generating images...");
+      setLoadingMessage("Generating images... This may take a few seconds");
       setError("");
       setResults([]);
       
@@ -376,7 +376,7 @@ export default function CreatePhotoshootPage() {
         throw new Error("Session expired");
       }
 
-      console.log("🚀 SENDING PAYLOAD:", payload);
+      console.log("🚀 SENDING PAYLOAD:", { prompt: customPrompt || "studio product photoshoot" });
 
       console.log("🚨 API URL:", import.meta.env.VITE_API_URL);
 
@@ -384,13 +384,15 @@ export default function CreatePhotoshootPage() {
 
       console.log("🚀 FINAL REQUEST:", `${API_URL}/api/generate`);
 
-      const res = await fetch(`${API_URL}/api/generate`, {
+      const response = await fetch(`${API_URL}/api/generate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          prompt: customPrompt || "studio product photoshoot",
+        }),
         signal: controller.signal
       });
 
@@ -398,16 +400,21 @@ export default function CreatePhotoshootPage() {
       clearTimeout(coldStartTimer);
       clearTimeout(slowTimer);
 
-      if (res.status === 403) {
+      if (response.status === 403) {
         throw new Error("Monthly image limit reached");
       }
-      if (!res.ok) throw new Error(`API failure: ${res.status}`);
+      if (!response.ok) throw new Error(`API failure: ${response.status}`);
 
-      const data = await res.json();
-      if (!data || !data.success || !data.images || data.images.length === 0) {
-        throw new Error("Empty response or generation failed");
+      const data = await response.json();
+      
+      // DEBUG
+      console.log("✅ BACKEND RESPONSE:", data);
+
+      if (!data.success || !data.images) {
+        throw new Error(data.error || "Generation failed");
       }
 
+      // ✅ UPDATE UI (CRITICAL LINE)
       setResults(data.images);
       
       // 5. Safe Usage Increment
@@ -431,13 +438,15 @@ export default function CreatePhotoshootPage() {
       }, 300);
 
     } catch (err: any) {
-      let errorMsg = "Generation failed. Try again.";
+      console.error("❌ ERROR:", err);
+      console.error("❌ GENERATION ERROR:", err);
+      let errorMsg = err.message || "Generation failed. Try again.";
       if (err.message === "Monthly image limit reached") errorMsg = err.message;
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
       setIsGenerating(false);
-      setLoadingMessage("Generating images...");
+      setLoadingMessage("Generating images... This may take a few seconds");
     }
   };
 
@@ -705,9 +714,16 @@ export default function CreatePhotoshootPage() {
                     )}
                     
                     {isGenerating && (
-                      <p className="text-sm text-blue-500 mt-4 text-center">
-                        Generating images... This may take a few seconds
-                      </p>
+                      <div className="mt-4">
+                        <p className="text-sm text-gray-400 text-center mb-6">
+                          {loadingMessage}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
+                          {[...Array(imageCount)].map((_, i) => (
+                            <div key={i} className="rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-200 animate-pulse aspect-square"></div>
+                          ))}
+                        </div>
+                      </div>
                     )}
 
                     {!isGenerating && results.length > 0 && (
