@@ -311,6 +311,16 @@ export default function CreatePhotoshootPage() {
     if (useLastRequest && lastRequestRef.current) {
       payload = lastRequestRef.current;
     } else {
+      if (!productImage) {
+        alert("Upload product image first");
+        return;
+      }
+      
+      if (!selectedTemplate) {
+        alert("Select a template first");
+        return;
+      }
+
       if (!isGenerateReady()) return;
       
       if (!currentUser) {
@@ -392,7 +402,9 @@ export default function CreatePhotoshootPage() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          prompt: customPrompt || "studio product photoshoot",
+          prompt: customPrompt,
+          productImage: payload.productImage,
+          template: payload.template,
           imageCount: payload.imageCount,
         }),
         signal: controller.signal

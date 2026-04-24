@@ -61,7 +61,22 @@ app.post("/api/generate", async (req, res) => {
   console.log("BODY:", req.body);
 
   try {
-    const { prompt, imageCount = 1 } = req.body;
+    const { prompt, productImage, template, imageCount = 1 } = req.body;
+
+    // ✅ HARD VALIDATION
+    if (!productImage) {
+      return res.status(400).json({
+        success: false,
+        error: "Product image is required",
+      });
+    }
+
+    if (!template) {
+      return res.status(400).json({
+        success: false,
+        error: "Template is required",
+      });
+    }
 
     // 1. Get user_id from auth
     const authHeader = req.headers.authorization;
@@ -130,11 +145,35 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    // Step 4: Run Generation
+    // ✅ CONTROLLED PROMPT (NO RANDOM DEFAULTS)
+    const basePrompt = `
+Professional ecommerce product photoshoot.
+
+Scene: ${template}
+
+Requirements:
+- clean minimal background
+- centered composition
+- soft studio lighting
+- realistic shadows
+- high detail
+- no extra objects
+- focus on product
+
+Style: commercial photography, 4k, realistic
+`;
+
+    const finalPrompt = prompt?.trim()
+      ? `${basePrompt}\nCustom details: ${prompt}`
+      : basePrompt;
+
+    console.log("FINAL PROMPT:", finalPrompt);
+
+    // ✅ CALL FAL
     const result: any = await fal.subscribe("fal-ai/fast-sdxl", {
       input: {
-        prompt: prompt || "studio product photoshoot",
-        image_size: "square_hd",
+        prompt: finalPrompt,
+        num_images: imageCount || 1,
       },
     });
 
