@@ -12,13 +12,9 @@ fal.config({
 const app = express();
 
 app.use(cors({
-  origin: [
-    "https://product-photoshoot-ai-nu.vercel.app",
-    "http://localhost:5173"
-  ],
+  origin: true, // ✅ allows all origins (prevents Vercel domain issues)
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
 }));
 
 app.use(express.json({ limit: "10mb" }));
