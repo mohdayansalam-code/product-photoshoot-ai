@@ -61,8 +61,69 @@ app.post("/api/generate", async (req, res) => {
   console.log("BODY:", req.body);
 
   try {
-    const { prompt } = req.body;
+    const { prompt, imageCount = 1 } = req.body;
 
+    // 1. Get user_id from auth
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Missing auth header" });
+    }
+    const token = authHeader.split(" ")[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ success: false, error: "Unauthorized: Invalid token" });
+    }
+
+    const userId = user.id;
+
+    // Fetch user usage row
+    let { data: userUsage, error: usageError } = await supabase
+      .from('users_usage')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    const now = new Date();
+
+    // Edge Case 1: First-time user
+    if (!userUsage) {
+      const { data: newUsage, error: insertError } = await supabase
+        .from('users_usage')
+        .insert([{ user_id: userId, images_used: 0, last_reset_date: now.toISOString() }])
+        .select()
+        .single();
+        
+      if (insertError) throw new Error("Failed to initialize user usage");
+      userUsage = newUsage;
+    }
+
+    let images_used = userUsage.images_used || 0;
+    const lastReset = new Date(userUsage.last_reset_date || now);
+
+    // Step 2: Monthly Reset Logic (CRITICAL)
+    const isNewMonth =
+      now.getMonth() !== lastReset.getMonth() ||
+      now.getFullYear() !== lastReset.getFullYear();
+
+    if (isNewMonth) {
+      images_used = 0;
+      await supabase
+        .from('users_usage')
+        .update({ images_used: 0, last_reset_date: now.toISOString() })
+        .eq('user_id', userId);
+    }
+
+    // Step 3: Limit Check
+    const LIMIT = 10;
+    if (images_used + imageCount > LIMIT) {
+      return res.status(403).json({
+        success: false,
+        error: "Monthly limit reached"
+      });
+    }
+
+    // Step 4: Run Generation
     const result: any = await fal.subscribe("fal-ai/fast-sdxl", {
       input: {
         prompt: prompt || "studio product photoshoot",
@@ -72,7 +133,6 @@ app.post("/api/generate", async (req, res) => {
 
     console.log("FAL RAW RESULT:", JSON.stringify(result, null, 2));
 
-    // 🔥 SAFE EXTRACTION (handles all Fal formats)
     const images =
       result?.data?.images ||
       result?.images ||
@@ -86,6 +146,14 @@ app.post("/api/generate", async (req, res) => {
 
     console.log("✅ FINAL IMAGES:", imageUrls);
 
+    // Step 5: Update Usage AFTER success
+    images_used += imageCount;
+    await supabase
+      .from('users_usage')
+      .update({ images_used })
+      .eq('user_id', userId);
+
+    // Step 6: Return Response
     return res.status(200).json({
       success: true,
       images: imageUrls,

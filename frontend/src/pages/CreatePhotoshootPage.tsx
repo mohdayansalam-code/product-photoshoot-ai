@@ -100,7 +100,7 @@ const SIZES = [
   { label: "4:3", name: "Classic" },
 ];
 
-const IMAGE_LIMIT = 30;
+const IMAGE_LIMIT = 10;
 
 export default function CreatePhotoshootPage() {
   // Filters
@@ -345,8 +345,9 @@ export default function CreatePhotoshootPage() {
 
     // Check Limits First (Frontend Double Check)
     if (imagesUsed + payload.imageCount > IMAGE_LIMIT) {
-      setError(`You have reached your monthly image limit of ${IMAGE_LIMIT}.`);
-      toast.error("Monthly image limit reached");
+      const errorMsg = "You reached free limit (10 images). Upgrade coming soon 🚀";
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
     
@@ -388,9 +389,11 @@ export default function CreatePhotoshootPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           prompt: customPrompt || "studio product photoshoot",
+          imageCount: payload.imageCount,
         }),
         signal: controller.signal
       });
@@ -400,7 +403,7 @@ export default function CreatePhotoshootPage() {
       clearTimeout(slowTimer);
 
       if (response.status === 403) {
-        throw new Error("Monthly image limit reached");
+        throw new Error("You reached free limit (10 images). Upgrade coming soon 🚀");
       }
       if (!response.ok) throw new Error(`API failure: ${response.status}`);
 
@@ -440,7 +443,7 @@ export default function CreatePhotoshootPage() {
       console.error("❌ ERROR:", err);
       console.error("❌ GENERATION ERROR:", err);
       let errorMsg = err.message || "Generation failed. Try again.";
-      if (err.message === "Monthly image limit reached") errorMsg = err.message;
+      if (err.message === "You reached free limit (10 images). Upgrade coming soon 🚀") errorMsg = err.message;
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -621,7 +624,7 @@ export default function CreatePhotoshootPage() {
             <div className="pt-2 shrink-0 pb-4">
               <div className="mb-3 text-center">
                 <p className="text-gray-400 text-sm">
-                  {imagesUsed} / 30 images used
+                  {imagesUsed} / 10 images used
                 </p>
               </div>
               
