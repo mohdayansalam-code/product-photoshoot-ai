@@ -89,17 +89,24 @@ app.post("/api/generate", async (req, res) => {
     // Edge Case 1: First-time user
     if (!userUsage) {
       const { data: newUsage, error: insertError } = await supabase
-        .from('users_usage')
-        .insert([{ user_id: userId, images_used: 0, last_reset_date: now.toISOString() }])
+        .from("users_usage")
+        .upsert({
+          user_id: userId,
+          images_used: 0,
+          last_reset: now.toISOString(),
+        })
         .select()
         .single();
         
-      if (insertError) throw new Error("Failed to initialize user usage");
+      if (insertError) {
+        console.error("SUPABASE ERROR:", insertError);
+        throw new Error("Failed to initialize user usage");
+      }
       userUsage = newUsage;
     }
 
     let images_used = userUsage.images_used || 0;
-    const lastReset = new Date(userUsage.last_reset_date || now);
+    const lastReset = new Date(userUsage.last_reset || userUsage.last_reset_date || now);
 
     // Step 2: Monthly Reset Logic (CRITICAL)
     const isNewMonth =
@@ -110,7 +117,7 @@ app.post("/api/generate", async (req, res) => {
       images_used = 0;
       await supabase
         .from('users_usage')
-        .update({ images_used: 0, last_reset_date: now.toISOString() })
+        .update({ images_used: 0, last_reset: now.toISOString() })
         .eq('user_id', userId);
     }
 
