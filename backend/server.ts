@@ -55,6 +55,11 @@ function checkRateLimit(userId: string) {
   return true;
 }
 
+// ✅ HEALTH CHECK ROUTE
+app.get("/", (req, res) => {
+  res.send("API is running...");
+});
+
 // ✅ MAIN GENERATION ROUTE
 app.post("/api/generate", async (req, res) => {
   try {
@@ -172,6 +177,8 @@ ${prompt || ""}
   }
 });
 
-app.listen(10000, () => {
-  console.log("Server running on 10000");
+const PORT = process.env.PORT || 10000;
+
+app.listen(PORT as number, "0.0.0.0", () => {
+  console.log(`Server running on ${PORT}`);
 });
