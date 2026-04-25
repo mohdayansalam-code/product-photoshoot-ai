@@ -154,39 +154,50 @@ app.post("/api/generate", async (req, res) => {
     };
 
     const basePrompt = `
-Professional product photoshoot.
+Use the provided product image as the ONLY subject.
+
+Place this product into a professional product photoshoot.
 
 STRICT RULES:
-- SINGLE product only
-- Centered composition
-- No random objects
-- No empty scenes
-- Clean background
-- Realistic lighting
-- High-end commercial style
+- DO NOT change the product
+- DO NOT replace the product
+- DO NOT generate a new product
+- KEEP the exact shape, color, branding
 
 Scene:
 ${templateMap[template] || template}
 
-Camera:
-- 50mm lens
-- shallow depth of field
+Lighting:
+- realistic shadows under product
+- soft studio lighting
+
+Composition:
+- centered product
+- balanced framing
 
 Quality:
 - ultra realistic
-- 4k
+- ecommerce ready
+- high resolution
+
+NEGATIVE:
+- no extra products
+- no clutter
+- no distortion
 `;
 
     const finalPrompt = prompt?.trim()
-      ? `${basePrompt}\nAdditional details:\n${prompt}`
+      ? `${basePrompt}\nExtra details: ${prompt}`
       : basePrompt;
 
-    console.log("FINAL PROMPT:", finalPrompt);
+    console.log("PRODUCT:", productImage);
+    console.log("PROMPT:", finalPrompt);
 
     // ✅ CALL FAL
-    const result: any = await fal.subscribe("fal-ai/fast-sdxl", {
+    const result: any = await fal.subscribe("fal-ai/flux-kontext-pro", {
       input: {
         prompt: finalPrompt,
+        image_url: productImage,
         num_images: imageCount || 1,
       },
     });
