@@ -742,11 +742,11 @@ export default function CreatePhotoshootPage() {
 
                     {!isGenerating && results.length > 0 && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
-                        {results.map((img, i) => (
+                        {results.map((img: any, i) => (
                           <div key={i} className="relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
-                            <img src={img} alt="Generated result" className="w-full h-auto object-cover" />
+                            <img src={img.url} alt="Generated result" className="w-full h-auto object-cover" />
                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4">
-                              <Button onClick={() => handleDownload(img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-48 shadow-lg">
+                              <Button onClick={() => handleDownload(img.url)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-48 shadow-lg">
                                 <Download className="w-4 h-4 mr-2" /> Download
                               </Button>
                               <Button onClick={() => executeGeneration(true)} className="bg-blue-600 text-white hover:bg-blue-500 rounded-full font-bold w-48 shadow-lg">

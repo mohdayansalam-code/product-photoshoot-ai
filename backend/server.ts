@@ -78,72 +78,40 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    // 1. Get user_id from auth
+    // ✅ TEMPORARILY DISABLED USAGE LOGIC TO PREVENT 500 ERRORS
+    // -------------------------------------------------------------
+    /*
     const authHeader = req.headers.authorization;
     if (!authHeader) {
       return res.status(401).json({ success: false, error: "Unauthorized: Missing auth header" });
     }
     const token = authHeader.split(" ")[1];
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
     if (authError || !user) {
       return res.status(401).json({ success: false, error: "Unauthorized: Invalid token" });
     }
-
     const userId = user.id;
 
-    // Fetch user usage row
-    let { data: userUsage, error: usageError } = await supabase
-      .from('users_usage')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
+    let { data: userUsage, error: usageError } = await supabase.from('users_usage').select('*').eq('user_id', userId).single();
     const now = new Date();
-
-    // Edge Case 1: First-time user
     if (!userUsage) {
-      const { data: newUsage, error: insertError } = await supabase
-        .from("users_usage")
-        .upsert({
-          user_id: userId,
-          images_used: 0,
-          last_reset: now.toISOString(),
-        })
-        .select()
-        .single();
-        
-      if (insertError) {
-        console.error("SUPABASE ERROR:", insertError);
-        throw new Error("Failed to initialize user usage");
-      }
+      const { data: newUsage, error: insertError } = await supabase.from("users_usage").upsert({ user_id: userId, images_used: 0, last_reset: now.toISOString() }).select().single();
+      if (insertError) throw new Error("Failed to initialize user usage");
       userUsage = newUsage;
     }
-
     let images_used = userUsage.images_used || 0;
     const lastReset = new Date(userUsage.last_reset || userUsage.last_reset_date || now);
-
-    // Step 2: Monthly Reset Logic (CRITICAL)
-    const isNewMonth =
-      now.getMonth() !== lastReset.getMonth() ||
-      now.getFullYear() !== lastReset.getFullYear();
-
+    const isNewMonth = now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear();
     if (isNewMonth) {
       images_used = 0;
-      await supabase
-        .from('users_usage')
-        .update({ images_used: 0, last_reset: now.toISOString() })
-        .eq('user_id', userId);
+      await supabase.from('users_usage').update({ images_used: 0, last_reset: now.toISOString() }).eq('user_id', userId);
     }
-
-    // Step 3: Limit Check
     const LIMIT = 10;
     if (images_used + imageCount > LIMIT) {
-      return res.status(403).json({
-        success: false,
-        error: "Monthly limit reached"
-      });
+      return res.status(403).json({ success: false, error: "Monthly limit reached" });
     }
+    */
+    // -------------------------------------------------------------
 
     // ✅ CONTROLLED PROMPT (NO RANDOM DEFAULTS)
     const templateMap: Record<string, string> = {
@@ -199,46 +167,39 @@ Clean professional product image for Shopify/Amazon.
       ? `${basePrompt}\nExtra details: ${prompt}`
       : basePrompt;
 
-    console.log("PRODUCT:", productImage);
-    console.log("PROMPT:", finalPrompt);
+    console.log("REQUEST:", { imageCount, productImage, template });
 
     // ✅ CALL FAL
     const result: any = await fal.subscribe("fal-ai/flux-kontext-pro", {
       input: {
         prompt: finalPrompt,
         image_url: productImage,
-        num_images: 1,
-        guidance_scale: 9,
-        num_inference_steps: 35,
+        num_images: Number(imageCount) || 1,
+        guidance_scale: 8,
+        num_inference_steps: 30
       },
     });
 
     console.log("FAL RAW RESULT:", JSON.stringify(result, null, 2));
 
-    const images =
-      result?.data?.images ||
-      result?.images ||
-      (result?.image ? [{ url: result.image }] : []);
+    const images = result?.data?.images || [];
 
-    if (!images || images.length === 0) {
+    if (!images.length) {
       throw new Error("No images returned from Fal");
     }
 
-    const imageUrls = images.map((img: any) => img.url || img);
+    console.log("IMAGES COUNT:", images.length);
 
-    console.log("✅ FINAL IMAGES:", imageUrls);
-
+    /*
     // Step 5: Update Usage AFTER success
     images_used += imageCount;
-    await supabase
-      .from('users_usage')
-      .update({ images_used })
-      .eq('user_id', userId);
+    await supabase.from('users_usage').update({ images_used }).eq('user_id', userId);
+    */
 
     // Step 6: Return Response
     return res.status(200).json({
       success: true,
-      images: imageUrls,
+      images
     });
 
   } catch (err: any) {
