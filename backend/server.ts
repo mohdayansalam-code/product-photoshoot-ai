@@ -177,8 +177,13 @@ ${prompt || ""}
   }
 });
 
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT;
 
-app.listen(PORT as number, "0.0.0.0", () => {
-  console.log(`Server running on ${PORT}`);
+if (!PORT) {
+  console.error("❌ PORT not found from Render");
+  process.exit(1);
+}
+
+app.listen(Number(PORT), "0.0.0.0", () => {
+  console.log(`✅ Server running on ${PORT}`);
 });
