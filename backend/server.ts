@@ -146,32 +146,62 @@ app.post("/api/generate", async (req, res) => {
     }
 
     // ✅ CONTROLLED PROMPT (NO RANDOM DEFAULTS)
+    const templateMap: Record<string, string> = {
+      editorial: "luxury fashion magazine photoshoot, dramatic lighting, premium studio background",
+      studio: "clean white studio background, soft shadows, minimal setup",
+      streetwear: "urban environment, concrete textures, natural lighting",
+      cosmetics: "soft pastel background, beauty lighting, minimal aesthetic",
+      ecommerce: "plain background, centered product, shadow under product"
+    };
+
     const basePrompt = `
-Professional ecommerce product photoshoot.
+You are a professional product photography AI.
 
-Scene: ${template}
+STRICT RULES:
+- ONLY generate a PRODUCT photoshoot
+- NO random environments without product
+- NO empty scenes
+- PRODUCT must be center focus
 
-Requirements:
-- clean minimal background
-- centered composition
-- soft studio lighting
-- realistic shadows
-- high detail
-- no extra objects
-- focus on product
+Scene: ${templateMap[template] || template}
 
-Style: commercial photography, 4k, realistic
+Lighting:
+- soft shadows
+- studio lighting
+- realistic reflections
+
+Camera:
+- 50mm lens
+- shallow depth of field
+- sharp focus
+
+Quality:
+- ultra realistic
+- 4k
 `;
 
-    const finalPrompt = prompt?.trim()
-      ? `${basePrompt}\nCustom details: ${prompt}`
+    let finalPrompt = prompt?.trim()
+      ? `${basePrompt}\n\nAdditional details:\n${prompt}`
       : basePrompt;
+
+    finalPrompt += `
+
+NEGATIVE PROMPT:
+- no bedroom scenes
+- no furniture unless required
+- no random objects
+- no messy backgrounds
+- no multiple subjects
+- no empty environment
+- no studio equipment visible
+`;
 
     console.log("FINAL PROMPT:", finalPrompt);
 
     // ✅ CALL FAL
     const result: any = await fal.subscribe("fal-ai/fast-sdxl", {
       input: {
+        image_url: productImage,
         prompt: finalPrompt,
         num_images: imageCount || 1,
       },
