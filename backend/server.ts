@@ -64,8 +64,10 @@ app.post("/api/generate", async (req, res) => {
     const { prompt, productImage, template, imageCount = 1 } = req.body;
 
     // ✅ HARD VALIDATION
-    if (!productImage) {
-      return res.status(400).json({ success: false, error: "Missing product image" });
+    if (!productImage || !productImage.includes("supabase.co")) {
+      return res.status(400).json({
+        error: "Invalid or missing product image"
+      });
     }
 
     if (!template) {
@@ -151,6 +153,20 @@ NEGATIVE:
       : basePrompt;
 
     console.log("REQUEST:", { imageCount, productImage, template });
+    console.log("IMAGE RECEIVED:", productImage);
+
+    try {
+      const check = await fetch(productImage, { method: "HEAD" });
+
+      if (!check.ok) {
+        throw new Error("Image not accessible");
+      }
+    } catch (err) {
+      console.error("IMAGE ACCESS ERROR:", err);
+      return res.status(400).json({
+        error: "Product image URL is broken"
+      });
+    }
 
     // ✅ CALL FAL
     const result: any = await fal.subscribe("fal-ai/flux-kontext-pro", {

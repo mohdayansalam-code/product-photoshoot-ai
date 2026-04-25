@@ -234,30 +234,30 @@ export default function CreatePhotoshootPage() {
         throw new Error("User not authenticated")
       }
 
-      const filePath = `${Date.now()}-${file.name}`
-      console.log("Uploading to:", filePath)
+      const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+      console.log("Uploading to:", fileName);
 
       const { data, error } = await supabase.storage
         .from("images")
-        .upload(filePath, file, {
+        .upload(fileName, file, {
           cacheControl: "3600",
-          upsert: false
-        })
-
-      console.log("Upload response:", data)
+          upsert: false,
+        });
 
       if (error) {
-        console.error("SUPABASE ERROR FULL:", error)
-        throw error
+        console.error("UPLOAD ERROR:", error);
+        alert("Upload failed");
+        return null;
       }
 
-      const { data: publicUrlData } = supabase.storage
+      // ✅ IMPORTANT: use EXACT returned path
+      const publicUrl = supabase.storage
         .from("images")
-        .getPublicUrl(filePath)
+        .getPublicUrl(data.path).data.publicUrl;
 
-      console.log("Public URL:", publicUrlData.publicUrl)
+      console.log("FINAL PUBLIC URL:", publicUrl);
 
-      return publicUrlData.publicUrl
+      return publicUrl;
 
     } catch (err: any) {
       console.error("FINAL UPLOAD ERROR:", err)
@@ -311,13 +311,13 @@ export default function CreatePhotoshootPage() {
     if (useLastRequest && lastRequestRef.current) {
       payload = lastRequestRef.current;
     } else {
-      if (!productImage) {
-        alert("Upload product image first");
+      if (!productImage || !productImage.includes("/storage/v1/object/public/images/")) {
+        alert("Invalid product image. Upload again.");
         return;
       }
-      
+
       if (!selectedTemplate) {
-        alert("Select a template first");
+        alert("Select a template");
         return;
       }
 
@@ -387,7 +387,7 @@ export default function CreatePhotoshootPage() {
         throw new Error("Session expired");
       }
 
-      console.log("PRODUCT IMAGE URL:", payload.productImage);
+      console.log("SENDING IMAGE:", payload.productImage);
       console.log("🚀 SENDING PAYLOAD:", { prompt: customPrompt || "studio product photoshoot" });
 
       console.log("🚨 API URL:", import.meta.env.VITE_API_URL);
