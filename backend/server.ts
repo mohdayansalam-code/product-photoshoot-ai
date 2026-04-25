@@ -156,23 +156,22 @@ app.post("/api/generate", async (req, res) => {
     const basePrompt = `
 Use the provided product image as the EXACT and ONLY subject.
 
-STRICT RULES:
-* Preserve 100% identical shape, color, branding
-* Do NOT redesign or alter the product
-* Do NOT generate a new object
+STRICT:
+* Keep product 100% identical (shape, color, branding)
+* Do NOT redesign or alter
+* Do NOT generate new objects
 
 COMPOSITION:
-* Single product only
-* Centered
+* Single centered product
 * No extra objects
 
 SCENE:
-* Minimal premium commercial background based on theme: ${templateMap[template] || template}
-* Clean gradient or soft neutral background only
+* Minimal premium background based on theme: ${templateMap[template] || template}
+* Clean gradient or neutral studio background only
 
 LIGHTING:
 * Soft diffused studio lighting
-* Realistic shadow directly under product
+* Natural shadow under product
 
 CAMERA:
 * 50mm product photography
@@ -180,12 +179,12 @@ CAMERA:
 
 QUALITY:
 * Ultra realistic
+* High-end commercial look
 * E-commerce ready
-* Premium brand advertisement
 
 NEGATIVE:
-* no studio equipment
 * no cameras
+* no lighting equipment
 * no bedroom
 * no humans
 * no clutter
@@ -193,7 +192,7 @@ NEGATIVE:
 * no distortion
 
 OUTPUT:
-Clean professional product image suitable for Shopify/Amazon.
+Clean professional product image for Shopify/Amazon.
 `;
 
     const finalPrompt = prompt?.trim()
