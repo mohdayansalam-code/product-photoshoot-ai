@@ -337,6 +337,8 @@ export default function CreatePhotoshootPage() {
         return;
       }
 
+      const selectedModel = activeCategory === "Fashion" ? "seedream" : "flux";
+
       payload = {
         template: selectedTemplateId,
         productImage,
@@ -347,7 +349,8 @@ export default function CreatePhotoshootPage() {
         customPrompt,
         modelType,
         requiresModel: selectedTemplate?.requiresModel || false,
-        userId: currentUser.id
+        userId: currentUser.id,
+        model: selectedModel
       };
       // 3. Save Payload Guarantee for Regenerate
       lastRequestRef.current = payload;
@@ -400,7 +403,8 @@ export default function CreatePhotoshootPage() {
         productImage: payload.productImage,
         template: payload.template,
         prompt: customPrompt || "",
-        imageCount: payload.imageCount
+        imageCount: payload.imageCount,
+        model: payload.model || "flux"
       };
 
       const response = await fetch(`${API_URL}/api/generate`, {

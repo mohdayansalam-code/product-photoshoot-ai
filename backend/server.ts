@@ -63,7 +63,7 @@ app.get("/", (req, res) => {
 // ✅ MAIN GENERATION ROUTE
 app.post("/api/generate", async (req, res) => {
   try {
-    const { productImage, template, prompt, imageCount } = req.body;
+    const { productImage, template, prompt, imageCount, model: reqModel } = req.body;
 
     // ✅ HARD VALIDATION
     if (!productImage) {
@@ -74,7 +74,7 @@ app.post("/api/generate", async (req, res) => {
       return res.status(400).json({ error: "Missing template" });
     }
 
-    console.log("IMAGE RECEIVED:", productImage);
+    console.log("IMAGE URL:", productImage);
     console.log("COUNT REQUESTED:", imageCount);
 
     // ✅ VERIFY IMAGE ACCESS
@@ -90,43 +90,80 @@ app.post("/api/generate", async (req, res) => {
       ecommerce: "amazon style product, minimal background"
     };
 
-    // ✅ FINAL PROMPT (BALANCED — NOT TOO STRICT)
-    const finalPrompt = `
-Use the provided product image as the main subject.
+    const basePrompt = `
+Use the provided product image as the EXACT subject.
 
-Keep product shape, color, and branding EXACT.
+CRITICAL RULES:
+- Keep the product 100% identical (shape, color, logo, texture)
+- Do NOT redesign, replace, or hallucinate a new product
+- Only ONE product must exist
 
-Scene: ${templateMap[template] || template}
+COMPOSITION:
+- Centered product
+- Clean framing
+- Professional product photography
 
-Lighting: professional studio lighting
-Camera: 50mm lens, sharp focus
+SCENE:
+${templateMap[template] || "minimal premium studio background"}
 
-No distortion, no multiple objects, no humans.
-Clean commercial product photography.
-${prompt || ""}
+LIGHTING:
+- soft studio lighting
+- realistic shadows
+- premium commercial look
+
+STYLE:
+- ecommerce ready
+- Shopify / Amazon quality
+- ultra clean
+- high-end branding aesthetic
+
+NEGATIVE:
+- no humans, no hands
+- no multiple products
+- no clutter or messy background
+- no bedroom / home scenes
+- no visible studio equipment
+- no distortion
+
+IMPORTANT:
+If using variation model, preserve product identity but allow slight stylistic enhancement.
+
+OUTPUT:
+Ultra realistic commercial product photography
 `;
 
-    // ✅ SAFE IMAGE COUNT
-    const count = Math.min(Math.max(Number(imageCount) || 1, 1), 4);
+    const model =
+      reqModel === "seedream"
+        ? "fal-ai/seedream-4.5"
+        : "fal-ai/flux-kontext-pro";
 
-    console.log("FINAL COUNT:", count);
+    const fluxConfig = {
+      prompt: basePrompt,
+      image_url: productImage,
+      num_images: Math.min(Number(imageCount) || 1, 2),
+      guidance_scale: 6,
+      num_inference_steps: 20,
+    };
 
-    // ✅ CALL FAL (IMPORTANT)
+    const seedreamConfig = {
+      prompt: basePrompt + "\nAdd premium cinematic styling and aesthetic composition.",
+      image_url: productImage,
+      num_images: Math.min(Number(imageCount) || 1, 2),
+      guidance_scale: 5,
+      num_inference_steps: 18,
+    };
+
+    const input = reqModel === "seedream" ? seedreamConfig : fluxConfig;
+
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000); // 60s safety
+    const timeout = setTimeout(() => controller.abort(), 120000);
 
     let result: any;
 
     try {
-      result = await fal.subscribe("fal-ai/flux-kontext-pro", {
-        input: {
-          prompt: finalPrompt,
-          image_url: productImage,
-          num_images: count,
-          guidance_scale: 7,
-          num_inference_steps: 28
-        },
-        signal: controller.signal
+      result = await fal.subscribe(model, {
+        input,
+        signal: controller.signal,
       });
     } catch (err) {
       console.error("FAL TIMEOUT OR ERROR:", err);
