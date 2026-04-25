@@ -154,34 +154,55 @@ app.post("/api/generate", async (req, res) => {
     };
 
     const basePrompt = `
-Use the provided product image as the EXACT subject.
+Use the provided product image as the ONLY subject of the image.
 
-STRICT RULES:
-- DO NOT generate a new product
-- DO NOT change product shape, color, branding
-- KEEP the product identical
+CRITICAL RULES:
+* The product MUST remain 100% identical (shape, color, branding)
+* DO NOT generate a new product
+* DO NOT modify or redesign the product
+* DO NOT hallucinate any extra objects
 
-Scene:
-${templateMap[template] || template}
+SCENE REQUIREMENT:
+Create a clean, minimal, high-end commercial product photoshoot.
+Theme: ${templateMap[template] || template}
 
-Composition:
-- centered product
-- realistic shadow under product
+COMPOSITION:
+* Product placed at center
+* Single subject only
+* No background clutter
+* No additional props unless explicitly required
 
-Lighting:
-- soft studio lighting
-- natural reflections
+BACKGROUND:
+* Smooth gradient OR plain studio background
+* Premium look (white, beige, soft tones)
+* No environment like bedroom, studio gear, or random scenes
 
-Style:
-- ultra realistic
-- ecommerce ready
-- clean background
+LIGHTING:
+* Soft diffused lighting
+* Natural shadows under product
+* High-end studio quality
 
-NEGATIVE:
-- no extra products
-- no clutter
-- no distortion
-- no fake objects
+CAMERA:
+* 50mm lens look
+* Sharp focus
+* Professional product photography
+
+STYLE:
+* Ultra realistic
+* E-commerce ready
+* Premium brand advertisement quality
+
+STRICT NEGATIVE:
+* no cameras
+* no lighting equipment
+* no studio setup visible
+* no multiple objects
+* no distortion
+* no messy background
+* no random scene generation
+
+FINAL GOAL:
+Generate a clean, premium, professional product image suitable for Shopify/Amazon listing.
 `;
 
     const finalPrompt = prompt?.trim()
