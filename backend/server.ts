@@ -184,12 +184,6 @@ Only adjust lighting, background, and mood.
 Keep product dominant in frame.
 `;
 
-    // 2. MODEL
-    const selectedModel = reqModel || "standard";
-    const model = selectedModel === "seedream"
-      ? "fal-ai/bytedance/seedream/v4.5/edit"
-      : "fal-ai/flux-2-pro";
-
     // 3. FINAL INPUT CONFIG
     const fluxInput = {
       prompt: fluxPrompt,
@@ -203,47 +197,74 @@ Keep product dominant in frame.
       num_images: 1,
     };
 
-    const input = selectedModel === "seedream" ? seedreamInput : fluxInput;
+    // 4. SMART PIPELINE EXECUTION
+    const runFlux = async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120000);
+      try {
+        let result = await fal.subscribe("fal-ai/flux-2-pro", { input: fluxInput, signal: controller.signal });
+        clearTimeout(timeout);
+        return result;
+      } catch (err) {
+        clearTimeout(timeout);
+        console.log("Flux failed, retrying once...");
+        // Retry once
+        const retryController = new AbortController();
+        const retryTimeout = setTimeout(() => retryController.abort(), 120000);
+        try {
+          let retryResult = await fal.subscribe("fal-ai/flux-2-pro", { input: fluxInput, signal: retryController.signal });
+          clearTimeout(retryTimeout);
+          return retryResult;
+        } catch (retryErr) {
+          clearTimeout(retryTimeout);
+          throw retryErr; // If Flux completely fails, it throws
+        }
+      }
+    };
 
-    // 6. TIMEOUT
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120000);
+    const runSeedream = async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120000);
+      try {
+        let result = await fal.subscribe("fal-ai/bytedance/seedream/v4.5/edit", { input: seedreamInput, signal: controller.signal });
+        clearTimeout(timeout);
+        return result;
+      } catch (err) {
+        clearTimeout(timeout);
+        console.log("Seedream failed. Returning null...");
+        return null; // Seedream failure shouldn't crash the pipeline
+      }
+    };
 
-    // 7. SAFE FALLBACK SYSTEM
-    let result: any;
+    console.log("🚀 Running Smart Pipeline (Flux + Seedream)");
+    const [fluxResult, seedreamResult] = await Promise.allSettled([
+      runFlux(),
+      runSeedream()
+    ]);
 
-    try {
-      result = await fal.subscribe(model, { 
-        input,
-        signal: controller.signal
-      });
-    } catch (err) {
-      console.log("Fallback to flux-2-pro");
-      result = await fal.subscribe("fal-ai/flux-2-pro", { input: fluxInput });
+    const finalImages: { type: string, url: string }[] = [];
+
+    // Extract Flux
+    if (fluxResult.status === "fulfilled" && fluxResult.value) {
+      let url = fluxResult.value.data?.images?.[0]?.url || fluxResult.value.images?.[0]?.url;
+      if (url) finalImages.push({ type: "ecommerce", url });
     }
 
-    clearTimeout(timeout);
-
-    console.log("FAL RAW RESPONSE:", JSON.stringify(result, null, 2));
-
-    // ✅ SAFE RESPONSE EXTRACTION
-    let images =
-      result?.data?.images?.map((img: any) => img.url) ||
-      result?.images?.map((img: any) => img.url) ||
-      [];
-
-    if (!images.length) {
-      throw new Error("No images generated");
+    // Extract Seedream
+    if (seedreamResult.status === "fulfilled" && seedreamResult.value) {
+      let url = seedreamResult.value.data?.images?.[0]?.url || seedreamResult.value.images?.[0]?.url;
+      if (url) finalImages.push({ type: "creative", url });
     }
 
-    // ✅ BEST OF N (Return only the best/first 1)
-    images = [images[0]];
+    if (finalImages.length === 0) {
+      throw new Error("Both models failed to generate images");
+    }
 
-    console.log("FINAL IMAGES COUNT (Returned):", images.length);
+    console.log("✅ FINAL IMAGES RETURNED:", finalImages.length);
 
     return res.json({
       success: true,
-      images
+      images: finalImages
     });
 
   } catch (err: any) {

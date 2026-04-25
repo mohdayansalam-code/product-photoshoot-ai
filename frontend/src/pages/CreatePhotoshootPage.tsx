@@ -130,7 +130,7 @@ export default function CreatePhotoshootPage() {
   const [loadingMessage, setLoadingMessage] = useState("Generating premium images...");
   const [error, setError] = useState<string>("");
   const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
-  const [results, setResults] = useState<string[]>([]);
+  const [results, setResults] = useState<any[]>([]);
   const [imagesUsed, setImagesUsed] = useState(0);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [successMessage, setSuccessMessage] = useState("");
@@ -371,9 +371,7 @@ export default function CreatePhotoshootPage() {
     
     try {
       setIsGenerating(true);
-      const loadingMsg = payload.model === "seedream" 
-        ? "Generating creative premium variations..." 
-        : "Generating high-precision product images...";
+      const loadingMsg = "Generating premium ecommerce and creative ad versions...";
       setLoadingMessage(loadingMsg);
       setError("");
       setResults([]);
@@ -631,14 +629,6 @@ export default function CreatePhotoshootPage() {
                     ))}
                   </select>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-300 text-sm">Image Count</span>
-                  <div className="flex items-center bg-[#0B0B0F] border border-gray-800 rounded-lg overflow-hidden h-7 w-24">
-                    <button onClick={() => setImageCount(Math.max(1, imageCount - 1))} className="flex-1 hover:bg-gray-800 text-gray-400 hover:text-white">-</button>
-                    <span className="w-8 text-sm text-center border-x border-gray-800 text-white flex items-center justify-center h-full">{imageCount}</span>
-                    <button onClick={() => setImageCount(Math.max(1, Math.min(4, imageCount + 1)))} className="flex-1 hover:bg-gray-800 text-gray-400 hover:text-white">+</button>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -778,7 +768,7 @@ export default function CreatePhotoshootPage() {
                           {loadingMessage}
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
-                          {[...Array(imageCount)].map((_, i) => (
+                          {[...Array(2)].map((_, i) => (
                             <div key={i} className="rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-200 animate-pulse aspect-square"></div>
                           ))}
                         </div>
@@ -803,9 +793,9 @@ export default function CreatePhotoshootPage() {
                               
                               {/* After Image */}
                               <div className="w-2/3 relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
-                                <img src={img} alt="Generated result" className="w-full h-full object-cover" />
+                                <img src={img.url || img} alt="Generated result" className="w-full h-full object-cover" />
                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4">
-                                  <Button onClick={() => handleDownload(img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-full max-w-[200px] shadow-lg text-xs h-9">
+                                  <Button onClick={() => handleDownload(img.url || img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-full max-w-[200px] shadow-lg text-xs h-9">
                                     <Download className="w-4 h-4 mr-2" /> Download
                                   </Button>
                                   <Button onClick={() => executeGeneration(true, { varyStyle: true })} className="bg-blue-600 text-white hover:bg-blue-500 rounded-full font-bold w-full max-w-[200px] shadow-lg text-xs h-9 px-2">
@@ -816,12 +806,14 @@ export default function CreatePhotoshootPage() {
                             </div>
                             <div className="px-1 flex flex-col gap-1.5">
                               <span className="text-xs font-bold text-gray-800 uppercase tracking-wider">
-                                {activeCategory === "Fashion" ? "Creative Premium Variation" : "High Precision Product Render"}
+                                {img.type === "ecommerce" ? "Clean Ecommerce Version" : img.type === "creative" ? "Creative Ad Version" : "Generated Result"}
                               </span>
                               <p className="text-[11px] text-gray-500">
-                                {activeCategory === "Fashion" 
-                                  ? "This variation emphasizes aesthetic styling while preserving product identity." 
-                                  : "This image was optimized for clean composition and ecommerce use."}
+                                {img.type === "ecommerce" 
+                                  ? "Optimized for product accuracy and minimal background." 
+                                  : img.type === "creative" 
+                                    ? "Enhanced with premium commercial lighting and styling."
+                                    : "Generated product variant."}
                               </p>
                               <div className="flex items-center gap-2 mt-2">
                                 <Button onClick={() => toast.success("Thanks for the feedback!")} variant="outline" size="sm" className="h-7 text-xs font-semibold rounded-full border-gray-200">
