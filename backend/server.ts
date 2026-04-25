@@ -147,43 +147,41 @@ app.post("/api/generate", async (req, res) => {
 
     // ✅ CONTROLLED PROMPT (NO RANDOM DEFAULTS)
     const templateMap: Record<string, string> = {
-      studio: "clean white studio background, soft shadows, minimal setup",
-      editorial: "luxury fashion photoshoot, dramatic lighting, premium studio",
-      ecommerce: "plain background, centered product, shadow under product",
-      lifestyle: "natural environment, soft lighting, realistic setting"
+      studio: "clean white studio background, soft shadows",
+      editorial: "luxury fashion magazine photoshoot, dramatic lighting",
+      ecommerce: "plain background, centered product, shadow",
+      lifestyle: "realistic environment, natural lighting",
     };
 
     const basePrompt = `
-Use the provided product image as the ONLY subject.
-
-Place this product into a professional product photoshoot.
+Use the provided product image as the EXACT subject.
 
 STRICT RULES:
-- DO NOT change the product
-- DO NOT replace the product
 - DO NOT generate a new product
-- KEEP the exact shape, color, branding
+- DO NOT change product shape, color, branding
+- KEEP the product identical
 
 Scene:
 ${templateMap[template] || template}
 
-Lighting:
-- realistic shadows under product
-- soft studio lighting
-
 Composition:
 - centered product
-- balanced framing
+- realistic shadow under product
 
-Quality:
+Lighting:
+- soft studio lighting
+- natural reflections
+
+Style:
 - ultra realistic
 - ecommerce ready
-- high resolution
+- clean background
 
 NEGATIVE:
 - no extra products
 - no clutter
 - no distortion
+- no fake objects
 `;
 
     const finalPrompt = prompt?.trim()
