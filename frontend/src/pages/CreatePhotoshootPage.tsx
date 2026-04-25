@@ -396,18 +396,20 @@ export default function CreatePhotoshootPage() {
 
       console.log("🚀 FINAL REQUEST:", `${API_URL}/api/generate`);
 
+      const fetchPayload = {
+        productImage: payload.productImage,
+        template: payload.template,
+        prompt: customPrompt || "",
+        imageCount: payload.imageCount
+      };
+
       const response = await fetch(`${API_URL}/api/generate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({
-          productImage: payload.productImage,
-          template: payload.template,
-          prompt: customPrompt || "",
-          imageCount: payload.imageCount,
-        }),
+        body: JSON.stringify(fetchPayload),
         signal: controller.signal
       });
 
@@ -415,12 +417,11 @@ export default function CreatePhotoshootPage() {
       clearTimeout(coldStartTimer);
       clearTimeout(slowTimer);
 
-      if (response.status === 403) {
-        throw new Error("You reached free limit (10 images). Upgrade coming soon 🚀");
-      }
-      if (!response.ok) throw new Error(`API failure: ${response.status}`);
-
       const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Generation failed");
+      }
       
       // DEBUG
       console.log("✅ BACKEND RESPONSE:", data);
@@ -430,7 +431,7 @@ export default function CreatePhotoshootPage() {
       }
 
       // ✅ UPDATE UI (CRITICAL LINE)
-      setResults(data.images);
+      setResults(data.images || []);
       
       // 5. Safe Usage Increment
       setImagesUsed(prev => prev + payload.imageCount);
@@ -745,9 +746,9 @@ export default function CreatePhotoshootPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
                         {results.map((img: any, i) => (
                           <div key={i} className="relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
-                            <img src={img.url} alt="Generated result" className="w-full h-auto object-cover" />
+                            <img src={img} alt="Generated result" className="w-full h-auto object-cover" />
                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4">
-                              <Button onClick={() => handleDownload(img.url)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-48 shadow-lg">
+                              <Button onClick={() => handleDownload(img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-48 shadow-lg">
                                 <Download className="w-4 h-4 mr-2" /> Download
                               </Button>
                               <Button onClick={() => executeGeneration(true)} className="bg-blue-600 text-white hover:bg-blue-500 rounded-full font-bold w-48 shadow-lg">

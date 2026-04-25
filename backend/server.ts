@@ -57,156 +57,92 @@ function checkRateLimit(userId: string) {
 
 // ✅ MAIN GENERATION ROUTE
 app.post("/api/generate", async (req, res) => {
-  console.log("=== GENERATE START ===");
-  console.log("BODY:", req.body);
-
   try {
-    const { prompt, productImage, template, imageCount = 1 } = req.body;
+    const { productImage, template, prompt, imageCount } = req.body;
 
     // ✅ HARD VALIDATION
-    if (!productImage || !productImage.includes("supabase.co")) {
-      return res.status(400).json({
-        error: "Invalid or missing product image"
-      });
+    if (!productImage) {
+      return res.status(400).json({ error: "Missing product image" });
     }
 
     if (!template) {
-      return res.status(400).json({ success: false, error: "Missing template" });
+      return res.status(400).json({ error: "Missing template" });
     }
 
-    // ✅ TEMPORARILY DISABLED USAGE LOGIC TO PREVENT 500 ERRORS
-    // -------------------------------------------------------------
-    /*
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ success: false, error: "Unauthorized: Missing auth header" });
-    }
-    const token = authHeader.split(" ")[1];
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return res.status(401).json({ success: false, error: "Unauthorized: Invalid token" });
-    }
-    const userId = user.id;
+    console.log("IMAGE RECEIVED:", productImage);
+    console.log("COUNT REQUESTED:", imageCount);
 
-    let { data: userUsage, error: usageError } = await supabase.from('users_usage').select('*').eq('user_id', userId).single();
-    const now = new Date();
-    if (!userUsage) {
-      const { data: newUsage, error: insertError } = await supabase.from("users_usage").upsert({ user_id: userId, images_used: 0, last_reset: now.toISOString() }).select().single();
-      if (insertError) throw new Error("Failed to initialize user usage");
-      userUsage = newUsage;
+    // ✅ VERIFY IMAGE ACCESS
+    const check = await fetch(productImage, { method: "HEAD" });
+    if (!check.ok) {
+      return res.status(400).json({ error: "Image not accessible" });
     }
-    let images_used = userUsage.images_used || 0;
-    const lastReset = new Date(userUsage.last_reset || userUsage.last_reset_date || now);
-    const isNewMonth = now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear();
-    if (isNewMonth) {
-      images_used = 0;
-      await supabase.from('users_usage').update({ images_used: 0, last_reset: now.toISOString() }).eq('user_id', userId);
-    }
-    const LIMIT = 10;
-    if (images_used + imageCount > LIMIT) {
-      return res.status(403).json({ success: false, error: "Monthly limit reached" });
-    }
-    */
-    // -------------------------------------------------------------
 
-    // ✅ CONTROLLED PROMPT (NO RANDOM DEFAULTS)
+    // ✅ TEMPLATE MAP (CLEAN)
     const templateMap: Record<string, string> = {
-      studio: "clean white studio background, soft shadows",
-      editorial: "luxury fashion magazine photoshoot, dramatic lighting",
-      ecommerce: "plain background, centered product, shadow",
-      lifestyle: "realistic environment, natural lighting",
+      editorial: "luxury fashion magazine, dramatic lighting",
+      studio: "clean white studio, soft shadows",
+      ecommerce: "amazon style product, minimal background"
     };
 
-    const basePrompt = `
-Use the provided product image as the EXACT subject.
+    // ✅ FINAL PROMPT (BALANCED — NOT TOO STRICT)
+    const finalPrompt = `
+Use the provided product image as the main subject.
 
-STRICT RULES:
-- DO NOT generate a new product
-- DO NOT change product shape, color, branding
-- KEEP the product identical
+Keep product shape, color, and branding EXACT.
 
-Scene:
-${templateMap[template] || template}
+Scene: ${templateMap[template] || template}
 
-Composition:
-- centered product
-- realistic shadow under product
+Lighting: professional studio lighting
+Camera: 50mm lens, sharp focus
 
-Lighting:
-- soft studio lighting
-- natural reflections
-
-Style:
-- ultra realistic
-- ecommerce ready
-- clean background
-
-NEGATIVE:
-- no extra products
-- no clutter
-- no distortion
-- no fake objects
+No distortion, no multiple objects, no humans.
+Clean commercial product photography.
+${prompt || ""}
 `;
 
-    const finalPrompt = prompt?.trim()
-      ? `${basePrompt}\nExtra details: ${prompt}`
-      : basePrompt;
+    // ✅ SAFE IMAGE COUNT
+    const count = Math.min(Math.max(Number(imageCount) || 1, 1), 4);
 
-    console.log("REQUEST:", { imageCount, productImage, template });
-    console.log("IMAGE RECEIVED:", productImage);
+    console.log("FINAL COUNT:", count);
 
-    try {
-      const check = await fetch(productImage, { method: "HEAD" });
-
-      if (!check.ok) {
-        throw new Error("Image not accessible");
-      }
-    } catch (err) {
-      console.error("IMAGE ACCESS ERROR:", err);
-      return res.status(400).json({
-        error: "Product image URL is broken"
-      });
-    }
-
-    // ✅ CALL FAL
+    // ✅ CALL FAL (IMPORTANT)
     const result: any = await fal.subscribe("fal-ai/flux-kontext-pro", {
       input: {
         prompt: finalPrompt,
         image_url: productImage,
-        num_images: Number(imageCount) || 1,
-        guidance_scale: 8,
-        num_inference_steps: 30
-      },
+        num_images: count,
+        guidance_scale: 7,
+        num_inference_steps: 28
+      }
     });
 
-    console.log("FAL RAW RESULT:", JSON.stringify(result, null, 2));
+    console.log("FAL RAW RESPONSE:", JSON.stringify(result, null, 2));
 
-    const images = result?.data?.images || [];
+    // ✅ NORMALIZE RESPONSE (CRITICAL FIX)
+    let images: string[] = [];
 
-    if (!images.length) {
-      throw new Error("No images returned from Fal");
+    if (result?.images && Array.isArray(result.images)) {
+      images = result.images.map((img: any) => img.url || img);
+    } else if (result?.output && Array.isArray(result.output)) {
+      images = result.output.map((img: any) => img.url || img);
+    } else if (result?.data?.images && Array.isArray(result.data.images)) {
+      images = result.data.images.map((img: any) => img.url || img);
+    } else {
+      throw new Error("Invalid Fal response format");
     }
 
-    console.log("IMAGES COUNT:", images.length);
+    console.log("FINAL IMAGES COUNT:", images.length);
 
-    /*
-    // Step 5: Update Usage AFTER success
-    images_used += imageCount;
-    await supabase.from('users_usage').update({ images_used }).eq('user_id', userId);
-    */
-
-    // Step 6: Return Response
-    return res.status(200).json({
+    return res.json({
       success: true,
       images
     });
 
   } catch (err: any) {
     console.error("❌ GENERATE ERROR:", err);
-
     return res.status(500).json({
-      success: false,
-      error: err.message || "Generation failed",
+      error: "Generation failed"
     });
   }
 });
