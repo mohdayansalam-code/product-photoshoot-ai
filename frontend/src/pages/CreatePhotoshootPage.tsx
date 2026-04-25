@@ -562,6 +562,7 @@ export default function CreatePhotoshootPage() {
                   onClear={() => setProductImage(null)}
                   uploading={uploadingState.product}
                 />
+                <p className="text-[10px] text-gray-500 italic mt-1 text-center">Tip: For best results, upload clean product images with simple backgrounds.</p>
                 <input ref={productInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleInputUpload(e, 'product')} />
                 
                 {selectedTemplate?.requiresModel && (
@@ -744,6 +745,11 @@ export default function CreatePhotoshootPage() {
                     
                     {isGenerating && (
                       <div className="mt-4">
+                        <div className="flex justify-center mb-3">
+                          <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                            {activeCategory === "Fashion" ? "Creative Mode" : "High Precision Mode"}
+                          </span>
+                        </div>
                         <p className="text-sm text-gray-400 text-center mb-6">
                           {loadingMessage}
                         </p>
@@ -771,6 +777,12 @@ export default function CreatePhotoshootPage() {
                           </div>
                         ))}
                       </div>
+                    )}
+                    
+                    {!isGenerating && results.length > 0 && (
+                      <p className="text-xs text-gray-400 text-center mt-6">
+                        These images are AI-generated. For best results, try different templates.
+                      </p>
                     )}
                   </motion.div>
                 )}
