@@ -341,7 +341,7 @@ export default function CreatePhotoshootPage() {
         return;
       }
 
-      const selectedModel = activeCategory === "Fashion" ? "creative" : "standard";
+      const selectedModel = activeCategory === "Fashion" ? "seedream" : "standard";
 
       payload = {
         template: selectedTemplateId,
@@ -371,7 +371,7 @@ export default function CreatePhotoshootPage() {
     
     try {
       setIsGenerating(true);
-      const loadingMsg = payload.model === "creative" 
+      const loadingMsg = payload.model === "seedream" 
         ? "Generating creative premium variations..." 
         : "Generating high-precision product images...";
       setLoadingMessage(loadingMsg);

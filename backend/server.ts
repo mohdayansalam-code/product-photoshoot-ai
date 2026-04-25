@@ -77,49 +77,62 @@ app.post("/api/generate", async (req, res) => {
     if (!check.ok) throw new Error("Image not accessible");
 
     const templateMap: Record<string, string> = {
-      editorial: "luxury fashion editorial scene, soft gradients, premium lighting",
-      studio: "clean white studio, soft shadow, minimal aesthetic",
-      ecommerce: "amazon-style product shot, pure background, sharp focus"
+      studio: "clean white studio background with soft gradient and subtle shadow",
+      editorial: "luxury fashion editorial background with soft gradients and premium lighting",
+      streetwear: "urban street environment with natural lighting and realistic depth",
+      luxury: "high-end premium brand scene with dramatic lighting and elegant background",
+      minimal: "minimal clean background with smooth gradient and soft shadow"
     };
 
     // 1. BASE PROMPT
     let basePrompt = `
 Use the provided product image as the EXACT subject.
 
-CRITICAL:
-- Preserve 100% product identity (shape, color, logo, texture)
-- Do NOT redesign, replace, or modify the product
-- Only ONE product in the image
+CRITICAL RULES:
+- The product MUST remain 100% identical
+- Do NOT change shape, color, material, branding, or logo
+- Do NOT redesign or replace the product
+- Only ONE product must exist in the scene
 
 COMPOSITION:
-- centered product
-- clean framing
-- professional product photography
+- Product centered and clearly visible
+- Clean framing with professional product photography angle
+- Maintain original proportions and geometry
 
 SCENE:
 ${templateMap[template] || "minimal premium studio background"}
 
 LIGHTING:
-- soft diffused studio lighting
-- realistic contact shadow under product
-- high-end commercial lighting
+- Soft studio lighting
+- Realistic shadows under product
+- High-end commercial lighting setup
+- Natural reflections based on material
 
 STYLE:
-- ecommerce ready
-- Shopify / Amazon quality
-- ultra clean background
-- sharp focus
+- Ultra realistic
+- High-end commercial photography
+- Ecommerce ready (Amazon / Shopify)
+- Clean background with no clutter
 
-NEGATIVE:
+DETAIL ENHANCEMENT:
+- Sharp focus on product edges and textures
+- Preserve fine material details (metal, glass, fabric, plastic)
+- High clarity, no blur
+- Accurate reflections and highlights
+
+STRICT NEGATIVE:
 - no humans
 - no hands
-- no extra objects
-- no clutter
-- no room scenes
+- no multiple products
+- no random objects
 - no distortion
+- no background clutter
+- no text overlays
+- no logos added or modified
+- no studio equipment visible
 
 OUTPUT:
-ultra realistic, high-end commercial product image
+Professional commercial product photo, premium brand quality, ultra realistic
 `;
 
     // SMART AUGMENTATIONS
@@ -128,22 +141,61 @@ ultra realistic, high-end commercial product image
     if (consistencyMode) basePrompt += "\nMaintain consistent style across multiple generations.";
     if (prompt) basePrompt += "\n\nUser Request: " + prompt;
 
+    // CATEGORY ENHANCEMENT
+    const categoryEnhancer: Record<string, string> = {
+      fashion: "fabric texture detail, soft shadows, lifestyle premium look",
+      cosmetics: "glossy reflections, clean luxury skincare lighting, soft gradients",
+      jewelry: "high sparkle reflections, gemstone shine, metallic highlights"
+    };
+
+    const finalPrompt = `
+${basePrompt}
+
+CATEGORY ENHANCEMENT:
+${categoryEnhancer[category || ""] || ""}
+`;
+
+    // MODEL-SPECIFIC PROMPT BOOST
+    const fluxPrompt = `
+${finalPrompt}
+
+STRICT:
+Maintain exact product identity with ZERO variation.
+Do not modify structure under any condition.
+`;
+
+    const seedreamPrompt = `
+${finalPrompt}
+
+CREATIVE MODE:
+Add premium cinematic styling and background aesthetics.
+
+STRICT:
+Preserve exact product geometry and branding.
+Do NOT alter structure or shape.
+Only enhance environment and lighting.
+`;
+
     // 2. MODEL
     const selectedModel = reqModel || "standard";
-    const model = selectedModel === "creative"
-      ? "fal-ai/flux-dev"
-      : "fal-ai/flux-pro";
+    const model = selectedModel === "seedream"
+      ? "fal-ai/bytedance/seedream/v4.5/edit"
+      : "fal-ai/flux-2-pro";
 
     // 3. FINAL INPUT CONFIG
-    const input = {
-      prompt: basePrompt,
+    const fluxInput = {
+      prompt: fluxPrompt,
       image_url: productImage,
-
       num_images: Math.min(Number(imageCount) || 1, 2),
-
-      guidance_scale: selectedModel === "creative" ? 5 : 6,
-      num_inference_steps: selectedModel === "creative" ? 18 : 22,
     };
+
+    const seedreamInput = {
+      prompt: seedreamPrompt,
+      image_urls: [productImage], // IMPORTANT
+      num_images: Math.min(Number(imageCount) || 1, 2),
+    };
+
+    const input = selectedModel === "seedream" ? seedreamInput : fluxInput;
 
     // 6. TIMEOUT
     const controller = new AbortController();
@@ -158,8 +210,8 @@ ultra realistic, high-end commercial product image
         signal: controller.signal
       });
     } catch (err) {
-      console.log("Fallback to flux-pro");
-      result = await fal.subscribe("fal-ai/flux-pro", { input });
+      console.log("Fallback to flux-2-pro");
+      result = await fal.subscribe("fal-ai/flux-2-pro", { input: fluxInput });
     }
 
     clearTimeout(timeout);
