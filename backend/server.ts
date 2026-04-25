@@ -63,7 +63,7 @@ app.get("/", (req, res) => {
 // ✅ MAIN GENERATION ROUTE
 app.post("/api/generate", async (req, res) => {
   try {
-    const { productImage, template, prompt, imageCount, model: reqModel, category } = req.body;
+    const { productImage, template, prompt, imageCount, model: reqModel, category, varyStyle, improveQuality, consistencyMode } = req.body;
 
     // ✅ HARD VALIDATION
     if (!productImage) throw new Error("Missing product image");
@@ -78,9 +78,9 @@ app.post("/api/generate", async (req, res) => {
 
     // ✅ TEMPLATE MAP (CLEAN)
     const templateMap: Record<string, string> = {
-      editorial: "luxury fashion magazine, dramatic lighting",
-      studio: "clean white studio, soft shadows",
-      ecommerce: "amazon style product, minimal background"
+      editorial: "luxury fashion editorial scene, soft gradients, premium lighting",
+      studio: "clean white studio, soft shadow, minimal aesthetic",
+      ecommerce: "amazon-style product shot, pure background, sharp focus"
     };
 
     const productTypePrompt = `
@@ -163,8 +163,14 @@ Ensure sharpness and professional lighting quality.
     // ✅ MODEL-SPECIFIC CONFIG (Generate 2 for Best-of-N)
     const requestImageCount = 2; // Always generate 2 for best-of-N
 
+    // ✅ DYNAMIC PROMPT AUGMENTATION
+    let augmentPrompt = "";
+    if (varyStyle) augmentPrompt += "\nSlightly vary background composition while preserving product.";
+    if (improveQuality) augmentPrompt += "\nImprove lighting, clarity, and composition.";
+    if (consistencyMode) augmentPrompt += "\nMaintain consistent style across multiple generations.";
+
     const fluxConfig = {
-      prompt: finalPrompt + `\nSTRICT:\nMaintain exact product identity with zero variation.\n` + detailEnhancer,
+      prompt: finalPrompt + augmentPrompt + `\nSTRICT:\nMaintain exact product identity with zero variation.\n` + detailEnhancer,
       image_url: productImage,
       num_images: requestImageCount,
       guidance_scale: guidance,
@@ -172,7 +178,7 @@ Ensure sharpness and professional lighting quality.
     };
 
     const seedreamConfig = {
-      prompt: finalPrompt + `\nAdd cinematic styling and premium composition.\n\nSTRICT:\nPreserve exact product geometry and branding.\nDo not alter structure.\n` + detailEnhancer,
+      prompt: finalPrompt + augmentPrompt + `\nAdd cinematic styling and premium composition.\n\nSTRICT:\nPreserve exact product geometry and branding.\nDo not alter structure.\n` + detailEnhancer,
       image_url: productImage,
       num_images: requestImageCount,
       guidance_scale: guidance,
