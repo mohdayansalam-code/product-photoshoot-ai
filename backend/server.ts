@@ -107,15 +107,30 @@ ${prompt || ""}
     console.log("FINAL COUNT:", count);
 
     // ✅ CALL FAL (IMPORTANT)
-    const result: any = await fal.subscribe("fal-ai/flux-kontext-pro", {
-      input: {
-        prompt: finalPrompt,
-        image_url: productImage,
-        num_images: count,
-        guidance_scale: 7,
-        num_inference_steps: 28
-      }
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000); // 60s safety
+
+    let result: any;
+
+    try {
+      result = await fal.subscribe("fal-ai/flux-kontext-pro", {
+        input: {
+          prompt: finalPrompt,
+          image_url: productImage,
+          num_images: count,
+          guidance_scale: 7,
+          num_inference_steps: 28
+        },
+        signal: controller.signal
+      });
+    } catch (err) {
+      console.error("FAL TIMEOUT OR ERROR:", err);
+      return res.status(500).json({
+        error: "Generation timeout. Try again."
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     console.log("FAL RAW RESPONSE:", JSON.stringify(result, null, 2));
 
@@ -130,6 +145,16 @@ ${prompt || ""}
       images = result.data.images.map((img: any) => img.url || img);
     } else {
       throw new Error("Invalid Fal response format");
+    }
+
+    if (!images || images.length === 0) {
+      return res.status(500).json({
+        error: "No images generated"
+      });
+    }
+
+    if (images.length !== count) {
+      console.warn("⚠ mismatch count:", images.length, "expected:", count);
     }
 
     console.log("FINAL IMAGES COUNT:", images.length);

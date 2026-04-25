@@ -460,6 +460,7 @@ export default function CreatePhotoshootPage() {
       if (err.message === "You reached free limit (10 images). Upgrade coming soon 🚀") errorMsg = err.message;
       setError(errorMsg);
       toast.error(errorMsg);
+      alert(err.message);
     } finally {
       setIsGenerating(false);
       setLoadingMessage("Generating images... This may take a few seconds");
