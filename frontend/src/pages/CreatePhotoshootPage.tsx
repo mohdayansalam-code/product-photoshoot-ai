@@ -432,9 +432,13 @@ export default function CreatePhotoshootPage() {
 
       // ✅ UPDATE UI (CRITICAL LINE)
       setResults(data.images || []);
+
+      if (data.images && data.images.length < payload.imageCount) {
+        alert(`Only ${data.images.length} images generated. Try again for full set.`);
+      }
       
       // 5. Safe Usage Increment
-      setImagesUsed(prev => prev + payload.imageCount);
+      setImagesUsed(prev => prev + (data.images ? data.images.length : payload.imageCount));
       toast.success("Images generated successfully!");
       
       if (timeoutRef.current) {
@@ -460,7 +464,6 @@ export default function CreatePhotoshootPage() {
       if (err.message === "You reached free limit (10 images). Upgrade coming soon 🚀") errorMsg = err.message;
       setError(errorMsg);
       toast.error(errorMsg);
-      alert(err.message);
     } finally {
       setIsGenerating(false);
       setLoadingMessage("Generating images... This may take a few seconds");
@@ -646,7 +649,7 @@ export default function CreatePhotoshootPage() {
               <button 
                 onClick={() => executeGeneration()}
                 disabled={!selectedTemplate || !productImage || (selectedTemplate?.requiresModel && !faceImage) || isGenerating}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
+                className={`w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 ${isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 <Sparkles className="w-4 h-4" /> {isGenerating ? "Generating..." : "Generate Photoshoot"}
               </button>
