@@ -127,7 +127,7 @@ export default function CreatePhotoshootPage() {
 
   // Status & Limits
   const [isGenerating, setIsGenerating] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState("Generating images... This may take a few seconds");
+  const [loadingMessage, setLoadingMessage] = useState("Generating premium images...");
   const [error, setError] = useState<string>("");
   const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<string[]>([]);
@@ -540,19 +540,6 @@ export default function CreatePhotoshootPage() {
 
           <div className={cn("space-y-5 transition-opacity duration-200", selectedTemplate ? "opacity-100" : "opacity-60 pointer-events-none")}>
             
-            <div className="space-y-2 mt-4">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Model</label>
-              <select 
-                value={modelType} 
-                onChange={(e) => setModelType(e.target.value)}
-                className="w-full bg-[#111] border border-gray-700 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-white/30 cursor-pointer"
-              >
-                <option value="auto" className="bg-[#0A0A0A] text-white">Auto (Default)</option>
-                <option value="flux" className="bg-[#0A0A0A] text-white">Flux (Product-focused)</option>
-                <option value="seedream" className="bg-[#0A0A0A] text-white">Seedream (Model-focused)</option>
-              </select>
-            </div>
-
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">References</label>
               
@@ -666,7 +653,7 @@ export default function CreatePhotoshootPage() {
                 disabled={!selectedTemplate || !productImage || (selectedTemplate?.requiresModel && !faceImage) || isGenerating}
                 className={`w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 ${isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                <Sparkles className="w-4 h-4" /> {isGenerating ? "Generating..." : "Generate Photoshoot"}
+                <Sparkles className="w-4 h-4" /> {isGenerating ? "Generating premium images..." : "Generate Product Photos"}
               </button>
               {!productImage && (
                 <p className="text-xs text-red-400 mt-2 text-center">
@@ -681,15 +668,37 @@ export default function CreatePhotoshootPage() {
         {/* MAIN */}
         <div className="flex-1 overflow-y-auto px-8 py-6 w-full custom-scrollbar bg-[#FDFCFB]">
           <div className="max-w-6xl mx-auto">
-            <h1 className="text-2xl font-semibold mb-4">Create Photoshoot</h1>
+            <div className="mb-10 text-center flex flex-col items-center">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-widest mb-4">
+                Loved by 500+ creators
+              </div>
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 mb-6 max-w-3xl leading-tight">
+                Turn your product photos into professional ads instantly
+              </h1>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-sm font-medium text-gray-600">
+                <span className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-blue-500" /> No photoshoot needed</span>
+                <span className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-blue-500" /> No editing skills required</span>
+                <span className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-blue-500" /> Generate high-quality product images in seconds</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+              <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm text-center">
+                <h3 className="font-bold text-gray-900 mb-1">Fashion</h3>
+                <p className="text-xs text-gray-500">Create lifestyle shots for clothing & accessories</p>
+              </div>
+              <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm text-center">
+                <h3 className="font-bold text-gray-900 mb-1">Cosmetics</h3>
+                <p className="text-xs text-gray-500">Generate clean, premium skincare visuals</p>
+              </div>
+              <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm text-center">
+                <h3 className="font-bold text-gray-900 mb-1">Jewelry</h3>
+                <p className="text-xs text-gray-500">Highlight shine, reflections, and luxury detail</p>
+              </div>
+            </div>
 
             {/* Template Section */}
             <div className="mb-6">
-              <div className="mb-4 text-sm text-gray-500">
-                <span className="font-medium text-black">Step 1:</span> Select a style &rarr;
-                <span className="font-medium text-black ml-2">Step 2:</span> Upload images &rarr;
-                <span className="font-medium text-black ml-2">Step 3:</span> Generate
-              </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {filteredTemplates.map(template => (
@@ -778,15 +787,29 @@ export default function CreatePhotoshootPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
                         {results.map((img: any, i) => (
                           <div key={i} className="flex flex-col gap-3">
-                            <div className="relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
-                              <img src={img} alt="Generated result" className="w-full h-auto object-cover" />
-                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4">
-                                <Button onClick={() => handleDownload(img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-56 shadow-lg">
-                                  <Download className="w-4 h-4 mr-2" /> Download
-                                </Button>
-                                <Button onClick={() => executeGeneration(true, { varyStyle: true })} className="bg-blue-600 text-white hover:bg-blue-500 rounded-full font-bold w-56 shadow-lg">
-                                  <RefreshCw className="w-4 h-4 mr-2" /> Try a different style
-                                </Button>
+                            <div className="flex items-center justify-center text-[10px] font-bold text-gray-400 uppercase tracking-widest gap-2 mb-1">
+                               <span>From this</span>
+                               <span className="text-gray-300">→</span>
+                               <span className="text-blue-600">To this in seconds</span>
+                            </div>
+                            <div className="flex gap-2">
+                              {/* Before Image */}
+                              <div className="w-1/3 relative rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white flex-shrink-0 flex items-center justify-center p-2">
+                                <img src={productImage as string} alt="Original product" className="w-full h-full object-contain opacity-80" />
+                                <div className="absolute top-2 left-2 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider backdrop-blur-sm">Raw</div>
+                              </div>
+                              
+                              {/* After Image */}
+                              <div className="w-2/3 relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
+                                <img src={img} alt="Generated result" className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4">
+                                  <Button onClick={() => handleDownload(img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-full max-w-[200px] shadow-lg text-xs h-9">
+                                    <Download className="w-4 h-4 mr-2" /> Download
+                                  </Button>
+                                  <Button onClick={() => executeGeneration(true, { varyStyle: true })} className="bg-blue-600 text-white hover:bg-blue-500 rounded-full font-bold w-full max-w-[200px] shadow-lg text-xs h-9 px-2">
+                                    <RefreshCw className="w-3 h-3 mr-1.5" /> Try different style
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                             <div className="px-1 flex flex-col gap-1.5">
@@ -813,9 +836,14 @@ export default function CreatePhotoshootPage() {
                     )}
                     
                     {!isGenerating && results.length > 0 && (
-                      <p className="text-xs text-gray-400 text-center mt-6">
-                        These images are AI-generated. For best results, try different templates.
-                      </p>
+                      <div className="text-center mt-12 pt-8 border-t border-gray-100">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-full">
+                          <Crown className="w-4 h-4 text-yellow-500" />
+                          <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            Ready for Shopify, Ads, and Social Media
+                          </p>
+                        </div>
+                      </div>
                     )}
                   </motion.div>
                 )}
