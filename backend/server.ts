@@ -88,51 +88,58 @@ app.post("/api/generate", async (req, res) => {
     let basePrompt = `
 Use the provided product image as the EXACT subject.
 
-CRITICAL RULES:
-- The product MUST remain 100% identical
-- Do NOT change shape, color, material, branding, or logo
-- Do NOT redesign or replace the product
-- Only ONE product must exist in the scene
+CRITICAL RULES (NON-NEGOTIABLE):
+- The product must remain 100% identical
+- Do NOT change shape, proportions, materials, or branding
+- Do NOT redesign or generate a new product
+- Only ONE product in the scene
 
-COMPOSITION:
-- Product centered and clearly visible
-- Clean framing with professional product photography angle
-- Maintain original proportions and geometry
+COMPOSITION (STRICT):
+- Product perfectly centered
+- Straight camera angle (slight perspective allowed)
+- Product occupies 60–75% of frame
+- No cropping of product
+- Clean margins around object
 
 SCENE:
-${templateMap[template] || "minimal premium studio background"}
+${templateMap[template] || "minimal premium gradient background"}
 
-LIGHTING:
-- Soft studio lighting
-- Realistic shadows under product
-- High-end commercial lighting setup
+LIGHTING (CONTROLLED):
+- Soft diffused studio lighting
+- Balanced exposure (no overexposure)
+- Realistic shadow directly under product
 - Natural reflections based on material
 
-STYLE:
-- Ultra realistic
-- High-end commercial photography
-- Ecommerce ready (Amazon / Shopify)
-- Clean background with no clutter
+STYLE (COMMERCIAL):
+- Ultra realistic photography
+- High-end brand advertising style
+- Clean ecommerce composition
+- Premium minimal aesthetic
 
-DETAIL ENHANCEMENT:
-- Sharp focus on product edges and textures
-- Preserve fine material details (metal, glass, fabric, plastic)
-- High clarity, no blur
+DETAIL LOCK:
+- Preserve fine textures (metal, leather, glass, plastic)
+- Sharp edges, no blur
 - Accurate reflections and highlights
+- No smoothing or melting of product
+
+BACKGROUND RULES:
+- Background must NOT overpower product
+- Keep depth subtle
+- No clutter or distractions
 
 STRICT NEGATIVE:
 - no humans
 - no hands
 - no multiple products
-- no random objects
+- no floating objects
 - no distortion
-- no background clutter
-- no text overlays
-- no logos added or modified
-- no studio equipment visible
+- no surreal effects
+- no text
+- no logos added
+- no heavy props
 
 OUTPUT:
-Professional commercial product photo, premium brand quality, ultra realistic
+High-end commercial product image, premium ecommerce quality, studio-grade realism
 `;
 
     // SMART AUGMENTATIONS
@@ -143,15 +150,15 @@ Professional commercial product photo, premium brand quality, ultra realistic
 
     // CATEGORY ENHANCEMENT
     const categoryEnhancer: Record<string, string> = {
-      fashion: "fabric texture detail, soft shadows, lifestyle premium look",
-      cosmetics: "glossy reflections, clean luxury skincare lighting, soft gradients",
-      jewelry: "high sparkle reflections, gemstone shine, metallic highlights"
+      fashion: "premium fabric texture, natural folds, soft lifestyle shadows",
+      cosmetics: "glossy reflections, clean skincare aesthetic, soft gradients, luxury packaging lighting",
+      jewelry: "high sparkle reflections, sharp gemstone highlights, metallic shine, luxury lighting"
     };
 
     const finalPrompt = `
 ${basePrompt}
 
-CATEGORY ENHANCEMENT:
+CATEGORY FOCUS:
 ${categoryEnhancer[category || ""] || ""}
 `;
 
@@ -159,21 +166,22 @@ ${categoryEnhancer[category || ""] || ""}
     const fluxPrompt = `
 ${finalPrompt}
 
-STRICT:
-Maintain exact product identity with ZERO variation.
-Do not modify structure under any condition.
+STRICT MODE:
+Absolute product identity preservation.
+Zero structural deviation allowed.
+Prioritize accuracy over creativity.
 `;
 
     const seedreamPrompt = `
 ${finalPrompt}
 
 CREATIVE MODE:
-Add premium cinematic styling and background aesthetics.
+Enhance environment with premium commercial styling.
 
-STRICT:
-Preserve exact product geometry and branding.
-Do NOT alter structure or shape.
-Only enhance environment and lighting.
+CONTROL:
+Do NOT modify product structure.
+Only adjust lighting, background, and mood.
+Keep product dominant in frame.
 `;
 
     // 2. MODEL
@@ -186,13 +194,13 @@ Only enhance environment and lighting.
     const fluxInput = {
       prompt: fluxPrompt,
       image_url: productImage,
-      num_images: Math.min(Number(imageCount) || 1, 2),
+      num_images: 1,
     };
 
     const seedreamInput = {
       prompt: seedreamPrompt,
-      image_urls: [productImage], // IMPORTANT
-      num_images: Math.min(Number(imageCount) || 1, 2),
+      image_urls: [productImage],
+      num_images: 1,
     };
 
     const input = selectedModel === "seedream" ? seedreamInput : fluxInput;

@@ -647,7 +647,7 @@ export default function CreatePhotoshootPage() {
                 <p className="text-gray-400 text-sm">
                   {imagesUsed} / 10 images used
                 </p>
-                <p className="text-[10px] text-yellow-600 mt-1.5 font-medium tracking-wide uppercase">Better input = better output</p>
+                <p className="text-[10px] text-yellow-600 mt-1.5 font-medium tracking-wide uppercase">Upload clean product image for best results</p>
               </div>
               
               <button 
