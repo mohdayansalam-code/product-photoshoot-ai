@@ -87,37 +87,49 @@ app.post("/api/generate", async (req, res) => {
 Use the provided product image as the EXACT subject.
 
 CRITICAL:
-- Preserve 100% identical shape, color, branding
-- Do NOT redesign or replace the product
-- Only ONE product allowed
+- Preserve exact shape, color, branding, proportions
+- Do NOT redesign or replace product
+- Only ONE product
 
 COMPOSITION:
-- Centered product
-- Clean framing
+- centered, hero shot
+- balanced spacing
+- premium framing
 
 SCENE:
 ${templateMap[template] || "minimal premium studio background"}
 
 LIGHTING:
-- soft studio lighting
+- soft diffused lighting
 - realistic shadow under product
+- subtle reflections (if applicable)
 
 STYLE:
-- ecommerce ready
-- high-end commercial look
-- ultra clean background
+- ultra realistic
+- high-end commercial photography
+- luxury brand aesthetic
+- sharp focus, high detail
+
+BACKGROUND:
+- smooth gradient or premium texture
+- no clutter
+- no noise
 
 NEGATIVE:
 - no humans
 - no hands
 - no multiple objects
-- no clutter
-- no bedroom scenes
-- no studio equipment
 - no distortion
+- no cheap lighting
+- no messy backgrounds
 
-OUTPUT:
-Ultra realistic product photography
+FINAL OUTPUT:
+A premium product image suitable for ads, Shopify, and luxury branding.
+`;
+
+    const detailEnhancer = `
+Enhance fine details, material texture, reflections, and edges.
+Ensure sharpness and professional lighting quality.
 `;
 
     // ✅ SMART MODEL ROUTING
@@ -131,7 +143,7 @@ Ultra realistic product photography
 
     // ✅ MODEL-SPECIFIC CONFIG
     const fluxConfig = {
-      prompt: basePrompt,
+      prompt: basePrompt + `\nSTRICT:\nMaintain exact product identity with zero variation.\n` + detailEnhancer,
       image_url: productImage,
       num_images: Math.min(Number(imageCount) || 1, 2),
       guidance_scale: 6,
@@ -139,7 +151,7 @@ Ultra realistic product photography
     };
 
     const seedreamConfig = {
-      prompt: basePrompt + `\nAdd premium cinematic styling.\nSTRICT: preserve exact product geometry and branding.\n`,
+      prompt: basePrompt + `\nAdd cinematic styling and premium composition.\n\nSTRICT:\nPreserve exact product geometry and branding.\nDo not alter structure.\n` + detailEnhancer,
       image_url: productImage,
       num_images: Math.min(Number(imageCount) || 1, 2),
       guidance_scale: 5,
