@@ -350,7 +350,8 @@ export default function CreatePhotoshootPage() {
         modelType,
         requiresModel: selectedTemplate?.requiresModel || false,
         userId: currentUser.id,
-        model: selectedModel
+        model: selectedModel,
+        category: activeCategory.toLowerCase()
       };
       // 3. Save Payload Guarantee for Regenerate
       lastRequestRef.current = payload;
@@ -366,7 +367,10 @@ export default function CreatePhotoshootPage() {
     
     try {
       setIsGenerating(true);
-      setLoadingMessage("Generating images... This may take a few seconds");
+      const loadingMsg = payload.model === "seedream" 
+        ? "Generating creative premium variations..." 
+        : "Generating high-precision product images...";
+      setLoadingMessage(loadingMsg);
       setError("");
       setResults([]);
       
@@ -404,7 +408,8 @@ export default function CreatePhotoshootPage() {
         template: payload.template,
         prompt: customPrompt || "",
         imageCount: payload.imageCount,
-        model: payload.model || "flux"
+        model: payload.model || "flux",
+        category: payload.category || activeCategory.toLowerCase()
       };
 
       const response = await fetch(`${API_URL}/api/generate`, {

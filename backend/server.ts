@@ -63,25 +63,18 @@ app.get("/", (req, res) => {
 // ✅ MAIN GENERATION ROUTE
 app.post("/api/generate", async (req, res) => {
   try {
-    const { productImage, template, prompt, imageCount, model: reqModel } = req.body;
+    const { productImage, template, prompt, imageCount, model: reqModel, category } = req.body;
 
     // ✅ HARD VALIDATION
-    if (!productImage) {
-      return res.status(400).json({ error: "Missing product image" });
-    }
-
-    if (!template) {
-      return res.status(400).json({ error: "Missing template" });
-    }
+    if (!productImage) throw new Error("Missing product image");
+    if (!template) throw new Error("Missing template");
 
     console.log("IMAGE URL:", productImage);
     console.log("COUNT REQUESTED:", imageCount);
 
     // ✅ VERIFY IMAGE ACCESS
     const check = await fetch(productImage, { method: "HEAD" });
-    if (!check.ok) {
-      return res.status(400).json({ error: "Image not accessible" });
-    }
+    if (!check.ok) throw new Error("Image not accessible");
 
     // ✅ TEMPLATE MAP (CLEAN)
     const templateMap: Record<string, string> = {
@@ -93,50 +86,50 @@ app.post("/api/generate", async (req, res) => {
     const basePrompt = `
 Use the provided product image as the EXACT subject.
 
-CRITICAL RULES:
-- Keep the product 100% identical (shape, color, logo, texture)
-- Do NOT redesign, replace, or hallucinate a new product
-- Only ONE product must exist
+CRITICAL:
+- Preserve 100% identical shape, color, branding
+- Do NOT redesign or replace the product
+- Only ONE product allowed
 
 COMPOSITION:
 - Centered product
 - Clean framing
-- Professional product photography
 
 SCENE:
 ${templateMap[template] || "minimal premium studio background"}
 
 LIGHTING:
 - soft studio lighting
-- realistic shadows
-- premium commercial look
+- realistic shadow under product
 
 STYLE:
 - ecommerce ready
-- Shopify / Amazon quality
-- ultra clean
-- high-end branding aesthetic
+- high-end commercial look
+- ultra clean background
 
 NEGATIVE:
-- no humans, no hands
-- no multiple products
-- no clutter or messy background
-- no bedroom / home scenes
-- no visible studio equipment
+- no humans
+- no hands
+- no multiple objects
+- no clutter
+- no bedroom scenes
+- no studio equipment
 - no distortion
 
-IMPORTANT:
-If using variation model, preserve product identity but allow slight stylistic enhancement.
-
 OUTPUT:
-Ultra realistic commercial product photography
+Ultra realistic product photography
 `;
 
-    const model =
-      reqModel === "seedream"
-        ? "fal-ai/seedream-4.5"
-        : "fal-ai/flux-kontext-pro";
+    // ✅ SMART MODEL ROUTING
+    const isStrictCategory = ["cosmetics", "jewelry"].includes((category || "").toLowerCase());
 
+    const model = isStrictCategory
+      ? "fal-ai/flux-kontext-pro"
+      : (reqModel === "seedream"
+          ? "fal-ai/seedream-4.5"
+          : "fal-ai/flux-kontext-pro");
+
+    // ✅ MODEL-SPECIFIC CONFIG
     const fluxConfig = {
       prompt: basePrompt,
       image_url: productImage,
@@ -146,57 +139,60 @@ Ultra realistic commercial product photography
     };
 
     const seedreamConfig = {
-      prompt: basePrompt + "\nAdd premium cinematic styling and aesthetic composition.",
+      prompt: basePrompt + `\nAdd premium cinematic styling.\nSTRICT: preserve exact product geometry and branding.\n`,
       image_url: productImage,
       num_images: Math.min(Number(imageCount) || 1, 2),
       guidance_scale: 5,
       num_inference_steps: 18,
     };
 
-    const input = reqModel === "seedream" ? seedreamConfig : fluxConfig;
+    const input = model === "fal-ai/seedream-4.5" ? seedreamConfig : fluxConfig;
 
+    // ✅ TIMEOUT + ABORT (NO HANGING)
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120000);
 
+    // ✅ RETRY + FALLBACK SYSTEM (CRITICAL)
     let result: any;
+    let attempt = 0;
 
-    try {
-      result = await fal.subscribe(model, {
-        input,
-        signal: controller.signal,
-      });
-    } catch (err) {
-      console.error("FAL TIMEOUT OR ERROR:", err);
-      return res.status(500).json({
-        error: "Generation timeout. Try again."
-      });
-    } finally {
-      clearTimeout(timeout);
+    while (attempt < 2) {
+      try {
+        result = await fal.subscribe(model, {
+          input,
+          signal: controller.signal,
+        });
+
+        if (result?.data?.images?.length > 0 || result?.images?.length > 0) break;
+      } catch (err) {
+        attempt++;
+      }
     }
+
+    if (!result || (!result.data?.images?.length && !result.images?.length)) {
+      // fallback to Flux
+      console.log("FALLING BACK TO FLUX KONTEXT PRO");
+      result = await fal.subscribe("fal-ai/flux-kontext-pro", {
+        input: fluxConfig,
+      });
+    }
+
+    clearTimeout(timeout);
 
     console.log("FAL RAW RESPONSE:", JSON.stringify(result, null, 2));
 
-    // ✅ NORMALIZE RESPONSE (CRITICAL FIX)
-    let images: string[] = [];
+    // ✅ SAFE RESPONSE EXTRACTION
+    const images =
+      result?.data?.images?.map((img: any) => img.url) ||
+      result?.images?.map((img: any) => img.url) ||
+      [];
 
-    if (result?.images && Array.isArray(result.images)) {
-      images = result.images.map((img: any) => img.url || img);
-    } else if (result?.output && Array.isArray(result.output)) {
-      images = result.output.map((img: any) => img.url || img);
-    } else if (result?.data?.images && Array.isArray(result.data.images)) {
-      images = result.data.images.map((img: any) => img.url || img);
-    } else {
-      throw new Error("Invalid Fal response format");
+    if (!images.length) {
+      throw new Error("No images generated");
     }
 
-    if (!images || images.length === 0) {
-      return res.status(500).json({
-        error: "No images generated"
-      });
-    }
-
-    if (images.length !== count) {
-      console.warn("⚠ mismatch count:", images.length, "expected:", count);
+    if (images.length !== Math.min(Number(imageCount) || 1, 2)) {
+      console.warn("⚠ mismatch count:", images.length, "expected:", Math.min(Number(imageCount) || 1, 2));
     }
 
     console.log("FINAL IMAGES COUNT:", images.length);
@@ -209,7 +205,7 @@ Ultra realistic commercial product photography
   } catch (err: any) {
     console.error("❌ GENERATE ERROR:", err);
     return res.status(500).json({
-      error: "Generation failed"
+      error: err.message || "Generation failed"
     });
   }
 });
