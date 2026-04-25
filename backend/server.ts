@@ -147,61 +147,45 @@ app.post("/api/generate", async (req, res) => {
 
     // ✅ CONTROLLED PROMPT (NO RANDOM DEFAULTS)
     const templateMap: Record<string, string> = {
-      editorial: "luxury fashion magazine photoshoot, dramatic lighting, premium studio background",
       studio: "clean white studio background, soft shadows, minimal setup",
-      streetwear: "urban environment, concrete textures, natural lighting",
-      cosmetics: "soft pastel background, beauty lighting, minimal aesthetic",
-      ecommerce: "plain background, centered product, shadow under product"
+      editorial: "luxury fashion photoshoot, dramatic lighting, premium studio",
+      ecommerce: "plain background, centered product, shadow under product",
+      lifestyle: "natural environment, soft lighting, realistic setting"
     };
 
     const basePrompt = `
-You are a professional product photography AI.
+Professional product photoshoot.
 
 STRICT RULES:
-- ONLY generate a PRODUCT photoshoot
-- NO random environments without product
-- NO empty scenes
-- PRODUCT must be center focus
+- SINGLE product only
+- Centered composition
+- No random objects
+- No empty scenes
+- Clean background
+- Realistic lighting
+- High-end commercial style
 
-Scene: ${templateMap[template] || template}
-
-Lighting:
-- soft shadows
-- studio lighting
-- realistic reflections
+Scene:
+${templateMap[template] || template}
 
 Camera:
 - 50mm lens
 - shallow depth of field
-- sharp focus
 
 Quality:
 - ultra realistic
 - 4k
 `;
 
-    let finalPrompt = prompt?.trim()
-      ? `${basePrompt}\n\nAdditional details:\n${prompt}`
+    const finalPrompt = prompt?.trim()
+      ? `${basePrompt}\nAdditional details:\n${prompt}`
       : basePrompt;
-
-    finalPrompt += `
-
-NEGATIVE PROMPT:
-- no bedroom scenes
-- no furniture unless required
-- no random objects
-- no messy backgrounds
-- no multiple subjects
-- no empty environment
-- no studio equipment visible
-`;
 
     console.log("FINAL PROMPT:", finalPrompt);
 
     // ✅ CALL FAL
     const result: any = await fal.subscribe("fal-ai/fast-sdxl", {
       input: {
-        image_url: productImage,
         prompt: finalPrompt,
         num_images: imageCount || 1,
       },

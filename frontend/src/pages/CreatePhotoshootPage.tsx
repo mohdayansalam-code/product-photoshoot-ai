@@ -402,7 +402,7 @@ export default function CreatePhotoshootPage() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          prompt: customPrompt,
+          prompt: customPrompt || "",
           productImage: payload.productImage,
           template: payload.template,
           imageCount: payload.imageCount,
