@@ -387,6 +387,7 @@ export default function CreatePhotoshootPage() {
         throw new Error("Session expired");
       }
 
+      console.log("PRODUCT IMAGE URL:", payload.productImage);
       console.log("🚀 SENDING PAYLOAD:", { prompt: customPrompt || "studio product photoshoot" });
 
       console.log("🚨 API URL:", import.meta.env.VITE_API_URL);
@@ -402,9 +403,9 @@ export default function CreatePhotoshootPage() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          prompt: customPrompt || "",
           productImage: payload.productImage,
           template: payload.template,
+          prompt: customPrompt || "",
           imageCount: payload.imageCount,
         }),
         signal: controller.signal

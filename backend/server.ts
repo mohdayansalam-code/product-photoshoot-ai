@@ -65,17 +65,11 @@ app.post("/api/generate", async (req, res) => {
 
     // ✅ HARD VALIDATION
     if (!productImage) {
-      return res.status(400).json({
-        success: false,
-        error: "Product image is required",
-      });
+      return res.status(400).json({ success: false, error: "Missing product image" });
     }
 
     if (!template) {
-      return res.status(400).json({
-        success: false,
-        error: "Template is required",
-      });
+      return res.status(400).json({ success: false, error: "Missing template" });
     }
 
     // ✅ TEMPORARILY DISABLED USAGE LOGIC TO PREVENT 500 ERRORS
@@ -122,45 +116,34 @@ app.post("/api/generate", async (req, res) => {
     };
 
     const basePrompt = `
-Use the provided product image as the EXACT and ONLY subject.
+Use the provided product image as the EXACT subject.
 
-STRICT:
-* Keep product 100% identical (shape, color, branding)
-* Do NOT redesign or alter
-* Do NOT generate new objects
+STRICT RULES:
+- DO NOT generate a new product
+- DO NOT change product shape, color, branding
+- KEEP the product identical
 
-COMPOSITION:
-* Single centered product
-* No extra objects
+Scene:
+${templateMap[template] || template}
 
-SCENE:
-* Minimal premium background based on theme: ${templateMap[template] || template}
-* Clean gradient or neutral studio background only
+Composition:
+- centered product
+- realistic shadow under product
 
-LIGHTING:
-* Soft diffused studio lighting
-* Natural shadow under product
+Lighting:
+- soft studio lighting
+- natural reflections
 
-CAMERA:
-* 50mm product photography
-* Sharp focus
-
-QUALITY:
-* Ultra realistic
-* High-end commercial look
-* E-commerce ready
+Style:
+- ultra realistic
+- ecommerce ready
+- clean background
 
 NEGATIVE:
-* no cameras
-* no lighting equipment
-* no bedroom
-* no humans
-* no clutter
-* no multiple objects
-* no distortion
-
-OUTPUT:
-Clean professional product image for Shopify/Amazon.
+- no extra products
+- no clutter
+- no distortion
+- no fake objects
 `;
 
     const finalPrompt = prompt?.trim()
