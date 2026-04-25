@@ -253,9 +253,11 @@ export default function CreatePhotoshootPage() {
       }
 
       // ✅ IMPORTANT: use EXACT returned path
-      const publicUrl = supabase.storage
+      const { data: urlData } = supabase.storage
         .from("images")
-        .getPublicUrl(data.path).data.publicUrl;
+        .getPublicUrl(data.path);
+
+      const publicUrl = urlData.publicUrl;
 
       console.log("FINAL PUBLIC URL:", publicUrl);
 
