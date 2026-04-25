@@ -76,144 +76,90 @@ app.post("/api/generate", async (req, res) => {
     const check = await fetch(productImage, { method: "HEAD" });
     if (!check.ok) throw new Error("Image not accessible");
 
-    // ✅ TEMPLATE MAP (CLEAN)
     const templateMap: Record<string, string> = {
       editorial: "luxury fashion editorial scene, soft gradients, premium lighting",
       studio: "clean white studio, soft shadow, minimal aesthetic",
       ecommerce: "amazon-style product shot, pure background, sharp focus"
     };
 
-    const productTypePrompt = `
-Product Type: ${category || "General"}
-
-If jewelry:
-- emphasize reflections, metallic shine, gemstone sparkle
-
-If cosmetics:
-- emphasize smooth surfaces, gloss, premium packaging lighting
-
-If fashion:
-- emphasize material texture, fabric detail, lifestyle composition
-`;
-
-    const finalPrompt = `
+    // 1. BASE PROMPT
+    let basePrompt = `
 Use the provided product image as the EXACT subject.
 
 CRITICAL:
-- Preserve exact shape, color, branding, proportions
-- Do NOT redesign or replace product
-- Only ONE product
-
-${productTypePrompt}
+- Preserve 100% product identity (shape, color, logo, texture)
+- Do NOT redesign, replace, or modify the product
+- Only ONE product in the image
 
 COMPOSITION:
-- centered hero shot
-- premium framing
-- clean spacing
+- centered product
+- clean framing
+- professional product photography
 
 SCENE:
 ${templateMap[template] || "minimal premium studio background"}
 
 LIGHTING:
-- soft diffused lighting
-- realistic shadow under product
-- premium reflections (if applicable)
+- soft diffused studio lighting
+- realistic contact shadow under product
+- high-end commercial lighting
 
 STYLE:
-- ultra realistic
-- luxury commercial photography
-- high-end brand aesthetic
-
-DETAILS:
-- sharp edges
-- clean reflections
-- realistic materials
-- high clarity
+- ecommerce ready
+- Shopify / Amazon quality
+- ultra clean background
+- sharp focus
 
 NEGATIVE:
 - no humans
+- no hands
+- no extra objects
 - no clutter
+- no room scenes
 - no distortion
-- no cheap lighting
-- no messy background
 
 OUTPUT:
-Luxury-level product advertisement image
+ultra realistic, high-end commercial product image
 `;
 
-    const detailEnhancer = `
-Enhance fine details, material texture, reflections, and edges.
-Ensure sharpness and professional lighting quality.
-`;
+    // SMART AUGMENTATIONS
+    if (varyStyle) basePrompt += "\nSlightly vary background composition while preserving product.";
+    if (improveQuality) basePrompt += "\nImprove lighting, clarity, and composition.";
+    if (consistencyMode) basePrompt += "\nMaintain consistent style across multiple generations.";
+    if (prompt) basePrompt += "\n\nUser Request: " + prompt;
 
-    // ✅ SMART MODEL ROUTING
-    const isStrictCategory = ["cosmetics", "jewelry"].includes((category || "").toLowerCase());
+    // 2. MODEL
+    const selectedModel = reqModel || "standard";
+    const model = selectedModel === "creative"
+      ? "fal-ai/flux-dev"
+      : "fal-ai/flux-pro";
 
-    const model = isStrictCategory
-      ? "fal-ai/flux-kontext-pro"
-      : (reqModel === "seedream"
-          ? "fal-ai/seedream-4.5"
-          : "fal-ai/flux-kontext-pro");
-
-    // ✅ QUALITY MODE SWITCH
-    const qualityMode = req.body.qualityMode || "premium"; // default to premium
-    const steps = qualityMode === "premium" ? 24 : 18;
-    const guidance = qualityMode === "premium" ? 6 : 5;
-
-    // ✅ MODEL-SPECIFIC CONFIG (Generate 2 for Best-of-N)
-    const requestImageCount = 2; // Always generate 2 for best-of-N
-
-    // ✅ DYNAMIC PROMPT AUGMENTATION
-    let augmentPrompt = "";
-    if (varyStyle) augmentPrompt += "\nSlightly vary background composition while preserving product.";
-    if (improveQuality) augmentPrompt += "\nImprove lighting, clarity, and composition.";
-    if (consistencyMode) augmentPrompt += "\nMaintain consistent style across multiple generations.";
-
-    const fluxConfig = {
-      prompt: finalPrompt + augmentPrompt + `\nSTRICT:\nMaintain exact product identity with zero variation.\n` + detailEnhancer,
+    // 3. FINAL INPUT CONFIG
+    const input = {
+      prompt: basePrompt,
       image_url: productImage,
-      num_images: requestImageCount,
-      guidance_scale: guidance,
-      num_inference_steps: steps,
+
+      num_images: Math.min(Number(imageCount) || 1, 2),
+
+      guidance_scale: selectedModel === "creative" ? 5 : 6,
+      num_inference_steps: selectedModel === "creative" ? 18 : 22,
     };
 
-    const seedreamConfig = {
-      prompt: finalPrompt + augmentPrompt + `\nAdd cinematic styling and premium composition.\n\nSTRICT:\nPreserve exact product geometry and branding.\nDo not alter structure.\n` + detailEnhancer,
-      image_url: productImage,
-      num_images: requestImageCount,
-      guidance_scale: guidance,
-      num_inference_steps: steps,
-    };
-
-    const input = model === "fal-ai/seedream-4.5" ? seedreamConfig : fluxConfig;
-
-    // ✅ TIMEOUT + ABORT (NO HANGING)
+    // 6. TIMEOUT
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120000);
 
-    // ✅ RETRY + FALLBACK SYSTEM (CRITICAL)
+    // 7. SAFE FALLBACK SYSTEM
     let result: any;
-    let attempt = 0;
 
-    while (attempt < 2) {
-      try {
-        result = await fal.subscribe(model, {
-          input,
-          signal: controller.signal,
-        });
-
-        if (result?.data?.images?.length > 0 || result?.images?.length > 0) break;
-      } catch (err) {
-        attempt++;
-      }
-    }
-
-    if (!result || (!result.data?.images?.length && !result.images?.length)) {
-      // fallback to Flux
-      console.log("FALLING BACK TO FLUX KONTEXT PRO");
-      result = await fal.subscribe("fal-ai/flux-kontext-pro", {
-        input: fluxConfig,
+    try {
+      result = await fal.subscribe(model, { 
+        input,
+        signal: controller.signal
       });
+    } catch (err) {
+      console.log("Fallback to flux-pro");
+      result = await fal.subscribe("fal-ai/flux-pro", { input });
     }
 
     clearTimeout(timeout);

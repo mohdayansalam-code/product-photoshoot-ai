@@ -339,7 +339,7 @@ export default function CreatePhotoshootPage() {
         return;
       }
 
-      const selectedModel = activeCategory === "Fashion" ? "seedream" : "flux";
+      const selectedModel = activeCategory === "Fashion" ? "creative" : "standard";
 
       payload = {
         template: selectedTemplateId,
@@ -369,7 +369,7 @@ export default function CreatePhotoshootPage() {
     
     try {
       setIsGenerating(true);
-      const loadingMsg = payload.model === "seedream" 
+      const loadingMsg = payload.model === "creative" 
         ? "Generating creative premium variations..." 
         : "Generating high-precision product images...";
       setLoadingMessage(loadingMsg);
@@ -410,7 +410,7 @@ export default function CreatePhotoshootPage() {
         template: payload.template,
         prompt: customPrompt || "",
         imageCount: payload.imageCount,
-        model: payload.model || "flux",
+        model: payload.model || "standard",
         category: payload.category || activeCategory.toLowerCase(),
         varyStyle: payload.varyStyle,
         improveQuality: payload.improveQuality
