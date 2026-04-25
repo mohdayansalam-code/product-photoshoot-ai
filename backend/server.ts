@@ -154,55 +154,46 @@ app.post("/api/generate", async (req, res) => {
     };
 
     const basePrompt = `
-Use the provided product image as the ONLY subject of the image.
+Use the provided product image as the EXACT and ONLY subject.
 
-CRITICAL RULES:
-* The product MUST remain 100% identical (shape, color, branding)
-* DO NOT generate a new product
-* DO NOT modify or redesign the product
-* DO NOT hallucinate any extra objects
-
-SCENE REQUIREMENT:
-Create a clean, minimal, high-end commercial product photoshoot.
-Theme: ${templateMap[template] || template}
+STRICT RULES:
+* Preserve 100% identical shape, color, branding
+* Do NOT redesign or alter the product
+* Do NOT generate a new object
 
 COMPOSITION:
-* Product placed at center
-* Single subject only
-* No background clutter
-* No additional props unless explicitly required
+* Single product only
+* Centered
+* No extra objects
 
-BACKGROUND:
-* Smooth gradient OR plain studio background
-* Premium look (white, beige, soft tones)
-* No environment like bedroom, studio gear, or random scenes
+SCENE:
+* Minimal premium commercial background based on theme: ${templateMap[template] || template}
+* Clean gradient or soft neutral background only
 
 LIGHTING:
-* Soft diffused lighting
-* Natural shadows under product
-* High-end studio quality
+* Soft diffused studio lighting
+* Realistic shadow directly under product
 
 CAMERA:
-* 50mm lens look
+* 50mm product photography
 * Sharp focus
-* Professional product photography
 
-STYLE:
+QUALITY:
 * Ultra realistic
 * E-commerce ready
-* Premium brand advertisement quality
+* Premium brand advertisement
 
-STRICT NEGATIVE:
+NEGATIVE:
+* no studio equipment
 * no cameras
-* no lighting equipment
-* no studio setup visible
+* no bedroom
+* no humans
+* no clutter
 * no multiple objects
 * no distortion
-* no messy background
-* no random scene generation
 
-FINAL GOAL:
-Generate a clean, premium, professional product image suitable for Shopify/Amazon listing.
+OUTPUT:
+Clean professional product image suitable for Shopify/Amazon.
 `;
 
     const finalPrompt = prompt?.trim()
