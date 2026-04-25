@@ -735,7 +735,15 @@ export default function CreatePhotoshootPage() {
                     initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} 
                     className="pt-8 border-t border-gray-200 pb-10"
                   >
-                    <h3 className="text-2xl font-semibold mb-6">Generated Results</h3>
+                    <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <h3 className="text-2xl font-semibold">Generated Results</h3>
+                      {!isGenerating && results.length > 0 && (
+                        <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200 shadow-sm">
+                          <Sparkles className="w-4 h-4" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Optimized for ecommerce quality</span>
+                        </div>
+                      )}
+                    </div>
                     
                     {successMessage && (
                       <div className="mb-4 px-4 py-2 rounded-lg bg-green-50 text-green-600 text-sm font-medium transition-opacity duration-300">

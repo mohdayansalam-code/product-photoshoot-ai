@@ -83,7 +83,20 @@ app.post("/api/generate", async (req, res) => {
       ecommerce: "amazon style product, minimal background"
     };
 
-    const basePrompt = `
+    const productTypePrompt = `
+Product Type: ${category || "General"}
+
+If jewelry:
+- emphasize reflections, metallic shine, gemstone sparkle
+
+If cosmetics:
+- emphasize smooth surfaces, gloss, premium packaging lighting
+
+If fashion:
+- emphasize material texture, fabric detail, lifestyle composition
+`;
+
+    const finalPrompt = `
 Use the provided product image as the EXACT subject.
 
 CRITICAL:
@@ -91,10 +104,12 @@ CRITICAL:
 - Do NOT redesign or replace product
 - Only ONE product
 
+${productTypePrompt}
+
 COMPOSITION:
-- centered, hero shot
-- balanced spacing
+- centered hero shot
 - premium framing
+- clean spacing
 
 SCENE:
 ${templateMap[template] || "minimal premium studio background"}
@@ -102,29 +117,28 @@ ${templateMap[template] || "minimal premium studio background"}
 LIGHTING:
 - soft diffused lighting
 - realistic shadow under product
-- subtle reflections (if applicable)
+- premium reflections (if applicable)
 
 STYLE:
 - ultra realistic
-- high-end commercial photography
-- luxury brand aesthetic
-- sharp focus, high detail
+- luxury commercial photography
+- high-end brand aesthetic
 
-BACKGROUND:
-- smooth gradient or premium texture
-- no clutter
-- no noise
+DETAILS:
+- sharp edges
+- clean reflections
+- realistic materials
+- high clarity
 
 NEGATIVE:
 - no humans
-- no hands
-- no multiple objects
+- no clutter
 - no distortion
 - no cheap lighting
-- no messy backgrounds
+- no messy background
 
-FINAL OUTPUT:
-A premium product image suitable for ads, Shopify, and luxury branding.
+OUTPUT:
+Luxury-level product advertisement image
 `;
 
     const detailEnhancer = `
@@ -141,21 +155,28 @@ Ensure sharpness and professional lighting quality.
           ? "fal-ai/seedream-4.5"
           : "fal-ai/flux-kontext-pro");
 
-    // ✅ MODEL-SPECIFIC CONFIG
+    // ✅ QUALITY MODE SWITCH
+    const qualityMode = req.body.qualityMode || "premium"; // default to premium
+    const steps = qualityMode === "premium" ? 24 : 18;
+    const guidance = qualityMode === "premium" ? 6 : 5;
+
+    // ✅ MODEL-SPECIFIC CONFIG (Generate 2 for Best-of-N)
+    const requestImageCount = 2; // Always generate 2 for best-of-N
+
     const fluxConfig = {
-      prompt: basePrompt + `\nSTRICT:\nMaintain exact product identity with zero variation.\n` + detailEnhancer,
+      prompt: finalPrompt + `\nSTRICT:\nMaintain exact product identity with zero variation.\n` + detailEnhancer,
       image_url: productImage,
-      num_images: Math.min(Number(imageCount) || 1, 2),
-      guidance_scale: 6,
-      num_inference_steps: 20,
+      num_images: requestImageCount,
+      guidance_scale: guidance,
+      num_inference_steps: steps,
     };
 
     const seedreamConfig = {
-      prompt: basePrompt + `\nAdd cinematic styling and premium composition.\n\nSTRICT:\nPreserve exact product geometry and branding.\nDo not alter structure.\n` + detailEnhancer,
+      prompt: finalPrompt + `\nAdd cinematic styling and premium composition.\n\nSTRICT:\nPreserve exact product geometry and branding.\nDo not alter structure.\n` + detailEnhancer,
       image_url: productImage,
-      num_images: Math.min(Number(imageCount) || 1, 2),
-      guidance_scale: 5,
-      num_inference_steps: 18,
+      num_images: requestImageCount,
+      guidance_scale: guidance,
+      num_inference_steps: steps,
     };
 
     const input = model === "fal-ai/seedream-4.5" ? seedreamConfig : fluxConfig;
@@ -194,7 +215,7 @@ Ensure sharpness and professional lighting quality.
     console.log("FAL RAW RESPONSE:", JSON.stringify(result, null, 2));
 
     // ✅ SAFE RESPONSE EXTRACTION
-    const images =
+    let images =
       result?.data?.images?.map((img: any) => img.url) ||
       result?.images?.map((img: any) => img.url) ||
       [];
@@ -203,11 +224,10 @@ Ensure sharpness and professional lighting quality.
       throw new Error("No images generated");
     }
 
-    if (images.length !== Math.min(Number(imageCount) || 1, 2)) {
-      console.warn("⚠ mismatch count:", images.length, "expected:", Math.min(Number(imageCount) || 1, 2));
-    }
+    // ✅ BEST OF N (Return only the best/first 1)
+    images = [images[0]];
 
-    console.log("FINAL IMAGES COUNT:", images.length);
+    console.log("FINAL IMAGES COUNT (Returned):", images.length);
 
     return res.json({
       success: true,
