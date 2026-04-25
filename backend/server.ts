@@ -207,7 +207,9 @@ Clean professional product image for Shopify/Amazon.
       input: {
         prompt: finalPrompt,
         image_url: productImage,
-        num_images: imageCount || 1,
+        num_images: 1,
+        guidance_scale: 9,
+        num_inference_steps: 35,
       },
     });
 
