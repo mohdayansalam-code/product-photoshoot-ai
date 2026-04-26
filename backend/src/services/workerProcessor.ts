@@ -117,14 +117,17 @@ export const workerProcessor = {
                 resultImages = [];
 
                 try {
-                    for (let i = 0; i < image_count; i++) {
+                    while (resultImages.length < image_count) {
                         const urls = await generateImageWithFal({ prompt, productImage: image_url });
                         if (urls && urls.length > 0) {
-                            resultImages.push(urls[0]);
+                            resultImages.push(...urls);
                         } else {
                             providerFailed = true;
                             break;
                         }
+                    }
+                    if (resultImages.length > image_count) {
+                        resultImages = resultImages.slice(0, image_count);
                     }
                 } catch (e: any) {
                     logger.error(`Provider error for job ${job.id} [${activeModel}]`, { error: e.message });

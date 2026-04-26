@@ -63,114 +63,267 @@ const aspectMap: Record<string, string> = {
   "4:3": "landscape_4_3"
 };
 
+function extractImages(result: any) {
+  return (
+    result?.data?.images ||
+    result?.images ||
+    result?.output ||
+    []
+  ).map((img: any) => img.url || img);
+}
+
+async function runWithTimeout(promise: Promise<any>, ms = 120000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+
+  try {
+    return await promise;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+const categoryEnhancerMap: Record<string, string> = {
+  fashion: `
+- emphasize fabric texture, folds, stitching
+- premium fashion lighting
+`,
+  cosmetics: `
+- glossy reflections
+- soft gradient lighting
+- skincare commercial style
+`,
+  jewelry: `
+- high sparkle reflections
+- gemstone shine
+- metallic highlights
+- luxury black or gradient background
+`,
+  default: ``
+};
+
 export async function runFalGeneration(options: FalGenerationOptions): Promise<string[]> {
   try {
     console.log("FAL INPUT:", options);
     const { prompt, template, productImage, faceImage, backgroundImage, aspectRatio, imageCount, customPrompt, modelType } = options;
     
+    // 🧱 7. HARD VALIDATION (KEEP THIS ALWAYS)
+    if (!productImage) {
+      throw new Error("Missing product image");
+    }
+
+    const check = await fetch(productImage, { method: "HEAD" }).catch(() => null);
+    if (!check || !check.ok) {
+      throw new Error("Image not accessible");
+    }
+
     // Sanitize user input
     let userPrompt = (template || prompt)?.trim() || "";
     if (userPrompt.length > 200) {
         userPrompt = userPrompt.substring(0, 200);
     }
 
-    if (!TEMPLATE_MAP[userPrompt]) {
-      throw new Error("Invalid template");
-    }
-
-    let basePrompt = TEMPLATE_MAP[userPrompt];
+    let baseScene = TEMPLATE_MAP[userPrompt] || "minimal luxury studio background";
 
     const safePrompt = customPrompt?.trim().slice(0, 200) || "";
     if (safePrompt) {
-      basePrompt = basePrompt + ", " + safePrompt;
+      baseScene = baseScene + ", " + safePrompt;
     }
 
-    // Enforce prompt template
-    const finalPrompt = `Create a professional ecommerce product photoshoot.
+    // Deduce niche from template
+    const niche = userPrompt.split('_')[0];
+    const categoryEnhancer = categoryEnhancerMap[niche?.toLowerCase()] || categoryEnhancerMap.default;
 
-IMPORTANT:
-* Keep the product EXACTLY the same
-* Do not change logo, shape, or color
-* Maintain accurate proportions
-* Preserve branding details
+    const basePrompt = `
+You are a professional commercial product photographer.
 
-Scene:
+TASK:
+Transform the provided product image into a high-end commercial product photo.
+
+-----------------------------------
+🔒 PRODUCT IDENTITY (NON-NEGOTIABLE)
+-----------------------------------
+- The uploaded product is the ONLY subject
+- Preserve EXACT shape, geometry, proportions
+- Preserve EXACT color, material, texture
+- Preserve logo, branding, and details
+- DO NOT redesign or replace the product
+- DO NOT generate a different item
+
+❗ If the product changes in any way → result is invalid
+
+-----------------------------------
+📸 COMPOSITION
+-----------------------------------
+- Single product only
+- Centered or premium composition
+- Clean framing
+- No cropping or deformation
+
+-----------------------------------
+🎨 SCENE
+-----------------------------------
+${baseScene}
+
+-----------------------------------
+💡 LIGHTING
+-----------------------------------
+- Soft professional studio lighting
+- Realistic shadows under product
+- Natural reflections based on material
+
+-----------------------------------
+✨ STYLE
+-----------------------------------
+- High-end commercial photography
+- Shopify / Amazon ready
+- Ultra clean and premium look
+- Sharp focus, high detail
+
+-----------------------------------
+🚫 STRICT NEGATIVE RULES
+-----------------------------------
+- No humans
+- No hands
+- No multiple products
+- No random objects
+- No background clutter
+- No distortion
+- No product replacement
+- No text overlays
+- No watermark
+
+-----------------------------------
+🎯 OUTPUT
+-----------------------------------
+Ultra realistic premium ecommerce product image
+`;
+
+    const fluxPrompt = `
 ${basePrompt}
 
-Style:
-* high-end commercial photography
-* soft lighting
-* realistic shadows
-* sharp focus
-* 4K quality`;
+${categoryEnhancer}
 
-    // Build image_urls dynamically
-    const image_urls = [productImage];
-    if (faceImage) image_urls.push(faceImage);
-    if (backgroundImage) image_urls.push(backgroundImage);
+-----------------------------------
+🔐 FLUX STRICT LOCK
+-----------------------------------
+This is an image-to-image task.
 
-    logger.info(`Starting fal.ai generation with ${image_urls.length} input images.`);
+- The product MUST remain identical
+- DO NOT hallucinate new objects
+- DO NOT replace product with anything else
+- Match exact geometry and proportions
+
+STRICT: this is an image-to-image transformation using the provided image. The output must use the SAME product.
+STRICT: do not generate a different object under any condition.
+
+❗ If output product ≠ input product → FAIL
+
+-----------------------------------
+📦 PRIORITY
+-----------------------------------
+Accuracy over creativity
+Exact product preservation is mandatory
+`;
+
+    const seedreamPrompt = `
+${basePrompt}
+
+${categoryEnhancer}
+
+-----------------------------------
+🎬 CREATIVE ENHANCEMENT
+-----------------------------------
+- Add premium commercial styling
+- Cinematic lighting and shadows
+- Luxury environment matching product type
+
+-----------------------------------
+🔒 PRODUCT SAFETY
+-----------------------------------
+- Keep product shape EXACT
+- Do not modify structure or branding
+- Only enhance environment
+
+-----------------------------------
+📦 PRIORITY
+-----------------------------------
+Creative background + premium lighting
+WITHOUT changing the product
+`;
+
+    logger.info(`Starting fal.ai generation pipeline.`);
     
     let attempt = 0;
     const maxRetries = 2;
 
     while (attempt <= maxRetries) {
         try {
-            // Optional: timeout handling
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("FAL_TIMEOUT")), 60000)
-            );
-
             // Determine image size mapping
             const mappedSize = aspectMap[aspectRatio || "1:1"] || "square";
-            
-            // Optional model switch
-            const safeModel = ["auto", "flux", "seedream"].includes(modelType || "") ? modelType : "auto";
-            const falEndpoint = safeModel === "flux" ? "fal-ai/flux-pro/v1.1" : "fal-ai/bytedance/seedream/v4.5/edit";
 
-            const payload = {
-                prompt: finalPrompt,
-                image_urls,
-                image_url: productImage, // some models use image_url instead of image_urls
-                num_images: imageCount || 2,
-                max_images: imageCount || 2,
+            const fluxConfig = {
+                prompt: fluxPrompt,
+                image_url: productImage,
+                num_images: 1,
+                guidance_scale: 7,        // 🔥 strong lock
+                num_inference_steps: 24,  // 🔥 more control
                 image_size: mappedSize
             };
-            
-            console.log("FAL INPUT:", payload);
 
-            const resultPromise = fal.subscribe(falEndpoint, {
-                input: payload,
-                logs: true,
-                onQueueUpdate: (update) => {
-                    if (update.status === "IN_PROGRESS") {
-                        logger.info(`fal.ai job in progress...`);
-                    }
-                }
-            });
+            const seedreamConfig = {
+                prompt: seedreamPrompt,
+                image_urls: [productImage],
+                num_images: 1,
+                guidance_scale: 5,
+                num_inference_steps: 18,
+                image_size: mappedSize
+            };
 
-            // Race against 60s timeout
-            const result: any = await Promise.race([resultPromise, timeoutPromise]);
+            const jobsPromise = Promise.allSettled([
+                runWithTimeout(fal.subscribe("fal-ai/flux-2-pro", { input: fluxConfig }), 120000),
+                runWithTimeout(fal.subscribe("fal-ai/bytedance/seedream/v4.5/edit", { input: seedreamConfig }), 120000)
+            ]);
+
+            const results: any = await jobsPromise;
             
-            console.log("FAL RAW RESULT:", result);
+            const [fluxResult, seedreamResult] = results;
             
-            if (result && result.images && result.images.length > 0) {
-                const urls = result.images.map((img: any) => img.url);
-                logger.info(`Successfully generated ${urls.length} images from fal.ai`);
-                return urls;
+            const fluxImages = fluxResult.status === "fulfilled"
+                ? extractImages(fluxResult.value)
+                : [];
+                
+            if (fluxResult.status === "rejected") {
+                logger.error("Flux generation failed:", fluxResult.reason);
+            }
+
+            const seedreamImages = seedreamResult.status === "fulfilled"
+                ? extractImages(seedreamResult.value)
+                : [];
+                
+            if (seedreamResult.status === "rejected") {
+                logger.error("Seedream generation failed:", seedreamResult.reason);
+            }
+
+            const finalImages = [
+                fluxImages[0] || null,
+                seedreamImages[0] || null,
+            ].filter(Boolean);
+            
+            if (finalImages.length > 0) {
+                logger.info(`Successfully generated ${finalImages.length} images from fal.ai pipeline`);
+                return finalImages;
             } else {
-                logger.warn(`fal.ai returned empty images on attempt ${attempt + 1}.`);
+                logger.warn(`Both models failed to return images on attempt ${attempt + 1}.`);
+                throw new Error("Both models failed");
             }
         } catch (error: any) {
-            logger.error(`fal.ai API Error on attempt ${attempt + 1}: ${error.message}`, { error });
-            if (error.message === "FAL_TIMEOUT") {
-                logger.error("fal.ai job timed out after 60s.");
-            }
+            logger.error(`fal.ai Pipeline Error on attempt ${attempt + 1}: ${error.message}`, { error });
         }
         
         attempt++;
         if (attempt <= maxRetries) {
-            logger.info(`Retrying fal.ai... (${attempt}/${maxRetries})`);
+            logger.info(`Retrying fal.ai pipeline... (${attempt}/${maxRetries})`);
             await new Promise(r => setTimeout(r, 2000)); // wait 2s before retry
         }
     }

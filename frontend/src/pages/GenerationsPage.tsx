@@ -193,14 +193,20 @@ export default function GenerationsPage() {
             </div>
             <div className="grid grid-cols-4 gap-3">
               {((gen.image_urls || gen.images) || []).map((img: string, i: number) => (
-                <motion.img
-                  key={i}
-                  src={img}
-                  alt=""
-                  className="rounded-lg aspect-square object-cover border border-border"
-                  whileHover={{ scale: 1.03 }}
-                  transition={{ duration: 0.2 }}
-                />
+                <div key={i} className="relative group">
+                  <motion.img
+                    src={img}
+                    alt=""
+                    className="rounded-lg aspect-square object-cover border border-border w-full"
+                    whileHover={{ scale: 1.03 }}
+                    transition={{ duration: 0.2 }}
+                  />
+                  <div className="absolute bottom-2 left-2 right-2 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <span className="bg-black/70 text-white text-[10px] px-2 py-1 rounded-md text-center backdrop-blur-sm truncate">
+                      {i === 0 ? "Accurate Product Image" : i === 1 ? "Creative Marketing Version" : `Variation ${i+1}`}
+                    </span>
+                  </div>
+                </div>
               ))}
             </div>
           </motion.div>

@@ -283,8 +283,8 @@ export default function CreatePhotoshootPage() {
       return;
     }
     
-    if (file.size > 10 * 1024 * 1024) {
-      alert("File size must be under 10MB");
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image too large");
       return;
     }
 
@@ -369,24 +369,28 @@ export default function CreatePhotoshootPage() {
       return;
     }
     
+    let messageInterval: NodeJS.Timeout | null = null;
     try {
       setIsGenerating(true);
-      const loadingMsg = "Generating premium ecommerce and creative ad versions...";
-      setLoadingMessage(loadingMsg);
+      const messages = [
+        "Creating your product photos...",
+        "Optimizing for ecommerce quality...",
+        "Applying premium lighting..."
+      ];
+      setLoadingMessage(messages[0]);
       setError("");
       setResults([]);
       
+      messageInterval = setInterval(() => {
+        setLoadingMessage(prev => {
+          const currentIndex = messages.indexOf(prev);
+          const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % messages.length;
+          return messages[nextIndex];
+        });
+      }, 2500);
+      
       // Mobile UX Fix: Close drawer immediately
       if (isMobilePanelOpen) setIsMobilePanelOpen(false);
-
-      // 4. Soft Messaging via Timers
-      const coldStartTimer = setTimeout(() => {
-        setLoadingMessage("Waking up server, please wait...");
-      }, 5000);
-      
-      const slowTimer = setTimeout(() => {
-        setLoadingMessage("This is taking longer than usual...");
-      }, 20000);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout
@@ -427,8 +431,6 @@ export default function CreatePhotoshootPage() {
       });
 
       clearTimeout(timeoutId);
-      clearTimeout(coldStartTimer);
-      clearTimeout(slowTimer);
 
       const data = await response.json();
 
@@ -439,8 +441,8 @@ export default function CreatePhotoshootPage() {
       // DEBUG
       console.log("✅ BACKEND RESPONSE:", data);
 
-      if (!data.success || !data.images) {
-        throw new Error(data.error || "Generation failed");
+      if (!data.success || !data.images || data.images.length === 0) {
+        throw new Error("No images generated");
       }
 
       // ✅ UPDATE UI (CRITICAL LINE)
@@ -467,7 +469,7 @@ export default function CreatePhotoshootPage() {
       }, 3000);
       
       setTimeout(() => {
-        document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById("results")?.scrollIntoView({ behavior: "smooth" });
       }, 300);
 
     } catch (err: any) {
@@ -479,7 +481,8 @@ export default function CreatePhotoshootPage() {
       toast.error(errorMsg);
     } finally {
       setIsGenerating(false);
-      setLoadingMessage("Generating images... This may take a few seconds");
+      setLoadingMessage("Generating ecommerce + ad version...");
+      if (messageInterval) clearInterval(messageInterval);
     }
   };
 
@@ -553,7 +556,7 @@ export default function CreatePhotoshootPage() {
                   onClear={() => setProductImage(null)}
                   uploading={uploadingState.product}
                 />
-                <p className="text-[10px] text-gray-500 italic mt-1 text-center">Tip: For best results, upload clean product images with simple backgrounds.</p>
+                <p className="text-[10px] text-gray-500 italic mt-1 text-center">👉 Upload clean product image with simple background</p>
                 <input ref={productInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleInputUpload(e, 'product')} />
                 
                 {selectedTemplate?.requiresModel && (
@@ -642,10 +645,10 @@ export default function CreatePhotoshootPage() {
               
               <button 
                 onClick={() => executeGeneration()}
-                disabled={!selectedTemplate || !productImage || (selectedTemplate?.requiresModel && !faceImage) || isGenerating}
+                disabled={isGenerating || !selectedTemplate || !productImage || (selectedTemplate?.requiresModel && !faceImage)}
                 className={`w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 ${isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
               >
-                <Sparkles className="w-4 h-4" /> {isGenerating ? "Generating premium images..." : "Generate Product Photos"}
+                <Sparkles className="w-4 h-4" /> {isGenerating ? "Generating..." : "Generate Product Photos"}
               </button>
               {!productImage && (
                 <p className="text-xs text-red-400 mt-2 text-center">
@@ -758,20 +761,14 @@ export default function CreatePhotoshootPage() {
                     )}
                     
                     {isGenerating && (
-                      <div className="mt-4">
-                        <div className="flex justify-center mb-3">
-                          <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                            {activeCategory === "Fashion" ? "Creative Mode" : "High Precision Mode"}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-400 text-center mb-6">
+                      <div className="flex flex-col items-center justify-center py-10 border border-gray-200 rounded-xl bg-gray-50/50 my-6">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                        <p className="text-lg font-medium text-gray-900">
                           {loadingMessage}
                         </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
-                          {[...Array(2)].map((_, i) => (
-                            <div key={i} className="rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-200 animate-pulse aspect-square"></div>
-                          ))}
-                        </div>
+                        <p className="text-sm text-gray-500 mt-2">
+                          This may take 10–20 seconds
+                        </p>
                       </div>
                     )}
 
@@ -794,7 +791,14 @@ export default function CreatePhotoshootPage() {
                               {/* After Image */}
                               <div className="w-2/3 relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
                                 <img src={img.url || img} alt="Generated result" className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4">
+                                
+                                <div className="absolute top-2 right-2 flex justify-center opacity-100 pointer-events-none z-10">
+                                  <span className="bg-black/70 text-white text-[10px] px-2 py-1 rounded-md text-center backdrop-blur-sm border border-white/10 shadow-sm truncate">
+                                    {i === 0 ? "Accurate Product Image" : i === 1 ? "Creative Marketing Version" : `Variation ${i+1}`}
+                                  </span>
+                                </div>
+
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4 z-20">
                                   <Button onClick={() => handleDownload(img.url || img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-full max-w-[200px] shadow-lg text-xs h-9">
                                     <Download className="w-4 h-4 mr-2" /> Download
                                   </Button>
