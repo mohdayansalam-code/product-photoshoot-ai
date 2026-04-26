@@ -121,8 +121,9 @@ export default function CreatePhotoshootPage() {
   const [modelType, setModelType] = useState("auto");
   const [useModel, setUseModel] = useState(false);
   const [customPrompt, setCustomPrompt] = useState("");
-  const [imageCount, setImageCount] = useState(2);
+  const [imageCount, setImageCount] = useState(1);
   const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [selectedModel, setSelectedModel] = useState("gpt");
   const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
 
   // Status & Limits
@@ -315,8 +316,8 @@ export default function CreatePhotoshootPage() {
     if (useLastRequest && lastRequestRef.current) {
       payload = { ...lastRequestRef.current, ...options };
     } else {
-      if (!productImage || !productImage.includes("/storage/v1/object/public/images/")) {
-        alert("Invalid product image. Upload again.");
+      if (!productImage) {
+        toast.error("Upload product image");
         return;
       }
 
@@ -340,8 +341,6 @@ export default function CreatePhotoshootPage() {
         toast.error("Session expired. Please login again.");
         return;
       }
-
-      const selectedModel = activeCategory === "Fashion" ? "seedream" : "standard";
 
       payload = {
         template: selectedTemplateId,
@@ -392,9 +391,6 @@ export default function CreatePhotoshootPage() {
       // Mobile UX Fix: Close drawer immediately
       if (isMobilePanelOpen) setIsMobilePanelOpen(false);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90000); // 90s timeout
-
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error("Session expired");
@@ -414,7 +410,7 @@ export default function CreatePhotoshootPage() {
         template: payload.template,
         prompt: customPrompt || "",
         imageCount: payload.imageCount,
-        model: payload.model || "standard",
+        model: payload.model || "gpt",
         category: payload.category || activeCategory.toLowerCase(),
         varyStyle: payload.varyStyle,
         improveQuality: payload.improveQuality,
@@ -428,11 +424,8 @@ export default function CreatePhotoshootPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(fetchPayload),
-        signal: controller.signal
+        body: JSON.stringify(fetchPayload)
       });
-
-      clearTimeout(timeoutId);
 
       const data = await response.json();
 
@@ -623,11 +616,37 @@ export default function CreatePhotoshootPage() {
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Settings</label>
               <div className="bg-[#111] border border-gray-700 rounded-xl p-3 space-y-4">
                 <div className="flex items-center justify-between">
+                  <span className="text-gray-300 text-sm">Model</span>
+                  <select 
+                    value={selectedModel} 
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="bg-[#0B0B0F] border border-gray-800 rounded-lg text-gray-300 text-sm px-2 py-1 w-40 focus:outline-none cursor-pointer"
+                  >
+                    <option value="gpt" className="bg-[#0A0A0A]">High Accuracy (GPT Image 2)</option>
+                    <option value="seedream" className="bg-[#0A0A0A]">Creative Mode (Seedream)</option>
+                  </select>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-300 text-sm">Image Count</span>
+                  <select 
+                    value={imageCount} 
+                    onChange={(e) => setImageCount(Number(e.target.value))}
+                    className="bg-[#0B0B0F] border border-gray-800 rounded-lg text-gray-300 text-sm px-2 py-1 w-40 focus:outline-none cursor-pointer"
+                  >
+                    <option value={1} className="bg-[#0A0A0A]">1 Image</option>
+                    <option value={2} className="bg-[#0A0A0A]">2 Images</option>
+                    <option value={3} className="bg-[#0A0A0A]">3 Images</option>
+                    <option value={4} className="bg-[#0A0A0A]">4 Images</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between">
                   <span className="text-gray-300 text-sm">Aspect Ratio</span>
                   <select 
                     value={aspectRatio} 
                     onChange={(e) => setAspectRatio(e.target.value)}
-                    className="bg-[#0B0B0F] border border-gray-800 rounded-lg text-gray-300 text-sm px-2 py-1 w-32 focus:outline-none cursor-pointer"
+                    className="bg-[#0B0B0F] border border-gray-800 rounded-lg text-gray-300 text-sm px-2 py-1 w-40 focus:outline-none cursor-pointer"
                   >
                     {SIZES.map(s => (
                       <option key={s.label} value={s.label} className="bg-[#0A0A0A]">{s.label} — {s.name}</option>

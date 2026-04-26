@@ -99,117 +99,102 @@ app.post("/api/generate", async (req, res) => {
     const selectedBackground = backgroundImage ? "the provided uploaded background image" : (templateMap[template] || "minimal premium gradient background");
 
     let finalPrompt = `
-Use the provided product image as the EXACT subject.
+Use the provided images exactly as inputs.
 
-INPUT PRIORITY:
-1. Product image (MANDATORY)
-2. Model face (if provided → MUST be used)
-3. Background image or selected template (MANDATORY)
+PRIMARY SUBJECT:
+* The product image is the MAIN subject
+* The product must remain 100% identical (shape, color, logo, texture, proportions)
+* Do NOT redesign or replace the product
 
-CRITICAL RULES:
-- Keep product 100% identical (shape, logo, material, proportions)
-- DO NOT replace or redesign product
-- ONLY one product allowed
+FACE USAGE (if provided):
+* The model face MUST be used
+* Place the face naturally in the scene (wearing / holding / aligned with product)
+* Match lighting, color tone, and perspective with the product
+* Do NOT generate a different face
 
-MODEL FACE RULE:
-- If face is provided → MUST appear naturally
-- Match lighting, angle, and perspective
-- Do NOT ignore face
-
-BACKGROUND RULE:
-- Use uploaded background or selected template EXACTLY
-- Do NOT replace background
-- Match lighting with product
+BACKGROUND (if provided):
+* Use the provided background image exactly
+* Do NOT replace or ignore it
+* Match lighting and shadows with the product and face
 
 COMPOSITION:
-- Product clearly visible
-- Clean framing
-- Professional product photography
-
-SCENE/ENVIRONMENT:
-${selectedBackground}
+* Single product only
+* Centered or professionally framed
+* Clean ecommerce or premium ad layout
+* No clutter
 
 LIGHTING:
-- realistic shadows
-- match environment lighting
-- premium commercial look
+* Realistic shadows
+* Consistent lighting across product, face, and background
+* High-end commercial photography look
 
 STYLE:
-- ecommerce ready
-- ad-ready output
-- clean + premium
+* Ecommerce ready
+* Shopify / Ads quality
+* Ultra realistic
+* Sharp focus, high detail
 
 STRICT NEGATIVE:
-- no extra objects
-- no multiple products
-- no distortion
-- no ignoring inputs
-- no random backgrounds
+* no product distortion
+* no changing product design
+* no extra objects
+* no multiple products
+* no random backgrounds
+* no ignoring inputs
 
 OUTPUT:
-High-end commercial product image using ALL provided inputs correctly
+Ultra realistic commercial product image using ALL provided inputs correctly.
 `;
 
     if (prompt) finalPrompt += "\n\nUser Request: " + prompt;
 
     // 3. FINAL INPUT CONFIG
-    const model = "openai/gpt-image-2/edit";
+    const model = req.body.model === "seedream" 
+      ? "fal-ai/bytedance/seedream/v4.5/edit" 
+      : "openai/gpt-image-2/edit";
+
     const input = {
       prompt: finalPrompt,
       image_urls: [
-        productImage,
         ...(modelFace ? [modelFace] : []),
+        productImage,
         ...(backgroundImage ? [backgroundImage] : [])
       ],
       num_images: Math.min(Number(imageCount) || 1, 4)
     };
 
-    const runWithTimeout = (promise: Promise<any>, ms: number) => {
-      let timeoutId: NodeJS.Timeout;
-      const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new Error("Timeout"));
-        }, ms);
-      });
-      return Promise.race([promise, timeoutPromise]).finally(() => {
-        clearTimeout(timeoutId);
-      });
-    };
-
     console.log("🚀 Running Pipeline with model:", model);
     console.log("Input images count:", input.image_urls.length);
+
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Timeout exceeded")), 180000)
+    );
+
+    async function generate() {
+      return await Promise.race([
+        fal.subscribe(model, { input }),
+        timeout
+      ]);
+    }
     
-    let result;
+    let result: any;
     try {
-      result = await runWithTimeout(fal.subscribe(model, { input }), 120000);
+      result = await generate();
     } catch (err) {
-      console.log("Generation failed, retrying once...");
-      try {
-        result = await runWithTimeout(fal.subscribe(model, { input }), 120000);
-      } catch (retryErr) {
-        throw retryErr;
-      }
+      console.log("Retrying...");
+      await new Promise(r => setTimeout(r, 2000));
+      result = await generate();
     }
 
-    const finalImages: { type: string, url: string }[] = [];
+    const images =
+      result?.data?.images ||
+      result?.images ||
+      result?.output ||
+      [];
 
-    if (result && (result.data?.images || result.images)) {
-      const generatedImages = result.data?.images || result.images;
-      for (const img of generatedImages) {
-        if (img.url) finalImages.push({ type: "ecommerce", url: img.url });
-      }
-    }
+    console.log("✅ FINAL IMAGES RETURNED:", images.length);
 
-    if (finalImages.length === 0) {
-      throw new Error("Model failed to generate images");
-    }
-
-    console.log("✅ FINAL IMAGES RETURNED:", finalImages.length);
-
-    return res.json({
-      success: true,
-      images: finalImages
-    });
+    return res.json({ success: true, images });
 
   } catch (err: any) {
     console.error("❌ GENERATE ERROR:", err);

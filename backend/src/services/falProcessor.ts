@@ -72,17 +72,6 @@ function extractImages(result: any) {
   ).map((img: any) => img.url || img);
 }
 
-async function runWithTimeout(promise: Promise<any>, ms = 120000) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), ms);
-
-  try {
-    return await promise;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 const categoryEnhancerMap: Record<string, string> = {
   fashion: `
 - emphasize fabric texture, folds, stitching
@@ -129,99 +118,57 @@ export async function runFalGeneration(options: FalGenerationOptions): Promise<s
     const selectedBackground = backgroundImage ? "the provided uploaded background image" : (baseScene + (safePrompt ? ", " + safePrompt : ""));
 
     let finalPrompt = `
-ULTRA STRICT IMAGE GENERATION — ALL INPUTS MUST BE USED
+Use the provided images exactly as inputs.
 
-INPUT ORDER (CRITICAL):
-- Image 1 = MODEL FACE (if provided)
-- Image 2 = PRODUCT (MANDATORY)
-- Image 3 = BACKGROUND (if provided)
+PRIMARY SUBJECT:
+* The product image is the MAIN subject
+* The product must remain 100% identical (shape, color, logo, texture, proportions)
+* Do NOT redesign or replace the product
 
-================================
+FACE USAGE (if provided):
+* The model face MUST be used
+* Place the face naturally in the scene (wearing / holding / aligned with product)
+* Match lighting, color tone, and perspective with the product
+* Do NOT generate a different face
 
-CORE OBJECTIVE:
-Generate a high-end commercial product image using ALL provided inputs.
+BACKGROUND (if provided):
+* Use the provided background image exactly
+* Do NOT replace or ignore it
+* Match lighting and shadows with the product and face
 
-================================
+COMPOSITION:
+* Single product only
+* Centered or professionally framed
+* Clean ecommerce or premium ad layout
+* No clutter
 
-🔒 PRODUCT LOCK (HIGHEST PRIORITY)
-- The product MUST be EXACTLY the same as input
-- Preserve 100%: shape, logo, proportions, color, material
-- DO NOT redesign, replace, or reinterpret the product
-- If product changes → INVALID OUTPUT
+LIGHTING:
+* Realistic shadows
+* Consistent lighting across product, face, and background
+* High-end commercial photography look
 
-================================
+STYLE:
+* Ecommerce ready
+* Shopify / Ads quality
+* Ultra realistic
+* Sharp focus, high detail
 
-👤 FACE ENFORCEMENT (MANDATORY IF PROVIDED)
-- The FIRST image is the human face — MUST be used
-- The final image MUST include this exact face
-- Face must be:
-  - clearly visible
-  - realistic
-  - properly blended
-- Match lighting, skin tone, angle, perspective
-- DO NOT ignore, crop out, or replace face
-- If face missing → INVALID OUTPUT
+STRICT NEGATIVE:
+* no product distortion
+* no changing product design
+* no extra objects
+* no multiple products
+* no random backgrounds
+* no ignoring inputs
 
-================================
-
-🖼️ BACKGROUND ENFORCEMENT
-- Use provided background or template EXACTLY
-- DO NOT replace with studio/random background
-- Match lighting and depth with subject
-- If background ignored → INVALID OUTPUT
-
-================================
-
-📸 COMPOSITION (VERY IMPORTANT)
-- Show human model wearing / holding / interacting with product
-- Face clearly visible + product clearly visible
-- ONE product only
-- No extra objects
-
-================================
-
-💡 LIGHTING
-- Match lighting across face, product, and background
-- Realistic shadows
-- Premium commercial photography quality
-
-================================
-
-🎯 STYLE
-- Ecommerce + Ad ready
-- Clean, premium, high-end branding
-- Natural, not artificial
-
-================================
-
-🚫 STRICT NEGATIVE RULES
-- no different product
-- no multiple products
-- no ignoring face
-- no ignoring background
-- no distortion
-- no random objects
-- no studio override
-- no cropping out face
-
-================================
-
-FINAL VALIDATION (MUST PASS ALL):
-✔ Product identical  
-✔ Face clearly used  
-✔ Background applied  
-✔ Clean composition  
-
-If ANY condition fails → regenerate correctly
+OUTPUT:
+Ultra realistic commercial product image using ALL provided inputs correctly.
 `;
 
     if (customPrompt) finalPrompt += "\n\nUser Request: " + customPrompt;
 
     logger.info(`Starting fal.ai generation pipeline.`);
     
-    let attempt = 0;
-    const maxRetries = 2;
-
     const model = "openai/gpt-image-2/edit";
     const input = {
       prompt: finalPrompt,
@@ -233,30 +180,36 @@ If ANY condition fails → regenerate correctly
       num_images: Math.min(Number(imageCount) || 1, 4)
     };
 
-    while (attempt <= maxRetries) {
-        try {
-            const result = await runWithTimeout(fal.subscribe(model, { input }), 120000);
-            
-            const extracted = extractImages(result);
-            if (extracted.length > 0) {
-                logger.info(`Successfully generated ${extracted.length} images from fal.ai pipeline`);
-                return extracted;
-            } else {
-                logger.warn(`Model failed to return images on attempt ${attempt + 1}.`);
-                throw new Error("Model failed");
-            }
-        } catch (error: any) {
-            logger.error(`fal.ai Pipeline Error on attempt ${attempt + 1}: ${error.message}`, { error });
-        }
-        
-        attempt++;
-        if (attempt <= maxRetries) {
-            logger.info(`Retrying fal.ai pipeline... (${attempt}/${maxRetries})`);
-            await new Promise(r => setTimeout(r, 2000)); // wait 2s before retry
-        }
+    const generate = async () => {
+      const timeout = new Promise<any>((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout exceeded")), 180000)
+      );
+
+      const result = await Promise.race([
+        fal.subscribe(model, { input }),
+        timeout
+      ]);
+
+      const extracted = extractImages(result);
+      if (extracted.length > 0) {
+        return extracted;
+      } else {
+        throw new Error("Model failed to return images");
+      }
+    };
+
+    let output;
+    try {
+      output = await generate();
+      logger.info(`Successfully generated ${output.length} images from fal.ai pipeline`);
+    } catch (e: any) {
+      logger.warn(`fal.ai Pipeline Error: ${e.message}. Retrying once...`);
+      await new Promise(r => setTimeout(r, 2000)); // wait 2s before retry
+      output = await generate();
+      logger.info(`Successfully generated ${output.length} images from fal.ai pipeline on retry`);
     }
 
-    throw new Error("Generation failed after retries.");
+    return output;
   } catch (err) {
     console.error("❌ FAL ERROR:", err);
     throw err;
