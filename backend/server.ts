@@ -63,11 +63,23 @@ app.get("/", (req, res) => {
 // ✅ MAIN GENERATION ROUTE
 app.post("/api/generate", async (req, res) => {
   try {
-    const { productImage, template, prompt, imageCount, model: reqModel, category, varyStyle, improveQuality, consistencyMode } = req.body;
+    const { 
+      productImage, 
+      template, 
+      prompt, 
+      imageCount, 
+      model: reqModel, 
+      category, 
+      varyStyle, 
+      improveQuality, 
+      consistencyMode,
+      modelFace,
+      backgroundImage
+    } = req.body;
 
     // ✅ HARD VALIDATION
     if (!productImage) throw new Error("Missing product image");
-    if (!template) throw new Error("Missing template");
+    if (!template && !backgroundImage) throw new Error("Missing template or background image");
 
     console.log("IMAGE URL:", productImage);
     console.log("COUNT REQUESTED:", imageCount);
@@ -84,180 +96,112 @@ app.post("/api/generate", async (req, res) => {
       minimal: "minimal clean background with smooth gradient and soft shadow"
     };
 
-    // 1. BASE PROMPT
-    let basePrompt = `
+    const selectedBackground = backgroundImage ? "the provided uploaded background image" : (templateMap[template] || "minimal premium gradient background");
+
+    let finalPrompt = `
 Use the provided product image as the EXACT subject.
 
-CRITICAL RULES (NON-NEGOTIABLE):
-- The product must remain 100% identical
-- Do NOT change shape, proportions, materials, or branding
-- Do NOT redesign or generate a new product
-- Only ONE product in the scene
+INPUT PRIORITY:
+1. Product image (MANDATORY)
+2. Model face (if provided → MUST be used)
+3. Background image or selected template (MANDATORY)
 
-COMPOSITION (STRICT):
-- Product perfectly centered
-- Straight camera angle (slight perspective allowed)
-- Product occupies 60–75% of frame
-- No cropping of product
-- Clean margins around object
+CRITICAL RULES:
+- Keep product 100% identical (shape, logo, material, proportions)
+- DO NOT replace or redesign product
+- ONLY one product allowed
 
-SCENE:
-${templateMap[template] || "minimal premium gradient background"}
+MODEL FACE RULE:
+- If face is provided → MUST appear naturally
+- Match lighting, angle, and perspective
+- Do NOT ignore face
 
-LIGHTING (CONTROLLED):
-- Soft diffused studio lighting
-- Balanced exposure (no overexposure)
-- Realistic shadow directly under product
-- Natural reflections based on material
+BACKGROUND RULE:
+- Use uploaded background or selected template EXACTLY
+- Do NOT replace background
+- Match lighting with product
 
-STYLE (COMMERCIAL):
-- Ultra realistic photography
-- High-end brand advertising style
-- Clean ecommerce composition
-- Premium minimal aesthetic
+COMPOSITION:
+- Product clearly visible
+- Clean framing
+- Professional product photography
 
-DETAIL LOCK:
-- Preserve fine textures (metal, leather, glass, plastic)
-- Sharp edges, no blur
-- Accurate reflections and highlights
-- No smoothing or melting of product
+SCENE/ENVIRONMENT:
+${selectedBackground}
 
-BACKGROUND RULES:
-- Background must NOT overpower product
-- Keep depth subtle
-- No clutter or distractions
+LIGHTING:
+- realistic shadows
+- match environment lighting
+- premium commercial look
+
+STYLE:
+- ecommerce ready
+- ad-ready output
+- clean + premium
 
 STRICT NEGATIVE:
-- no humans
-- no hands
+- no extra objects
 - no multiple products
-- no floating objects
 - no distortion
-- no surreal effects
-- no text
-- no logos added
-- no heavy props
+- no ignoring inputs
+- no random backgrounds
 
 OUTPUT:
-High-end commercial product image, premium ecommerce quality, studio-grade realism
+High-end commercial product image using ALL provided inputs correctly
 `;
 
-    // SMART AUGMENTATIONS
-    if (varyStyle) basePrompt += "\nSlightly vary background composition while preserving product.";
-    if (improveQuality) basePrompt += "\nImprove lighting, clarity, and composition.";
-    if (consistencyMode) basePrompt += "\nMaintain consistent style across multiple generations.";
-    if (prompt) basePrompt += "\n\nUser Request: " + prompt;
-
-    // CATEGORY ENHANCEMENT
-    const categoryEnhancer: Record<string, string> = {
-      fashion: "premium fabric texture, natural folds, soft lifestyle shadows",
-      cosmetics: "glossy reflections, clean skincare aesthetic, soft gradients, luxury packaging lighting",
-      jewelry: "high sparkle reflections, sharp gemstone highlights, metallic shine, luxury lighting"
-    };
-
-    const finalPrompt = `
-${basePrompt}
-
-CATEGORY FOCUS:
-${categoryEnhancer[category || ""] || ""}
-`;
-
-    // MODEL-SPECIFIC PROMPT BOOST
-    const fluxPrompt = `
-${finalPrompt}
-
-STRICT MODE:
-Absolute product identity preservation.
-Zero structural deviation allowed.
-Prioritize accuracy over creativity.
-`;
-
-    const seedreamPrompt = `
-${finalPrompt}
-
-CREATIVE MODE:
-Enhance environment with premium commercial styling.
-
-CONTROL:
-Do NOT modify product structure.
-Only adjust lighting, background, and mood.
-Keep product dominant in frame.
-`;
+    if (prompt) finalPrompt += "\n\nUser Request: " + prompt;
 
     // 3. FINAL INPUT CONFIG
-    const fluxInput = {
-      prompt: fluxPrompt,
-      image_url: productImage,
-      num_images: 1,
+    const model = "openai/gpt-image-2/edit";
+    const input = {
+      prompt: finalPrompt,
+      image_urls: [
+        productImage,
+        ...(modelFace ? [modelFace] : []),
+        ...(backgroundImage ? [backgroundImage] : [])
+      ],
+      num_images: Math.min(Number(imageCount) || 1, 4)
     };
 
-    const seedreamInput = {
-      prompt: seedreamPrompt,
-      image_urls: [productImage],
-      num_images: 1,
+    const runWithTimeout = (promise: Promise<any>, ms: number) => {
+      let timeoutId: NodeJS.Timeout;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error("Timeout"));
+        }, ms);
+      });
+      return Promise.race([promise, timeoutPromise]).finally(() => {
+        clearTimeout(timeoutId);
+      });
     };
 
-    // 4. SMART PIPELINE EXECUTION
-    const runFlux = async () => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 120000);
+    console.log("🚀 Running Pipeline with model:", model);
+    console.log("Input images count:", input.image_urls.length);
+    
+    let result;
+    try {
+      result = await runWithTimeout(fal.subscribe(model, { input }), 120000);
+    } catch (err) {
+      console.log("Generation failed, retrying once...");
       try {
-        let result = await fal.subscribe("fal-ai/flux-2-pro", { input: fluxInput, signal: controller.signal });
-        clearTimeout(timeout);
-        return result;
-      } catch (err) {
-        clearTimeout(timeout);
-        console.log("Flux failed, retrying once...");
-        // Retry once
-        const retryController = new AbortController();
-        const retryTimeout = setTimeout(() => retryController.abort(), 120000);
-        try {
-          let retryResult = await fal.subscribe("fal-ai/flux-2-pro", { input: fluxInput, signal: retryController.signal });
-          clearTimeout(retryTimeout);
-          return retryResult;
-        } catch (retryErr) {
-          clearTimeout(retryTimeout);
-          throw retryErr; // If Flux completely fails, it throws
-        }
+        result = await runWithTimeout(fal.subscribe(model, { input }), 120000);
+      } catch (retryErr) {
+        throw retryErr;
       }
-    };
-
-    const runSeedream = async () => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 120000);
-      try {
-        let result = await fal.subscribe("fal-ai/bytedance/seedream/v4.5/edit", { input: seedreamInput, signal: controller.signal });
-        clearTimeout(timeout);
-        return result;
-      } catch (err) {
-        clearTimeout(timeout);
-        console.log("Seedream failed. Returning null...");
-        return null; // Seedream failure shouldn't crash the pipeline
-      }
-    };
-
-    console.log("🚀 Running Smart Pipeline (Flux + Seedream)");
-    const [fluxResult, seedreamResult] = await Promise.allSettled([
-      runFlux(),
-      runSeedream()
-    ]);
+    }
 
     const finalImages: { type: string, url: string }[] = [];
 
-    // Extract Flux
-    if (fluxResult.status === "fulfilled" && fluxResult.value) {
-      let url = fluxResult.value.data?.images?.[0]?.url || fluxResult.value.images?.[0]?.url;
-      if (url) finalImages.push({ type: "ecommerce", url });
-    }
-
-    // Extract Seedream
-    if (seedreamResult.status === "fulfilled" && seedreamResult.value) {
-      let url = seedreamResult.value.data?.images?.[0]?.url || seedreamResult.value.images?.[0]?.url;
-      if (url) finalImages.push({ type: "creative", url });
+    if (result && (result.data?.images || result.images)) {
+      const generatedImages = result.data?.images || result.images;
+      for (const img of generatedImages) {
+        if (img.url) finalImages.push({ type: "ecommerce", url: img.url });
+      }
     }
 
     if (finalImages.length === 0) {
-      throw new Error("Both models failed to generate images");
+      throw new Error("Model failed to generate images");
     }
 
     console.log("✅ FINAL IMAGES RETURNED:", finalImages.length);

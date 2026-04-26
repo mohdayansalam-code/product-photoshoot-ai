@@ -124,198 +124,126 @@ export async function runFalGeneration(options: FalGenerationOptions): Promise<s
     }
 
     let baseScene = TEMPLATE_MAP[userPrompt] || "minimal luxury studio background";
-
     const safePrompt = customPrompt?.trim().slice(0, 200) || "";
-    if (safePrompt) {
-      baseScene = baseScene + ", " + safePrompt;
-    }
 
-    // Deduce niche from template
-    const niche = userPrompt.split('_')[0];
-    const categoryEnhancer = categoryEnhancerMap[niche?.toLowerCase()] || categoryEnhancerMap.default;
+    const selectedBackground = backgroundImage ? "the provided uploaded background image" : (baseScene + (safePrompt ? ", " + safePrompt : ""));
 
-    const basePrompt = `
-You are a professional commercial product photographer.
+    let finalPrompt = `
+ULTRA STRICT IMAGE GENERATION — ALL INPUTS MUST BE USED
 
-TASK:
-Transform the provided product image into a high-end commercial product photo.
+INPUT ORDER (CRITICAL):
+- Image 1 = MODEL FACE (if provided)
+- Image 2 = PRODUCT (MANDATORY)
+- Image 3 = BACKGROUND (if provided)
 
------------------------------------
-🔒 PRODUCT IDENTITY (NON-NEGOTIABLE)
------------------------------------
-- The uploaded product is the ONLY subject
-- Preserve EXACT shape, geometry, proportions
-- Preserve EXACT color, material, texture
-- Preserve logo, branding, and details
-- DO NOT redesign or replace the product
-- DO NOT generate a different item
+================================
 
-❗ If the product changes in any way → result is invalid
+CORE OBJECTIVE:
+Generate a high-end commercial product image using ALL provided inputs.
 
------------------------------------
-📸 COMPOSITION
------------------------------------
-- Single product only
-- Centered or premium composition
-- Clean framing
-- No cropping or deformation
+================================
 
------------------------------------
-🎨 SCENE
------------------------------------
-${baseScene}
+🔒 PRODUCT LOCK (HIGHEST PRIORITY)
+- The product MUST be EXACTLY the same as input
+- Preserve 100%: shape, logo, proportions, color, material
+- DO NOT redesign, replace, or reinterpret the product
+- If product changes → INVALID OUTPUT
 
------------------------------------
+================================
+
+👤 FACE ENFORCEMENT (MANDATORY IF PROVIDED)
+- The FIRST image is the human face — MUST be used
+- The final image MUST include this exact face
+- Face must be:
+  - clearly visible
+  - realistic
+  - properly blended
+- Match lighting, skin tone, angle, perspective
+- DO NOT ignore, crop out, or replace face
+- If face missing → INVALID OUTPUT
+
+================================
+
+🖼️ BACKGROUND ENFORCEMENT
+- Use provided background or template EXACTLY
+- DO NOT replace with studio/random background
+- Match lighting and depth with subject
+- If background ignored → INVALID OUTPUT
+
+================================
+
+📸 COMPOSITION (VERY IMPORTANT)
+- Show human model wearing / holding / interacting with product
+- Face clearly visible + product clearly visible
+- ONE product only
+- No extra objects
+
+================================
+
 💡 LIGHTING
------------------------------------
-- Soft professional studio lighting
-- Realistic shadows under product
-- Natural reflections based on material
+- Match lighting across face, product, and background
+- Realistic shadows
+- Premium commercial photography quality
 
------------------------------------
-✨ STYLE
------------------------------------
-- High-end commercial photography
-- Shopify / Amazon ready
-- Ultra clean and premium look
-- Sharp focus, high detail
+================================
 
------------------------------------
+🎯 STYLE
+- Ecommerce + Ad ready
+- Clean, premium, high-end branding
+- Natural, not artificial
+
+================================
+
 🚫 STRICT NEGATIVE RULES
------------------------------------
-- No humans
-- No hands
-- No multiple products
-- No random objects
-- No background clutter
-- No distortion
-- No product replacement
-- No text overlays
-- No watermark
+- no different product
+- no multiple products
+- no ignoring face
+- no ignoring background
+- no distortion
+- no random objects
+- no studio override
+- no cropping out face
 
------------------------------------
-🎯 OUTPUT
------------------------------------
-Ultra realistic premium ecommerce product image
+================================
+
+FINAL VALIDATION (MUST PASS ALL):
+✔ Product identical  
+✔ Face clearly used  
+✔ Background applied  
+✔ Clean composition  
+
+If ANY condition fails → regenerate correctly
 `;
 
-    const fluxPrompt = `
-${basePrompt}
-
-${categoryEnhancer}
-
------------------------------------
-🔐 FLUX STRICT LOCK
------------------------------------
-This is an image-to-image task.
-
-- The product MUST remain identical
-- DO NOT hallucinate new objects
-- DO NOT replace product with anything else
-- Match exact geometry and proportions
-
-STRICT: this is an image-to-image transformation using the provided image. The output must use the SAME product.
-STRICT: do not generate a different object under any condition.
-
-❗ If output product ≠ input product → FAIL
-
------------------------------------
-📦 PRIORITY
------------------------------------
-Accuracy over creativity
-Exact product preservation is mandatory
-`;
-
-    const seedreamPrompt = `
-${basePrompt}
-
-${categoryEnhancer}
-
------------------------------------
-🎬 CREATIVE ENHANCEMENT
------------------------------------
-- Add premium commercial styling
-- Cinematic lighting and shadows
-- Luxury environment matching product type
-
------------------------------------
-🔒 PRODUCT SAFETY
------------------------------------
-- Keep product shape EXACT
-- Do not modify structure or branding
-- Only enhance environment
-
------------------------------------
-📦 PRIORITY
------------------------------------
-Creative background + premium lighting
-WITHOUT changing the product
-`;
+    if (customPrompt) finalPrompt += "\n\nUser Request: " + customPrompt;
 
     logger.info(`Starting fal.ai generation pipeline.`);
     
     let attempt = 0;
     const maxRetries = 2;
 
+    const model = "openai/gpt-image-2/edit";
+    const input = {
+      prompt: finalPrompt,
+      image_urls: [
+        ...(faceImage ? [faceImage] : []),
+        productImage,
+        ...(backgroundImage ? [backgroundImage] : [])
+      ],
+      num_images: Math.min(Number(imageCount) || 1, 4)
+    };
+
     while (attempt <= maxRetries) {
         try {
-            // Determine image size mapping
-            const mappedSize = aspectMap[aspectRatio || "1:1"] || "square";
-
-            const fluxConfig = {
-                prompt: fluxPrompt,
-                image_url: productImage,
-                num_images: 1,
-                guidance_scale: 7,        // 🔥 strong lock
-                num_inference_steps: 24,  // 🔥 more control
-                image_size: mappedSize
-            };
-
-            const seedreamConfig = {
-                prompt: seedreamPrompt,
-                image_urls: [productImage],
-                num_images: 1,
-                guidance_scale: 5,
-                num_inference_steps: 18,
-                image_size: mappedSize
-            };
-
-            const jobsPromise = Promise.allSettled([
-                runWithTimeout(fal.subscribe("fal-ai/flux-2-pro", { input: fluxConfig }), 120000),
-                runWithTimeout(fal.subscribe("fal-ai/bytedance/seedream/v4.5/edit", { input: seedreamConfig }), 120000)
-            ]);
-
-            const results: any = await jobsPromise;
+            const result = await runWithTimeout(fal.subscribe(model, { input }), 120000);
             
-            const [fluxResult, seedreamResult] = results;
-            
-            const fluxImages = fluxResult.status === "fulfilled"
-                ? extractImages(fluxResult.value)
-                : [];
-                
-            if (fluxResult.status === "rejected") {
-                logger.error("Flux generation failed:", fluxResult.reason);
-            }
-
-            const seedreamImages = seedreamResult.status === "fulfilled"
-                ? extractImages(seedreamResult.value)
-                : [];
-                
-            if (seedreamResult.status === "rejected") {
-                logger.error("Seedream generation failed:", seedreamResult.reason);
-            }
-
-            const finalImages = [
-                fluxImages[0] || null,
-                seedreamImages[0] || null,
-            ].filter(Boolean);
-            
-            if (finalImages.length > 0) {
-                logger.info(`Successfully generated ${finalImages.length} images from fal.ai pipeline`);
-                return finalImages;
+            const extracted = extractImages(result);
+            if (extracted.length > 0) {
+                logger.info(`Successfully generated ${extracted.length} images from fal.ai pipeline`);
+                return extracted;
             } else {
-                logger.warn(`Both models failed to return images on attempt ${attempt + 1}.`);
-                throw new Error("Both models failed");
+                logger.warn(`Model failed to return images on attempt ${attempt + 1}.`);
+                throw new Error("Model failed");
             }
         } catch (error: any) {
             logger.error(`fal.ai Pipeline Error on attempt ${attempt + 1}: ${error.message}`, { error });

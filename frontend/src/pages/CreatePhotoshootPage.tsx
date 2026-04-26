@@ -417,7 +417,9 @@ export default function CreatePhotoshootPage() {
         model: payload.model || "standard",
         category: payload.category || activeCategory.toLowerCase(),
         varyStyle: payload.varyStyle,
-        improveQuality: payload.improveQuality
+        improveQuality: payload.improveQuality,
+        modelFace: payload.faceImage,
+        backgroundImage: payload.backgroundImage
       };
 
       const response = await fetch(`${API_URL}/api/generate`, {
