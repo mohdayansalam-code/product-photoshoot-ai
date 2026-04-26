@@ -153,6 +153,10 @@ Ultra realistic commercial product image using ALL provided inputs correctly.
       ? "fal-ai/bytedance/seedream/v4.5/edit" 
       : "openai/gpt-image-2/edit";
 
+    const safeImageCount = model === "openai/gpt-image-2/edit"
+      ? Math.min(Number(imageCount) || 1, 2)
+      : Math.min(Number(imageCount) || 1, 4);
+
     const input = {
       prompt: finalPrompt,
       image_urls: [
@@ -160,14 +164,14 @@ Ultra realistic commercial product image using ALL provided inputs correctly.
         productImage,
         ...(backgroundImage ? [backgroundImage] : [])
       ],
-      num_images: Math.min(Number(imageCount) || 1, 4)
+      num_images: safeImageCount
     };
 
     console.log("🚀 Running Pipeline with model:", model);
     console.log("Input images count:", input.image_urls.length);
 
     const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Timeout exceeded")), 180000)
+      setTimeout(() => reject(new Error("Timeout exceeded")), 300000)
     );
 
     async function generate() {

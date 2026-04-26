@@ -300,9 +300,18 @@ export default function CreatePhotoshootPage() {
     setUploadingState(prev => ({ ...prev, [type]: false }));
   };
 
-  const handleDownload = (imgUrl: string) => {
+  const handleDownload = async (imgUrl: string) => {
     try {
-      window.open(imgUrl, "_blank");
+      const res = await fetch(imgUrl);
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = "generated-image.png";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
     } catch {
       toast.error("Download failed");
     }
@@ -378,7 +387,6 @@ export default function CreatePhotoshootPage() {
       ];
       setLoadingMessage(messages[0]);
       setError("");
-      setResults([]);
       
       messageInterval = setInterval(() => {
         setLoadingMessage(prev => {
@@ -441,7 +449,7 @@ export default function CreatePhotoshootPage() {
       }
 
       // ✅ UPDATE UI (CRITICAL LINE)
-      setResults(data.images || []);
+      setResults(prev => [...prev, ...(data.images || [])]);
 
       if (data.images && data.images.length < payload.imageCount) {
         alert(`Only ${data.images.length} images generated. Try again for full set.`);
@@ -622,8 +630,8 @@ export default function CreatePhotoshootPage() {
                     onChange={(e) => setSelectedModel(e.target.value)}
                     className="bg-[#0B0B0F] border border-gray-800 rounded-lg text-gray-300 text-sm px-2 py-1 w-40 focus:outline-none cursor-pointer"
                   >
-                    <option value="gpt" className="bg-[#0A0A0A]">High Accuracy (GPT Image 2)</option>
-                    <option value="seedream" className="bg-[#0A0A0A]">Creative Mode (Seedream)</option>
+                    <option value="gpt" className="bg-[#0A0A0A]">High Accuracy (slower)</option>
+                    <option value="seedream" className="bg-[#0A0A0A]">Creative (faster)</option>
                   </select>
                 </div>
                 
