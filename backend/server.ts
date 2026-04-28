@@ -343,6 +343,7 @@ Ultra-realistic, high-end commercial product image ready for ads and ecommerce.
     if (images.length > 0) {
       const generated = images.length;
 
+      // 1. get existing usage
       const { data: existing } = await supabase
         .from("daily_usage")
         .select("count")
@@ -350,30 +351,28 @@ Ultra-realistic, high-end commercial product image ready for ads and ecommerce.
         .eq("date", today)
         .maybeSingle();
 
-      const newCount = (existing?.count || 0) + generated;
+      const current = existing?.count || 0;
 
-      console.log("USER:", user.id);
-      console.log("EXISTING COUNT:", existing?.count);
-      console.log("NEW COUNT:", newCount);
-
-      const { error: usageUpsertError } = await supabase
-        .from("daily_usage")
-        .upsert(
-          {
-            user_id: user.id,
-            date: today,
-            count: newCount
-          },
-          {
-            onConflict: "user_id,date"
-          }
-        );
-
-      if (usageUpsertError) {
-        console.error("❌ DAILY USAGE UPDATE FAILED:", usageUpsertError);
+      // 2. update or insert
+      if (!existing) {
+        // first time today
+        const { error } = await supabase.from("daily_usage").insert({
+          user_id: user.id,
+          date: today,
+          count: generated
+        });
+        if (error) console.error("❌ DAILY USAGE UPDATE FAILED:", error);
       } else {
-        console.log(`✅ User ${user.id} daily usage updated`);
+        // increment
+        const { error } = await supabase
+          .from("daily_usage")
+          .update({ count: current + generated })
+          .eq("user_id", user.id)
+          .eq("date", today);
+        if (error) console.error("❌ DAILY USAGE UPDATE FAILED:", error);
       }
+      
+      console.log(`✅ User ${user.id} daily usage updated`);
     }
 
     return res.json({ success: true, images });
