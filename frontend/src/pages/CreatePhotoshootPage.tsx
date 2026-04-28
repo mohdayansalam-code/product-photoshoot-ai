@@ -133,49 +133,30 @@ export default function CreatePhotoshootPage() {
   const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
   const [results, setResults] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [usage, setUsage] = useState<{ used: number; limit: number } | null>(null);
+  const [session, setSession] = useState<any>(null);
+  const [usage, setUsage] = useState<number | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [authEmail, setAuthEmail] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
-  // Auth & Usage Fetch
+  // Auth Fetch
   useEffect(() => {
     let mounted = true;
-    const fetchAuthAndUsage = async (session: any) => {
-      if (session?.user) {
-        if (mounted) setCurrentUser(session.user);
-        
-        // Fetch usage
-        try {
-          const API_URL = import.meta.env.VITE_API_URL || "https://product-photoshoot-ai.onrender.com";
-          const res = await fetch(`${API_URL}/api/usage`, {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`
-            }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (mounted) setUsage(data);
-          }
-        } catch (e) {
-          console.error("Failed to fetch usage", e);
-        }
-      } else {
-        if (mounted) setCurrentUser(null);
-        if (mounted) setUsage(null);
-      }
-      if (mounted) setIsAuthChecking(false);
-    };
 
-    // Initial Check
     supabase.auth.getSession().then(({ data: { session } }) => {
-      fetchAuthAndUsage(session);
+      if (mounted) {
+        setSession(session);
+        setCurrentUser(session?.user || null);
+        setIsAuthChecking(false);
+      }
     });
 
-    // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      fetchAuthAndUsage(session);
+      if (mounted) {
+        setSession(session);
+        setCurrentUser(session?.user || null);
+      }
     });
 
     return () => {
@@ -183,6 +164,27 @@ export default function CreatePhotoshootPage() {
       subscription.unsubscribe();
     };
   }, []);
+
+  const fetchUsage = async () => {
+    if (!session?.access_token) return;
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "https://product-photoshoot-ai.onrender.com";
+      const res = await fetch(`${API_URL}/api/usage`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+      const data = await res.json();
+      console.log("FRONTEND USAGE:", data);
+      setUsage(data.used);
+    } catch (err) {
+      console.error("Failed to fetch usage", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsage();
+  }, [session?.access_token]);
 
 
   // Safety & Recovery Refs
@@ -411,8 +413,8 @@ export default function CreatePhotoshootPage() {
     }
 
     // Check Limits First (Frontend Double Check)
-    if (usage !== null && usage.used + payload.imageCount > usage.limit) {
-      const errorMsg = `Daily limit reached (${usage.used}/${usage.limit} used today).`;
+    if (usage !== null && usage + payload.imageCount > 10) {
+      const errorMsg = `Daily limit reached (${usage}/10 used today).`;
       setError(errorMsg);
       toast.error(errorMsg);
       return;
@@ -498,8 +500,8 @@ export default function CreatePhotoshootPage() {
         alert(`Only ${data.images.length} images generated. Try again for full set.`);
       }
       
-      // 5. Safe Usage Update (Local fallback, backend handles real deduction)
-      setUsage(prev => prev ? { ...prev, used: prev.used + data.images.length } : null);
+      // 5. Safe Usage Update (Fetch from backend)
+      await fetchUsage();
       toast.success("Images generated successfully!");
       
       if (timeoutRef.current) {
@@ -771,7 +773,7 @@ export default function CreatePhotoshootPage() {
             <div className="pt-2 shrink-0 pb-4">
               <div className="mb-3 text-center">
                 <p className="text-gray-400 text-sm">
-                  {usage !== null ? `${usage.used} / ${usage.limit} images used today` : "Loading limits..."}
+                  {usage !== null ? `${usage} / 10 images used today` : "Loading limits..."}
                 </p>
                 <p className="text-[10px] text-yellow-600 mt-1.5 font-medium tracking-wide uppercase">Upload clean product image for best results</p>
               </div>

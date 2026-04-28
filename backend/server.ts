@@ -63,26 +63,27 @@ app.get("/", (req, res) => {
 // ✅ USAGE CHECK ROUTE
 app.get("/api/usage", async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Missing or invalid authorization header" });
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) {
+      return res.status(401).json({ error: "Missing authorization" });
     }
-    const token = authHeader.split(" ")[1];
+
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
     const today = new Date().toISOString().slice(0, 10);
-    const { data: usageRow } = await supabase
+    const { data } = await supabase
       .from('daily_usage')
       .select('count')
       .eq('user_id', user.id)
       .eq('date', today)
       .maybeSingle();
 
-    const used = usageRow?.count || 0;
-    return res.json({ used, limit: 10 });
+    console.log("USAGE FETCH:", user.id, data);
+
+    return res.json({ used: data?.count || 0 });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -159,51 +160,99 @@ app.post("/api/generate", async (req, res) => {
     const selectedBackground = backgroundImage ? "the provided uploaded background image" : (templateMap[template] || "minimal premium gradient background");
 
     let finalPrompt = `
-Use the provided images exactly as inputs.
+AI PRODUCT PHOTOSHOOT — STRICT GENERATION MODE
 
-PRIMARY SUBJECT:
-* The product image is the MAIN subject
-* The product must remain 100% identical (shape, color, logo, texture, proportions)
-* Do NOT redesign or replace the product
+Use the provided product image as the EXACT subject.
 
-FACE USAGE (if provided):
-* The model face MUST be used
-* Place the face naturally in the scene (wearing / holding / aligned with product)
-* Match lighting, color tone, and perspective with the product
-* Do NOT generate a different face
+-----------------------------------------------------
 
-BACKGROUND (if provided):
-* Use the provided background image exactly
-* Do NOT replace or ignore it
-* Match lighting and shadows with the product and face
+🔒 CRITICAL PRODUCT RULES (NON-NEGOTIABLE)
+- The product MUST remain 100% identical
+- Do NOT change shape, color, material, logo, or proportions
+- Do NOT redesign or replace the product
+- Only ONE product must exist
+- No duplicates, no variations
 
-COMPOSITION:
-* Single product only
-* Centered or professionally framed
-* Clean ecommerce or premium ad layout
-* No clutter
+-----------------------------------------------------
 
-LIGHTING:
-* Realistic shadows
-* Consistent lighting across product, face, and background
-* High-end commercial photography look
+👤 MODEL USAGE (CONDITIONAL)
 
-STYLE:
-* Ecommerce ready
-* Shopify / Ads quality
-* Ultra realistic
-* Sharp focus, high detail
+IF useModel = true:
+- Use the provided model face
+- Integrate naturally with the product
+- Face must look realistic and aligned with lighting
 
-STRICT NEGATIVE:
-* no product distortion
-* no changing product design
-* no extra objects
-* no multiple products
-* no random backgrounds
-* no ignoring inputs
+IF useModel = false:
+- STRICT: Do NOT include any human, model, or face
 
-OUTPUT:
-Ultra realistic commercial product image using ALL provided inputs correctly.
+-----------------------------------------------------
+
+🖼 BACKGROUND RULES
+
+IF background image provided:
+- MUST use the exact background
+- Match lighting, shadows, and perspective
+
+IF no background:
+- Use a clean, premium, minimal environment
+- No clutter, no random objects
+
+-----------------------------------------------------
+
+📐 COMPOSITION
+
+- Centered or professionally framed product
+- Clean composition
+- Balanced spacing
+- No cropping of the product
+- Full product must be visible
+
+-----------------------------------------------------
+
+💡 LIGHTING
+
+- Soft professional studio lighting
+- Realistic shadows under product
+- Premium commercial look
+- High-end ecommerce style
+
+-----------------------------------------------------
+
+📏 OUTPUT SIZE (STRICT)
+
+- Output MUST match selected aspect ratio
+- Do NOT default to square unless 1:1
+- No cropping, stretching, or distortion
+- Fill entire frame correctly
+
+-----------------------------------------------------
+
+🎯 STYLE
+
+- Ultra realistic
+- High-end commercial photography
+- Shopify / Amazon ready
+- Clean, sharp, premium branding quality
+
+-----------------------------------------------------
+
+🚫 STRICT NEGATIVE RULES
+
+- No multiple products
+- No humans (if model OFF)
+- No distortion
+- No random objects
+- No messy backgrounds
+- No bedroom / home scenes
+- No text overlays
+- No watermark
+- No studio equipment visible
+
+-----------------------------------------------------
+
+📌 FINAL OUTPUT
+
+Ultra-realistic, high-end commercial product image ready for ads and ecommerce.
 `;
 
     if (prompt) finalPrompt += "\n\nUser Request: " + prompt;
@@ -290,13 +339,35 @@ Ultra realistic commercial product image using ALL provided inputs correctly.
 
     console.log("✅ FINAL IMAGES RETURNED:", images.length);
 
-    // ✅ ATOMIC INCREMENT AFTER SUCCESS
+    // ✅ INCREMENT AFTER SUCCESS (NO RPC)
     if (images.length > 0) {
-      const { error: usageUpsertError } = await supabase.rpc("increment_usage", {
-        p_user_id: user.id,
-        p_date: today,
-        p_count: images.length
-      });
+      const generated = images.length;
+
+      const { data: existing } = await supabase
+        .from("daily_usage")
+        .select("count")
+        .eq("user_id", user.id)
+        .eq("date", today)
+        .maybeSingle();
+
+      const newCount = (existing?.count || 0) + generated;
+
+      console.log("USER:", user.id);
+      console.log("EXISTING COUNT:", existing?.count);
+      console.log("NEW COUNT:", newCount);
+
+      const { error: usageUpsertError } = await supabase
+        .from("daily_usage")
+        .upsert(
+          {
+            user_id: user.id,
+            date: today,
+            count: newCount
+          },
+          {
+            onConflict: "user_id,date"
+          }
+        );
 
       if (usageUpsertError) {
         console.error("❌ DAILY USAGE UPDATE FAILED:", usageUpsertError);
