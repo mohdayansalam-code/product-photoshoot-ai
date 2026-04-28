@@ -292,19 +292,16 @@ Ultra realistic commercial product image using ALL provided inputs correctly.
 
     // ✅ ATOMIC INCREMENT AFTER SUCCESS
     if (images.length > 0) {
-      const generated = images.length;
-      const { error: usageUpsertError } = await supabase
-        .from('daily_usage')
-        .upsert({
-          user_id: user.id,
-          date: today,
-          count: used + generated
-        });
+      const { error: usageUpsertError } = await supabase.rpc("increment_usage", {
+        p_user_id: user.id,
+        p_date: today,
+        p_count: images.length
+      });
 
       if (usageUpsertError) {
         console.error("❌ DAILY USAGE UPDATE FAILED:", usageUpsertError);
       } else {
-        console.log(`✅ User ${user.id} daily usage updated: ${used + generated}/${LIMIT}`);
+        console.log(`✅ User ${user.id} daily usage updated`);
       }
     }
 
