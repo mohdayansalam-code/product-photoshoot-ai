@@ -60,9 +60,48 @@ app.get("/", (req, res) => {
   res.send("API is running...");
 });
 
+// ✅ USAGE CHECK ROUTE
+app.get("/api/usage", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Missing or invalid authorization header" });
+    }
+    const token = authHeader.split(" ")[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: usageRow } = await supabase
+      .from('daily_usage')
+      .select('count')
+      .eq('user_id', user.id)
+      .eq('date', today)
+      .maybeSingle();
+
+    const used = usageRow?.count || 0;
+    return res.json({ used, limit: 10 });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // ✅ MAIN GENERATION ROUTE
 app.post("/api/generate", async (req, res) => {
   try {
+    // ✅ AUTHENTICATION
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Missing or invalid authorization header" });
+    }
+    const token = authHeader.split(" ")[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const { 
       productImage, 
       template, 
@@ -74,8 +113,29 @@ app.post("/api/generate", async (req, res) => {
       improveQuality, 
       consistencyMode,
       modelFace,
-      backgroundImage
+      backgroundImage,
+      useModel,
+      aspectRatio
     } = req.body;
+
+    const parsedImageCount = Number(imageCount) || 1;
+
+    // ✅ DAILY LIMIT CHECK
+    const LIMIT = 10;
+    const today = new Date().toISOString().slice(0, 10);
+
+    const { data: usageRow, error: usageError } = await supabase
+      .from('daily_usage')
+      .select('count')
+      .eq('user_id', user.id)
+      .eq('date', today)
+      .maybeSingle();
+
+    const used = usageRow?.count || 0;
+
+    if (used + parsedImageCount > LIMIT) {
+      return res.status(400).json({ error: `Daily limit reached (${used}/${LIMIT} used today).` });
+    }
 
     // ✅ HARD VALIDATION
     if (!productImage) throw new Error("Missing product image");
@@ -148,27 +208,59 @@ Ultra realistic commercial product image using ALL provided inputs correctly.
 
     if (prompt) finalPrompt += "\n\nUser Request: " + prompt;
 
+    if (!useModel) {
+      finalPrompt += "\n\nSTRICT: Do NOT include any human or model.";
+    }
+
+    if (useModel) {
+      finalPrompt += "\n\nSTRICT: Use provided model face naturally.";
+    }
+
     // 3. FINAL INPUT CONFIG
     const model = req.body.model === "seedream" 
       ? "fal-ai/bytedance/seedream/v4.5/edit" 
       : "openai/gpt-image-2/edit";
 
+    if (aspectRatio) {
+      if (model === "fal-ai/bytedance/seedream/v4.5/edit") {
+        finalPrompt += `\n\nSTRICT IMAGE FORMAT:\n- Must follow ${aspectRatio}\n- No cropping\n- No stretching`;
+      } else {
+        finalPrompt += `\n\nSTRICT OUTPUT SIZE:\n- Output MUST match ${aspectRatio}\n- Do NOT generate square if not 1:1\n- Fill full frame properly`;
+      }
+    }
+
     const safeImageCount = model === "openai/gpt-image-2/edit"
       ? Math.min(Number(imageCount) || 1, 2)
       : Math.min(Number(imageCount) || 1, 4);
 
+    const image_urls = [];
+    if (useModel && modelFace) {
+      image_urls.push(modelFace);
+    }
+    image_urls.push(productImage);
+    if (backgroundImage) {
+      image_urls.push(backgroundImage);
+    }
+
+    const sizeMap: Record<string, string> = {
+      "1:1": "1024x1024",
+      "4:5": "1024x1280",
+      "16:9": "1280x720",
+      "9:16": "720x1280"
+    };
+    const selectedSize = sizeMap[aspectRatio] || "1024x1024";
+
     const input = {
       prompt: finalPrompt,
-      image_urls: [
-        ...(modelFace ? [modelFace] : []),
-        productImage,
-        ...(backgroundImage ? [backgroundImage] : [])
-      ],
-      num_images: safeImageCount
+      image_urls: image_urls,
+      num_images: safeImageCount,
+      size: selectedSize
     };
 
     console.log("🚀 Running Pipeline with model:", model);
     console.log("Input images count:", input.image_urls.length);
+    console.log("ASPECT:", aspectRatio);
+    console.log("SIZE:", selectedSize);
 
     const timeout = new Promise((_, reject) =>
       setTimeout(() => reject(new Error("Timeout exceeded")), 300000)
@@ -197,6 +289,24 @@ Ultra realistic commercial product image using ALL provided inputs correctly.
       [];
 
     console.log("✅ FINAL IMAGES RETURNED:", images.length);
+
+    // ✅ ATOMIC INCREMENT AFTER SUCCESS
+    if (images.length > 0) {
+      const generated = images.length;
+      const { error: usageUpsertError } = await supabase
+        .from('daily_usage')
+        .upsert({
+          user_id: user.id,
+          date: today,
+          count: used + generated
+        });
+
+      if (usageUpsertError) {
+        console.error("❌ DAILY USAGE UPDATE FAILED:", usageUpsertError);
+      } else {
+        console.log(`✅ User ${user.id} daily usage updated: ${used + generated}/${LIMIT}`);
+      }
+    }
 
     return res.json({ success: true, images });
 
