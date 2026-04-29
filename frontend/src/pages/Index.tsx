@@ -1,4 +1,5 @@
 import { Camera, FolderOpen, Images, Plus } from "lucide-react";
+import { demoImages } from "@/data/demoImages";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -117,7 +118,8 @@ export default function Index() {
                 className="group relative aspect-square rounded-2xl border border-border overflow-hidden bg-card/50 shadow-sm hover:shadow-md transition-all"
               >
                 <img 
-                  src={gen.image_urls?.[0] || gen.images?.[0] || "https://via.placeholder.com/400?text=Processing..."} 
+                  src={gen.image_urls?.[0] || gen.images?.[0] || demoImages[36].src} 
+                  onError={(e) => e.currentTarget.style.display = "none"}
                   alt={gen.prompt} 
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
                 />

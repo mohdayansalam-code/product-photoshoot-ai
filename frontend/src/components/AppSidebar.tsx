@@ -10,7 +10,6 @@ import {
   Sparkles,
   Package,
 } from "lucide-react";
-import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -24,8 +23,6 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { CreditIndicator } from "@/components/CreditIndicator";
-import { getCredits, DEFAULT_CREDITS } from "@/lib/api";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -42,45 +39,6 @@ const navItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const [credits, setCredits] = useState({ used: 0, limit: 10 });
-  const [loadingCredits, setLoadingCredits] = useState(true);
-  const [errorCredits, setErrorCredits] = useState(false);
-  const [retryingCredits, setRetryingCredits] = useState(false);
-
-  const loadCreditsData = async (isRetry = false) => {
-    if (isRetry) setRetryingCredits(true);
-    else setLoadingCredits(true);
-    
-    setErrorCredits(false);
-    try {
-      setCredits({ used: DEFAULT_CREDITS.images_used, limit: DEFAULT_CREDITS.monthly_limit });
-    } catch (err) {
-      console.error("Failed to fetch credits", err);
-    } finally {
-      setLoadingCredits(false);
-      setRetryingCredits(false);
-    }
-  };
-
-  useEffect(() => {
-    loadCreditsData();
-
-    // 3. CREDIT UI SYNC: Listen for global hooks & fallbacks
-    const handleSync = () => loadCreditsData(true);
-    window.addEventListener("sync_credits", handleSync);
-    window.addEventListener("focus", handleSync); // Refresh on tab focus
-    
-    // Interval sync (60 seconds)
-    const syncInterval = setInterval(() => {
-       loadCreditsData(true);
-    }, 60000);
-
-    return () => {
-       window.removeEventListener("sync_credits", handleSync);
-       window.removeEventListener("focus", handleSync);
-       clearInterval(syncInterval);
-    };
-  }, []);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
@@ -115,17 +73,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-3">
-        <CreditIndicator 
-          used={credits.used}
-          limit={credits.limit}
-          collapsed={collapsed}
-          loading={loadingCredits}
-          error={errorCredits}
-          retrying={retryingCredits}
-          onRetry={() => loadCreditsData(true)}
-        />
-      </SidebarFooter>
     </Sidebar>
   );
 }

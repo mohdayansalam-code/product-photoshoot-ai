@@ -108,3 +108,4 @@ export async function uploadAsset(b: Blob) { return null; }
 export async function uploadProduct(b: any, n: string) { return null; }
 export async function callImageTool(u: string, t: string) { return null; }
 export async function deleteProduct(id: string) { return null; }
+export async function generateVariations(jobId: string, url: string) { return null; }

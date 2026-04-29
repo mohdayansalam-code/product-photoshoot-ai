@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { demoImages } from "@/data/demoImages";
 
 // --- TEMPLATES DATA ---
 const TEMPLATES = [
@@ -27,7 +28,7 @@ const TEMPLATES = [
     name: "Editorial Shoot",
     description: "High-end magazine style, dramatic lighting",
     requiresModel: true,
-    image: "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=600&q=80"
+    image: demoImages[12].src
   },
   {
     id: "fashion_streetwear",
@@ -35,7 +36,7 @@ const TEMPLATES = [
     name: "Streetwear",
     description: "Urban environment, edgy style",
     requiresModel: true,
-    image: "https://images.unsplash.com/photo-1550614000-4b95d4662d5f?auto=format&fit=crop&w=600&q=80"
+    image: demoImages[13].src
   },
   {
     id: "cosmetics_luxury_skincare",
@@ -43,7 +44,7 @@ const TEMPLATES = [
     name: "Luxury Skincare",
     description: "Soft lighting, premium aesthetic",
     requiresModel: false,
-    image: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=600&q=80"
+    image: demoImages[14].src
   },
   {
     id: "cosmetics_white_studio",
@@ -51,7 +52,7 @@ const TEMPLATES = [
     name: "Clean White Studio",
     description: "Minimal shadows, ecommerce style",
     requiresModel: false,
-    image: "https://images.unsplash.com/photo-1598452963314-b09f397a5c48?auto=format&fit=crop&w=600&q=80"
+    image: demoImages[15].src
   },
   {
     id: "jewelry_dark_luxury",
@@ -59,7 +60,7 @@ const TEMPLATES = [
     name: "Dark Luxury",
     description: "Dark background, gold reflections",
     requiresModel: false,
-    image: "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=600&q=80"
+    image: demoImages[16].src
   },
   {
     id: "jewelry_marble",
@@ -67,7 +68,7 @@ const TEMPLATES = [
     name: "Marble Surface",
     description: "Elegant marble, natural light",
     requiresModel: false,
-    image: "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?auto=format&fit=crop&w=600&q=80"
+    image: demoImages[17].src
   },
   {
     id: "campaign_cosmetics_model",
@@ -75,7 +76,7 @@ const TEMPLATES = [
     name: "Cosmetics Model Shoot",
     description: "Model interacting with skincare product",
     requiresModel: true,
-    image: "https://images.unsplash.com/photo-1515688594390-b649af70d282?auto=format&fit=crop&w=600&q=80"
+    image: demoImages[18].src
   },
   {
     id: "campaign_premium_ad",
@@ -83,7 +84,7 @@ const TEMPLATES = [
     name: "Premium Campaign Ad",
     description: "High budget commercial look",
     requiresModel: true,
-    image: "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?auto=format&fit=crop&w=600&q=80"
+    image: demoImages[19].src
   }
 ];
 
@@ -414,7 +415,7 @@ export default function CreatePhotoshootPage() {
 
     // Check Limits First (Frontend Double Check)
     if (usage !== null && usage + payload.imageCount > 10) {
-      const errorMsg = `Daily limit reached (${usage}/10 used today).`;
+      const errorMsg = `Monthly limit reached (10 images)`;
       setError(errorMsg);
       toast.error(errorMsg);
       return;
@@ -773,7 +774,7 @@ export default function CreatePhotoshootPage() {
             <div className="pt-2 shrink-0 pb-4">
               <div className="mb-3 text-center">
                 <p className="text-gray-400 text-sm">
-                  {usage !== null ? `${usage} / 10 images used today` : "Loading limits..."}
+                  {usage !== null ? `${usage} / 10 images used this month` : "Loading limits..."}
                 </p>
                 <p className="text-[10px] text-yellow-600 mt-1.5 font-medium tracking-wide uppercase">Upload clean product image for best results</p>
               </div>
@@ -840,7 +841,7 @@ export default function CreatePhotoshootPage() {
                       selectedTemplateId === template.id ? "border-blue-500 shadow-md" : "border-gray-200"
                     )}
                   >
-                    <img src={template.image} className="rounded-lg mb-2 w-full object-cover aspect-[4/3]" />
+                    <img src={template.image} onError={(e) => e.currentTarget.style.display = "none"} className="rounded-lg mb-2 w-full object-cover aspect-[4/3]" />
                     <h3 className="font-semibold text-sm">{template.name}</h3>
                     <p className="text-xs text-gray-500 line-clamp-2">
                       {template.description}

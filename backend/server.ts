@@ -73,17 +73,18 @@ app.get("/api/usage", async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
     const { data } = await supabase
       .from('daily_usage')
       .select('count')
       .eq('user_id', user.id)
-      .eq('date', today)
+      .eq('month', monthKey)
       .maybeSingle();
 
     console.log("USAGE FETCH:", user.id, data);
 
-    return res.json({ used: data?.count || 0 });
+    return res.json({ used: data?.count || 0, limit: 10 });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -121,21 +122,22 @@ app.post("/api/generate", async (req, res) => {
 
     const parsedImageCount = Number(imageCount) || 1;
 
-    // ✅ DAILY LIMIT CHECK
+    // ✅ MONTHLY LIMIT CHECK
     const LIMIT = 10;
-    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
 
     const { data: usageRow, error: usageError } = await supabase
       .from('daily_usage')
       .select('count')
       .eq('user_id', user.id)
-      .eq('date', today)
+      .eq('month', monthKey)
       .maybeSingle();
 
     const used = usageRow?.count || 0;
 
     if (used + parsedImageCount > LIMIT) {
-      return res.status(400).json({ error: `Daily limit reached (${used}/${LIMIT} used today).` });
+      return res.status(400).json({ error: `Monthly limit reached (10 images)` });
     }
 
     // ✅ HARD VALIDATION
@@ -343,36 +345,39 @@ Ultra-realistic, high-end commercial product image ready for ads and ecommerce.
     if (images.length > 0) {
       const generated = images.length;
 
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+
       // 1. get existing usage
       const { data: existing } = await supabase
         .from("daily_usage")
         .select("count")
         .eq("user_id", user.id)
-        .eq("date", today)
+        .eq("month", monthKey)
         .maybeSingle();
 
-      const current = existing?.count || 0;
+      const used = existing?.count || 0;
 
       // 2. update or insert
       if (!existing) {
-        // first time today
+        // first time this month
         const { error } = await supabase.from("daily_usage").insert({
           user_id: user.id,
-          date: today,
+          month: monthKey,
           count: generated
         });
-        if (error) console.error("❌ DAILY USAGE UPDATE FAILED:", error);
+        if (error) console.error("❌ MONTHLY USAGE UPDATE FAILED:", error);
       } else {
         // increment
         const { error } = await supabase
           .from("daily_usage")
-          .update({ count: current + generated })
+          .update({ count: used + generated })
           .eq("user_id", user.id)
-          .eq("date", today);
-        if (error) console.error("❌ DAILY USAGE UPDATE FAILED:", error);
+          .eq("month", monthKey);
+        if (error) console.error("❌ MONTHLY USAGE UPDATE FAILED:", error);
       }
       
-      console.log(`✅ User ${user.id} daily usage updated`);
+      console.log(`✅ User ${user.id} monthly usage updated`);
     }
 
     return res.json({ success: true, images });

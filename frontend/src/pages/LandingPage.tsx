@@ -10,12 +10,10 @@ import {
   Store, Briefcase, ChevronRight
 } from "lucide-react";
 
-import heroImg1 from "@/assets/landing-hero-1.jpg";
-import heroImg2 from "@/assets/landing-hero-2.jpg";
-import heroImg3 from "@/assets/landing-hero-3.jpg";
-import heroImg4 from "@/assets/landing-hero-4.jpg";
-import heroImg5 from "@/assets/landing-hero-5.jpg";
-import dashboardPreview from "@/assets/landing-dashboard-preview.jpg";
+import { demoImages } from "@/data/demoImages";
+
+const PRODUCT_IMAGES = demoImages.slice(0, 6).map(img => img.src);
+const dashboardPreview = demoImages[6].src;
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -34,7 +32,7 @@ const FEATURE_TABS = [
   { label: "AI Enhancement", icon: Wand2 },
 ];
 
-const PRODUCT_IMAGES = [heroImg1, heroImg2, heroImg3, heroImg4, heroImg5, heroImg1];
+// PRODUCT_IMAGES replaced with demoImages above
 
 const FOR_WHOM = [
   {
@@ -216,7 +214,7 @@ export default function LandingPage() {
               transition={{ type: "spring", stiffness: 300 }}
               className={`rounded-2xl overflow-hidden shadow-xl shadow-slate-200/50 ${i === 0 ? "row-span-2" : ""}`}
             >
-              <img src={img} alt="AI generated product" className={`w-full object-cover ${i === 0 ? "h-full" : "aspect-square"}`} loading="lazy" />
+              <img src={img} onError={(e) => e.currentTarget.style.display = "none"} alt="AI generated product" className={`w-full object-cover ${i === 0 ? "h-full" : "aspect-square"}`} loading="lazy" />
             </motion.div>
           ))}
         </motion.div>
@@ -263,7 +261,7 @@ export default function LandingPage() {
                   transition={{ type: "spring", stiffness: 300 }}
                   className="rounded-2xl overflow-hidden bg-white border border-slate-100 shadow-lg shadow-slate-100/50"
                 >
-                  <img src={img} alt="Product" className="w-full aspect-square object-cover" loading="lazy" />
+                  <img src={img} onError={(e) => e.currentTarget.style.display = "none"} alt="Product" className="w-full aspect-square object-cover" loading="lazy" />
                 </motion.div>
               ))}
             </motion.div>
@@ -325,7 +323,7 @@ export default function LandingPage() {
             custom={1}
             className="rounded-3xl overflow-hidden border border-slate-200 shadow-2xl shadow-slate-200/50 mb-12"
           >
-            <img src={dashboardPreview} alt="Platform dashboard preview" className="w-full" loading="lazy" />
+            <img src={dashboardPreview} onError={(e) => e.currentTarget.style.display = "none"} alt="Platform dashboard preview" className="w-full" loading="lazy" />
           </motion.div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -368,7 +366,7 @@ export default function LandingPage() {
             whileHover={{ scale: 1.01 }}
             className="relative rounded-3xl overflow-hidden border border-slate-200 shadow-2xl shadow-slate-200/50 cursor-pointer group"
           >
-            <img src={dashboardPreview} alt="Video demo" className="w-full" loading="lazy" />
+            <img src={dashboardPreview} onError={(e) => e.currentTarget.style.display = "none"} alt="Video demo" className="w-full" loading="lazy" />
             <div className="absolute inset-0 bg-slate-900/30 group-hover:bg-slate-900/40 transition-colors flex items-center justify-center">
               <div className="h-20 w-20 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
                 <Play className="h-8 w-8 text-blue-600 ml-1" fill="currentColor" />

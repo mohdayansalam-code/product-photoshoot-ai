@@ -190,7 +190,7 @@ export const GenerationGallery = memo(function GenerationGallery({
              {status === "completed" && <ToolBadge tool="product_fix" className="shadow-black/5" />}
           </div>
 
-          <img src={img} alt={`Generated ${i + 1}`} className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105" />
+          <img src={img} onError={(e) => e.currentTarget.style.display = "none"} alt={`Generated ${i + 1}`} className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105" />
           <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/45 transition-all duration-300 flex items-end justify-center pb-3 opacity-0 group-hover:opacity-100 p-2">
             <div className="flex flex-wrap justify-center gap-1.5 w-full">
               <Button disabled={downloadingUrl === img} size="sm" variant="secondary" className="h-8 text-xs gap-1 bg-card/90 backdrop-blur-sm hover:bg-card" onClick={() => handleDownload(img, i)}>

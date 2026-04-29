@@ -196,6 +196,7 @@ export default function GenerationsPage() {
                 <div key={i} className="relative group">
                   <motion.img
                     src={img}
+                    onError={(e) => e.currentTarget.style.display = "none"}
                     alt=""
                     className="rounded-lg aspect-square object-cover border border-border w-full"
                     whileHover={{ scale: 1.03 }}
