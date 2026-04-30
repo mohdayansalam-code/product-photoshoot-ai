@@ -16,9 +16,8 @@ app.use(cors({
     "https://product-photoshoot-ai-nu.vercel.app",
     "http://localhost:5173"
   ],
-  credentials: true,
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
 }));
 
 app.use(express.json({ limit: "10mb" }));
@@ -78,7 +77,8 @@ app.get("/api/me", async (req, res) => {
     }
 
     const now = new Date();
-    const monthKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthKey = firstDayOfMonth.toISOString().split("T")[0];
 
     const { data } = await supabase
       .from('monthly_usage')
@@ -89,7 +89,18 @@ app.get("/api/me", async (req, res) => {
     let used = data?.usage_count || 0;
     
     // Auto-reset if month changed
-    if (data && data.last_reset_date !== monthKey) {
+    let shouldReset = false;
+    if (data && data.last_reset_date) {
+      const lastReset = new Date(data.last_reset_date);
+      if (
+        lastReset.getMonth() !== now.getMonth() ||
+        lastReset.getFullYear() !== now.getFullYear()
+      ) {
+        shouldReset = true;
+      }
+    }
+
+    if (shouldReset) {
       await supabase
         .from('monthly_usage')
         .update({ usage_count: 0, last_reset_date: monthKey })
@@ -147,7 +158,8 @@ app.post("/api/generate", async (req, res) => {
     // ✅ MONTHLY LIMIT CHECK
     const LIMIT = 10;
     const now = new Date();
-    const monthKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthKey = firstDayOfMonth.toISOString().split("T")[0];
 
     let { data: usageRow, error: usageError } = await supabase
       .from('monthly_usage')
@@ -155,7 +167,18 @@ app.post("/api/generate", async (req, res) => {
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (usageRow && usageRow.last_reset_date !== monthKey) {
+    let shouldReset = false;
+    if (usageRow && usageRow.last_reset_date) {
+      const lastReset = new Date(usageRow.last_reset_date);
+      if (
+        lastReset.getMonth() !== now.getMonth() ||
+        lastReset.getFullYear() !== now.getFullYear()
+      ) {
+        shouldReset = true;
+      }
+    }
+
+    if (shouldReset) {
       await supabase
         .from('monthly_usage')
         .update({ usage_count: 0, last_reset_date: monthKey })
@@ -382,7 +405,8 @@ Ultra-realistic, high-end commercial product image ready for ads and ecommerce.
     if (images.length > 0) {
       const generated = images.length;
       const now = new Date();
-      const monthKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthKey = firstDayOfMonth.toISOString().split("T")[0];
       
       // 1. Calculate expiry (3 days from now)
       const expiresAt = new Date();
