@@ -207,7 +207,7 @@ export default function LandingPage() {
           transition={{ duration: 0.7, delay: 0.3 }}
           className="grid grid-cols-2 gap-4"
         >
-          {[heroImg1, heroImg2, heroImg3, heroImg4].map((img, i) => (
+          {[demoImages[0].src, demoImages[1].src, demoImages[2].src, demoImages[3].src].map((img, i) => (
             <motion.div
               key={i}
               whileHover={{ y: -6, scale: 1.02 }}
