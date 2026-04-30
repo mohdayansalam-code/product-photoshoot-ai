@@ -1,164 +1,145 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, Trash2, Pencil, FolderOpen, Camera, Package } from "lucide-react";
+import { Download, FolderOpen, Package, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { fetchAssets, fetchProducts, getGenerations } from "@/lib/api";
 import { GridSkeleton } from "@/components/ui/SkeletonViews";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "react-router-dom";
-
-const tabs = ["Products", "Generated", "Edited"] as const;
+import { supabase } from "@/lib/supabase";
 
 export default function AssetsPage() {
-  const [activeTab, setActiveTab] = useState<typeof tabs[number]>("Products");
   const [isLoading, setIsLoading] = useState(true);
-  
-  const [products, setProducts] = useState<any[]>([]);
-  const [generations, setGenerations] = useState<any[]>([]);
-  const [assets, setAssets] = useState<any[]>([]);
-  
+  const [images, setImages] = useState<any[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
-    setIsLoading(true);
-    const loadData = async () => {
-       try {
-          if (activeTab === "Products" && products.length === 0) {
-             const data = await fetchProducts();
-             setProducts((data || []).map((p: any, i) => ({ id: p.id, src: p.imageUrl, name: p.name || `Product ${(i+1)}` })));
-          }
-          if (activeTab === "Generated" && generations.length === 0) {
-             const data = await getGenerations();
-             const list: any[] = [];
-             data.forEach((g: any, i) => {
-                 (g.images || g.image_urls || []).forEach((imgUrl: string, j: number) => {
-                     list.push({ id: `g-${g.id}-${j}`, src: imgUrl, name: `Generated ${g.scene || i}` });
-                 });
-             });
-             setGenerations(list);
-          }
-          if (activeTab === "Edited" && assets.length === 0) {
-             const data = await fetchAssets();
-             setAssets(data);
-          }
-       } catch(e: any) {
-          console.error("Failed to load generic assets", e);
-       }
-       setIsLoading(false);
-    };
-    loadData();
-  }, [activeTab]);
+    const fetchImages = async () => {
+      setIsLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
 
-  const getActiveList = () => {
-      if (activeTab === "Products") return products;
-      if (activeTab === "Generated") return generations;
-      return assets;
+        const API_URL = import.meta.env.VITE_API_URL || "https://product-photoshoot-ai.onrender.com";
+        const res = await fetch(`${API_URL}/api/images`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        });
+        const data = await res.json();
+        
+        if (data.images) {
+          setImages(data.images);
+        }
+      } catch (e: any) {
+        console.error("Failed to load images", e);
+        toast({ title: "Failed to load images", description: e.message, variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchImages();
+  }, [toast]);
+
+  const getDaysRemaining = (expiresAt: string) => {
+    const expires = new Date(expiresAt).getTime();
+    const now = new Date().getTime();
+    const diffDays = Math.ceil((expires - now) / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+  const handleDownload = async (url: string) => {
+    try {
+      toast({ title: "Starting download..." });
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `photoai-export-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch {
+      toast({ title: "Download failed", variant: "destructive" });
+    }
   };
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-6">
+    <div className="p-8 max-w-6xl mx-auto space-y-6">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center gap-2 mb-1">
-          <FolderOpen className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-semibold text-foreground">Assets Library</h1>
+          <FolderOpen className="h-6 w-6 text-blue-600" />
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Assets Library</h1>
         </div>
-        <p className="text-sm text-muted-foreground">Manage your product images and generated assets</p>
+        <p className="text-sm text-gray-500">View and manage your generated photos. Images auto-delete after 3 days.</p>
       </motion.div>
-
-      <div className="flex gap-1 bg-secondary rounded-lg p-1 w-fit">
-        {(tabs || []).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`relative px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              activeTab === tab ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {activeTab === tab && (
-              <motion.div
-                layoutId="assets-tab"
-                className="absolute inset-0 bg-card rounded-md shadow-soft"
-                transition={{ type: "spring", stiffness: 400, damping: 30 }}
-              />
-            )}
-            <span className="relative z-10">{tab}</span>
-          </button>
-        ))}
-      </div>
 
       <AnimatePresence mode="wait">
         {isLoading ? (
-           <div className="pt-4"><GridSkeleton count={4} /></div>
-        ) : getActiveList().length === 0 ? (
+           <div className="pt-4"><GridSkeleton count={8} /></div>
+        ) : images.length === 0 ? (
            <motion.div
              key="empty"
              initial={{ opacity: 0 }}
              animate={{ opacity: 1 }}
-             className="flex flex-col items-center justify-center py-20 bg-secondary/30 border border-dashed border-border rounded-xl mt-4"
+             className="flex flex-col items-center justify-center py-24 bg-gray-50 border border-dashed border-gray-200 rounded-2xl mt-8"
            >
-             <Package className="h-10 w-10 text-muted-foreground/50 mb-3" />
-             <h3 className="text-xl font-medium text-foreground">
-                {activeTab === "Products" ? "No products yet" : activeTab === "Edited" ? "No saved images" : "No generated images"}
-             </h3>
-             <p className="text-sm text-muted-foreground max-w-sm text-center mt-1">
-                {activeTab === "Products" ? "Upload your first product to get started." : "Your saved files will appear here."}
+             <Package className="h-12 w-12 text-gray-300 mb-4" />
+             <h3 className="text-lg font-semibold text-gray-900">No images found</h3>
+             <p className="text-sm text-gray-500 max-w-sm text-center mt-2">
+                Generate a photoshoot and your photos will appear here.
              </p>
            </motion.div>
         ) : (
           <motion.div
-            key={activeTab}
+            key="grid"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.2 }}
-            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-4"
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-8"
           >
-            {(getActiveList() || []).map((asset, i) => (
-            <motion.div
-              key={asset.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.05 }}
-              whileHover={{ y: -3 }}
-              className="group rounded-xl border border-border bg-card overflow-hidden shadow-soft"
-            >
-              <div className="relative aspect-square overflow-hidden">
-                <img src={asset.src} alt={asset.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/40 transition-all duration-300 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                  <Button size="icon" variant="secondary" className="h-8 w-8 bg-card/90 backdrop-blur-sm" title="Use in Photoshoot" asChild>
-                    <Link to="/dashboard/generate">
-                      <Camera className="h-3.5 w-3.5" />
-                    </Link>
-                  </Button>
-                  <Button size="icon" variant="secondary" className="h-8 w-8 bg-card/90 backdrop-blur-sm" title="Edit" asChild>
-                    <Link to={`/dashboard/editor?image=${encodeURIComponent(asset.src)}`}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Link>
-                  </Button>
-                  <Button size="icon" variant="secondary" className="h-8 w-8 bg-card/90 backdrop-blur-sm" title="Download" onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = asset.src;
-                    link.download = asset.name;
-                    link.click();
-                    toast({ title: "Download started" });
-                  }}>
-                    <Download className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button size="icon" variant="secondary" className="h-8 w-8 bg-card/90 backdrop-blur-sm text-destructive" title="Delete" onClick={() => {
-                    toast({
-                      title: "Action Disabled",
-                      description: "Delete is currently disabled for mock assets.",
-                      variant: "destructive"
-                    });
-                  }}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-              <p className="text-xs font-medium text-foreground p-2.5 truncate">{asset.name}</p>
-            </motion.div>
-          ))}
-        </motion.div>
+            {images.map((asset, i) => {
+              const daysLeft = getDaysRemaining(asset.expires_at);
+              return (
+                <motion.div
+                  key={asset.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="group relative rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="relative aspect-[4/5] overflow-hidden bg-gray-100">
+                    <img src={asset.image_url} alt="Generated" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                    
+                    <div className="absolute top-2 left-2 right-2 flex justify-between items-start opacity-100">
+                      <div className="bg-black/60 backdrop-blur-md px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 border border-white/10 shadow-sm">
+                        <Clock className={`w-3.5 h-3.5 ${daysLeft <= 1 ? 'text-red-400' : 'text-blue-400'}`} />
+                        <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                          Expires in {daysLeft} day{daysLeft !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="absolute inset-0 bg-black/40 transition-opacity duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100 backdrop-blur-[2px]">
+                      <Button 
+                        variant="secondary" 
+                        className="bg-white text-black hover:bg-gray-100 rounded-full font-bold shadow-lg"
+                        onClick={() => handleDownload(asset.image_url)}
+                      >
+                        <Download className="h-4 w-4 mr-2" /> Download
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="p-3 border-t border-gray-100">
+                    <p className="text-xs text-gray-500 font-medium">
+                      Generated: {new Date(asset.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

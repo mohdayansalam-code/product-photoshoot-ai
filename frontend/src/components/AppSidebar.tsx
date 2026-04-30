@@ -27,12 +27,8 @@ import {
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Generate Photoshoot", url: "/dashboard/create-photoshoot", icon: Camera },
-  { title: "Generations", url: "/dashboard/generations", icon: Images },
-  { title: "AI Image Tools", url: "/dashboard/tools", icon: Wand2 },
   { title: "AI Image Editor", url: "/dashboard/editor", icon: Pencil },
-  { title: "Products", url: "/dashboard/products", icon: Package },
   { title: "Assets Library", url: "/dashboard/assets", icon: FolderOpen },
-  { title: "Credits", url: "/dashboard/credits", icon: Coins },
   { title: "Settings", url: "/dashboard/settings", icon: Settings },
 ];
 

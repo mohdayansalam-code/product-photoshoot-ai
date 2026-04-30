@@ -68,15 +68,9 @@ const AppContent = () => {
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/create-photoshoot" element={<CreatePhotoshootPage />} />
-              <Route path="/generations" element={<GenerationsPage />} />
-              <Route path="/tools" element={<AIToolsPage />} />
               <Route path="/editor" element={<EditorPage />} />
-              <Route path="/products" element={<ProductsLibraryPage />} />
               <Route path="/assets" element={<AssetsPage />} />
-              <Route path="/billing" element={<BillingPage />} />
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/profile" element={<SettingsPage />} />
-              <Route path="/admin" element={<AdminPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </DashboardLayout>

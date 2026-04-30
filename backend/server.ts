@@ -60,8 +60,8 @@ app.get("/", (req, res) => {
   res.send("API is running...");
 });
 
-// ✅ USAGE CHECK ROUTE
-app.get("/api/usage", async (req, res) => {
+// ✅ USAGE & PLAN INFO ROUTE
+app.get("/api/me", async (req, res) => {
   try {
     const token = req.headers.authorization?.replace("Bearer ", "");
     if (!token) {
@@ -75,16 +75,34 @@ app.get("/api/usage", async (req, res) => {
 
     const now = new Date();
     const monthKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+
     const { data } = await supabase
-      .from('daily_usage')
-      .select('count')
+      .from('monthly_usage')
+      .select('*')
       .eq('user_id', user.id)
-      .eq('month', monthKey)
       .maybeSingle();
 
-    console.log("USAGE FETCH:", user.id, data);
+    let used = data?.usage_count || 0;
+    
+    // Auto-reset if month changed
+    if (data && data.last_reset_date !== monthKey) {
+      await supabase
+        .from('monthly_usage')
+        .update({ usage_count: 0, last_reset_date: monthKey })
+        .eq('user_id', user.id);
+      used = 0;
+    } else if (!data) {
+      await supabase
+        .from('monthly_usage')
+        .insert({ user_id: user.id, usage_count: 0, last_reset_date: monthKey });
+    }
 
-    return res.json({ used: data?.count || 0, limit: 10 });
+    return res.json({ 
+      plan: "Free", 
+      used: used, 
+      limit: 10, 
+      reset_date: monthKey 
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -127,14 +145,29 @@ app.post("/api/generate", async (req, res) => {
     const now = new Date();
     const monthKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
 
-    const { data: usageRow, error: usageError } = await supabase
-      .from('daily_usage')
-      .select('count')
+    let { data: usageRow, error: usageError } = await supabase
+      .from('monthly_usage')
+      .select('*')
       .eq('user_id', user.id)
-      .eq('month', monthKey)
       .maybeSingle();
 
-    const used = usageRow?.count || 0;
+    if (usageRow && usageRow.last_reset_date !== monthKey) {
+      await supabase
+        .from('monthly_usage')
+        .update({ usage_count: 0, last_reset_date: monthKey })
+        .eq('user_id', user.id);
+      usageRow.usage_count = 0;
+      usageRow.last_reset_date = monthKey;
+    } else if (!usageRow) {
+      const { data: newRow } = await supabase
+        .from('monthly_usage')
+        .insert({ user_id: user.id, usage_count: 0, last_reset_date: monthKey })
+        .select()
+        .single();
+      usageRow = newRow || { usage_count: 0 };
+    }
+
+    const used = usageRow?.usage_count || 0;
 
     if (used + parsedImageCount > LIMIT) {
       return res.status(400).json({ error: `Monthly limit reached (10 images)` });
@@ -341,43 +374,39 @@ Ultra-realistic, high-end commercial product image ready for ads and ecommerce.
 
     console.log("✅ FINAL IMAGES RETURNED:", images.length);
 
-    // ✅ INCREMENT AFTER SUCCESS (NO RPC)
+    // ✅ SAVE IMAGES & INCREMENT USAGE
     if (images.length > 0) {
       const generated = images.length;
-
       const now = new Date();
       const monthKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
-
-      // 1. get existing usage
-      const { data: existing } = await supabase
-        .from("daily_usage")
-        .select("count")
-        .eq("user_id", user.id)
-        .eq("month", monthKey)
-        .maybeSingle();
-
-      const used = existing?.count || 0;
-
-      // 2. update or insert
-      if (!existing) {
-        // first time this month
-        const { error } = await supabase.from("daily_usage").insert({
-          user_id: user.id,
-          month: monthKey,
-          count: generated
-        });
-        if (error) console.error("❌ MONTHLY USAGE UPDATE FAILED:", error);
-      } else {
-        // increment
-        const { error } = await supabase
-          .from("daily_usage")
-          .update({ count: used + generated })
-          .eq("user_id", user.id)
-          .eq("month", monthKey);
-        if (error) console.error("❌ MONTHLY USAGE UPDATE FAILED:", error);
-      }
       
-      console.log(`✅ User ${user.id} monthly usage updated`);
+      // 1. Calculate expiry (3 days from now)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 3);
+
+      // 2. Save ALL images individually
+      for (const img of images) {
+        const imageUrl = img.url || img;
+        const { error: imgError } = await supabase
+          .from("generated_images")
+          .insert({
+            user_id: user.id,
+            image_url: imageUrl,
+            expires_at: expiresAt.toISOString()
+          });
+        if (imgError) console.error("❌ IMAGE SAVE FAILED:", imgError);
+      }
+
+      // 3. Increment monthly usage
+      const { error: usageErr } = await supabase
+        .from("monthly_usage")
+        .update({ usage_count: used + generated })
+        .eq("user_id", user.id)
+        .eq("last_reset_date", monthKey);
+        
+      if (usageErr) console.error("❌ MONTHLY USAGE UPDATE FAILED:", usageErr);
+      
+      console.log(`✅ User ${user.id} saved ${generated} images & updated usage.`);
     }
 
     return res.json({ success: true, images });
@@ -387,6 +416,40 @@ Ultra-realistic, high-end commercial product image ready for ads and ecommerce.
     return res.status(500).json({
       error: err.message || "Generation failed"
     });
+  }
+});
+
+// ✅ ASSETS LIBRARY ROUTE
+app.get("/api/images", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) return res.status(401).json({ error: "Missing authorization" });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: "Unauthorized" });
+
+    const now = new Date().toISOString();
+
+    // 1. Auto cleanup expired images
+    await supabase
+      .from("generated_images")
+      .delete()
+      .eq("user_id", user.id)
+      .lt("expires_at", now);
+
+    // 2. Fetch active images
+    const { data, error } = await supabase
+      .from("generated_images")
+      .select("*")
+      .eq("user_id", user.id)
+      .gte("expires_at", now)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    return res.json({ images: data });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
