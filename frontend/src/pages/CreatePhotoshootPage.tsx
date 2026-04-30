@@ -152,6 +152,8 @@ export default function CreatePhotoshootPage() {
   const productInputRef = useRef<HTMLInputElement>(null);
   const faceInputRef = useRef<HTMLInputElement>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
+  const generateRef = useRef<HTMLButtonElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   // 1. Local Storage Safe Load
   useEffect(() => {
@@ -172,6 +174,15 @@ export default function CreatePhotoshootPage() {
       setSelectedModel(activePreset.model);
     }
   }, [activePreset]);
+
+  // Auto Scroll to Generate
+  useEffect(() => {
+    if (activePreset || productImage) {
+      setTimeout(() => {
+        generateRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 500);
+    }
+  }, [activePreset, productImage]);
 
   // 2. Local Storage Safe Save
   useEffect(() => {
@@ -439,7 +450,7 @@ export default function CreatePhotoshootPage() {
       
       // 5. Safe Usage Update (Fetch from backend)
       await fetchUsage();
-      toast.success("Images generated successfully!");
+      toast.success("✨ Your photos are ready!");
       
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -454,7 +465,7 @@ export default function CreatePhotoshootPage() {
       }, 3000);
       
       setTimeout(() => {
-        document.getElementById("results")?.scrollIntoView({ behavior: "smooth" });
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 300);
 
     } catch (err: any) {
@@ -497,6 +508,14 @@ export default function CreatePhotoshootPage() {
       )}
     </div>
   );
+
+  const handleDownloadAll = async () => {
+    toast.success("Starting download of all images...");
+    for (let i = 0; i < results.length; i++) {
+      await handleDownload(results[i].url || results[i]);
+      await new Promise(r => setTimeout(r, 500));
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -716,50 +735,70 @@ export default function CreatePhotoshootPage() {
                 <p className="text-[10px] text-yellow-600 mt-1.5 font-medium tracking-wide uppercase">Upload clean product image for best results</p>
               </div>
               
-              <button 
-                onClick={() => executeGeneration()}
-                disabled={isGenerating || !productImage || (useModel && !faceImage)}
-                className={`w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 ${isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                <Sparkles className="w-4 h-4" /> {isGenerating ? "Generating..." : "Generate Product Photos"}
-              </button>
-              {!productImage && (
-                <p className="text-xs text-red-400 mt-2 text-center">
-                  Upload required images to continue
-                </p>
-              )}
+              <div className="group relative">
+                <button 
+                  ref={generateRef}
+                  onClick={() => executeGeneration()}
+                  disabled={isGenerating || !isGenerateReady()}
+                  className={`w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-4 font-bold text-lg shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${isGenerating ? "opacity-50 cursor-not-allowed" : "hover:scale-[1.02]"}`}
+                >
+                  <Sparkles className="w-5 h-5" /> {isGenerating ? "Generating..." : "Generate Photoshoot"}
+                </button>
+                {(!isGenerateReady()) && (
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-3 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    Upload product to continue
+                  </div>
+                )}
+              </div>
             </div>
 
           </div>
         </div>
 
         {/* MAIN */}
-        <div className="flex-1 w-full overflow-y-auto px-8 py-6 custom-scrollbar bg-[#FDFCFB]">
+        <div className="flex-1 w-full overflow-y-auto px-8 py-6 custom-scrollbar bg-[#FDFCFB]" ref={resultsRef}>
           <div className="generation-area h-full flex flex-col items-center justify-center">
             {isGenerating && (
               <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                <p className="text-lg font-medium text-gray-900">{loadingMessage}</p>
-                <p className="text-sm text-gray-500 mt-2">This may take 10–20 seconds</p>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mb-6"></div>
+                <div className="loading-state space-y-2">
+                  <p className="text-2xl font-bold text-gray-900">Generating your photos...</p>
+                  <p className="text-lg text-gray-500">This takes ~10–20 seconds</p>
+                </div>
               </div>
             )}
             
             {!isGenerating && results.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center text-gray-400">
-                <p className="text-lg">No images yet — generate your first photoshoot</p>
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <p className="text-2xl font-bold text-gray-900 mb-2">No images yet</p>
+                <p className="text-lg text-gray-500">Upload your product and click Generate</p>
               </div>
             ) : !isGenerating && (
-              <div className="grid grid-cols-3 gap-4 w-full h-fit">
-                {results.map((img: any, i: number) => (
-                  <div key={i} className="relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100 aspect-[4/5]">
-                    <img src={img.url || img} alt="Generated result" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4 z-20">
-                      <Button onClick={() => handleDownload(img.url || img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-full max-w-[200px] shadow-lg text-xs h-9">
-                        <Download className="w-4 h-4 mr-2" /> Download
-                      </Button>
+              <div className="w-full flex flex-col gap-6">
+                <div className="flex items-center justify-between w-full">
+                  <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    ✨ Your photos are ready!
+                  </h3>
+                  <Button onClick={handleDownloadAll} variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 font-bold">
+                    <Download className="w-4 h-4 mr-2" /> Download All
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 w-full h-fit pb-12">
+                  {results.map((img: any, i: number) => (
+                    <div key={i} className="relative group rounded-2xl overflow-hidden border border-gray-200 shadow-md hover:shadow-xl transition-all duration-300 bg-white aspect-[4/5]">
+                      <img src={img.url || img} alt="Generated result" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center backdrop-blur-[2px] gap-3 p-4 z-20">
+                        <Button onClick={() => handleDownload(img.url || img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-full max-w-[200px] shadow-lg text-sm h-10 transition-transform hover:scale-105">
+                          <Download className="w-4 h-4 mr-2" /> Download
+                        </Button>
+                        <Button onClick={() => executeGeneration(true)} variant="secondary" className="bg-blue-600 text-white hover:bg-blue-700 border-none rounded-full font-bold w-full max-w-[200px] shadow-lg text-sm h-10 transition-transform hover:scale-105">
+                          <RefreshCw className="w-4 h-4 mr-2" /> Regenerate Similar
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
