@@ -50,7 +50,6 @@ export default function Index() {
         <div className="space-y-1">
            <div className="flex items-center gap-4">
              <h1 className="text-4xl font-bold tracking-tight text-foreground">Create Photoshoot</h1>
-             <p className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-bold text-sm border border-green-200">{imagesUsed} / {monthlyLimit} images used</p>
            </div>
            <p className="text-lg text-muted-foreground">Generate stunning AI product photos in seconds.</p>
         </div>
