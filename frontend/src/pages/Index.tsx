@@ -105,7 +105,7 @@ export default function Index() {
           
           {/* Preset 1 */}
           <div 
-            onClick={() => navigate("/dashboard/create-photoshoot")}
+            onClick={() => navigate("/dashboard/create-photoshoot?preset=amazon")}
             className="group cursor-pointer bg-white rounded-2xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-all flex items-center gap-4 hover:border-blue-200"
           >
             <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
@@ -122,7 +122,7 @@ export default function Index() {
 
           {/* Preset 2 */}
           <div 
-            onClick={() => navigate("/dashboard/create-photoshoot")}
+            onClick={() => navigate("/dashboard/create-photoshoot?preset=instagram")}
             className="group cursor-pointer bg-white rounded-2xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-all flex items-center gap-4 hover:border-blue-200"
           >
             <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
@@ -139,7 +139,7 @@ export default function Index() {
 
           {/* Preset 3 */}
           <div 
-            onClick={() => navigate("/dashboard/create-photoshoot")}
+            onClick={() => navigate("/dashboard/create-photoshoot?preset=website")}
             className="group cursor-pointer bg-white rounded-2xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-all flex items-center gap-4 hover:border-blue-200"
           >
             <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">

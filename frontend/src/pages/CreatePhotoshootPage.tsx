@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { 
   X, 
   Sparkles,
   Download,
@@ -22,6 +22,27 @@ import { toast } from "sonner";
 
 const CATEGORIES = ["Fashion", "Cosmetics", "Jewelry", "Model Campaigns"];
 
+const PRESETS: Record<string, any> = {
+  amazon: {
+    name: "Amazon Listing",
+    prompt: "clean white background, product centered, soft shadow, ecommerce style, high clarity, no distractions",
+    aspectRatio: "1:1",
+    model: "gpt",
+  },
+  instagram: {
+    name: "Instagram Ads",
+    prompt: "colorful background, lifestyle scene, modern lighting, trendy aesthetic, social media style",
+    aspectRatio: "4:5",
+    model: "seedream",
+  },
+  website: {
+    name: "Website Banner",
+    prompt: "premium product banner, soft lighting, minimal background, luxury feel, high resolution",
+    aspectRatio: "16:9",
+    model: "gpt",
+  }
+};
+
 const SIZES = [
   { label: "1:1", name: "Square" },
   { label: "16:9", name: "Widescreen" },
@@ -38,6 +59,10 @@ const SIZES = [
 const IMAGE_LIMIT = 10;
 
 export default function CreatePhotoshootPage() {
+  const [searchParams] = useSearchParams();
+  const presetKey = searchParams.get("preset");
+  const activePreset = presetKey && PRESETS[presetKey] ? PRESETS[presetKey] : null;
+
   // Filters
   const [activeCategory, setActiveCategory] = useState<string>("Cosmetics");
   
@@ -138,6 +163,14 @@ export default function CreatePhotoshootPage() {
       } catch (e) {}
     }
   }, []);
+
+  useEffect(() => {
+    if (activePreset) {
+      setCustomPrompt(activePreset.prompt);
+      setAspectRatio(activePreset.aspectRatio);
+      setSelectedModel(activePreset.model);
+    }
+  }, [activePreset]);
 
   // 2. Local Storage Safe Save
   useEffect(() => {
@@ -526,7 +559,14 @@ export default function CreatePhotoshootPage() {
     <div className="min-h-screen bg-[#FDFCFB] text-slate-900 font-sans flex flex-col relative overflow-hidden">
       {/* Header */}
       <header className="h-[70px] border-b bg-white flex items-center justify-between px-6 shrink-0 z-30">
-        <h2 className="font-bold text-xl tracking-tight text-black">PhotoAI</h2>
+        <h2 className="font-bold text-xl tracking-tight text-black flex items-center gap-3">
+          PhotoAI
+          {activePreset && (
+            <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-semibold">
+              Preset: {activePreset.name}
+            </span>
+          )}
+        </h2>
         <div className="flex items-center gap-3 ml-auto">
           <label className="text-sm font-medium text-gray-500">Niche:</label>
           <select 
