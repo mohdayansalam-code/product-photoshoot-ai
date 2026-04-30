@@ -18,75 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { demoImages } from "@/data/demoImages";
 
-// --- TEMPLATES DATA ---
-const TEMPLATES = [
-  {
-    id: "fashion_editorial",
-    category: "Fashion",
-    name: "Editorial Shoot",
-    description: "High-end magazine style, dramatic lighting",
-    requiresModel: true,
-    image: demoImages[12].src
-  },
-  {
-    id: "fashion_streetwear",
-    category: "Fashion",
-    name: "Streetwear",
-    description: "Urban environment, edgy style",
-    requiresModel: true,
-    image: demoImages[13].src
-  },
-  {
-    id: "cosmetics_luxury_skincare",
-    category: "Cosmetics",
-    name: "Luxury Skincare",
-    description: "Soft lighting, premium aesthetic",
-    requiresModel: false,
-    image: demoImages[14].src
-  },
-  {
-    id: "cosmetics_white_studio",
-    category: "Cosmetics",
-    name: "Clean White Studio",
-    description: "Minimal shadows, ecommerce style",
-    requiresModel: false,
-    image: demoImages[15].src
-  },
-  {
-    id: "jewelry_dark_luxury",
-    category: "Jewelry",
-    name: "Dark Luxury",
-    description: "Dark background, gold reflections",
-    requiresModel: false,
-    image: demoImages[16].src
-  },
-  {
-    id: "jewelry_marble",
-    category: "Jewelry",
-    name: "Marble Surface",
-    description: "Elegant marble, natural light",
-    requiresModel: false,
-    image: demoImages[17].src
-  },
-  {
-    id: "campaign_cosmetics_model",
-    category: "Model Campaigns",
-    name: "Cosmetics Model Shoot",
-    description: "Model interacting with skincare product",
-    requiresModel: true,
-    image: demoImages[18].src
-  },
-  {
-    id: "campaign_premium_ad",
-    category: "Model Campaigns",
-    name: "Premium Campaign Ad",
-    description: "High budget commercial look",
-    requiresModel: true,
-    image: demoImages[19].src
-  }
-];
 
 const CATEGORIES = ["Fashion", "Cosmetics", "Jewelry", "Model Campaigns"];
 
@@ -110,8 +42,6 @@ export default function CreatePhotoshootPage() {
   const [activeCategory, setActiveCategory] = useState<string>("Cosmetics");
   
   // Selections
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
-  const selectedTemplate = TEMPLATES.find(t => t.id === selectedTemplateId);
   
   // Images
   const [productImage, setProductImage] = useState<string | null>(null);
@@ -203,32 +133,19 @@ export default function CreatePhotoshootPage() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.template && TEMPLATES.some(t => t.id === parsed.template)) {
-          setSelectedTemplateId(parsed.template);
-        } else {
-          setSelectedTemplateId("");
-        }
         if (parsed.aspectRatio) setAspectRatio(parsed.aspectRatio);
         if (parsed.modelType) setModelType(parsed.modelType);
       } catch (e) {}
     }
   }, []);
 
-  // 1b. Strict Template Match
-  useEffect(() => {
-    if (selectedTemplateId && !TEMPLATES.find(t => t.id === selectedTemplateId)) {
-      setSelectedTemplateId("");
-    }
-  }, [selectedTemplateId]);
-
   // 2. Local Storage Safe Save
   useEffect(() => {
     localStorage.setItem("photoshoot_settings", JSON.stringify({
-      template: selectedTemplateId,
       aspectRatio,
       modelType
     }));
-  }, [selectedTemplateId, aspectRatio, modelType]);
+  }, [aspectRatio, modelType]);
 
   // Auto Default Logic
   useEffect(() => {
@@ -247,18 +164,7 @@ export default function CreatePhotoshootPage() {
     }
   }, [activeCategory]);
 
-  useEffect(() => {
-    if (selectedTemplate) {
-      if (selectedTemplate.requiresModel) {
-        setUseModel(true);
-      }
-    }
-  }, [selectedTemplate]);
-
-  const filteredTemplates = TEMPLATES.filter(t => t.category === activeCategory);
-
   const isGenerateReady = () => {
-    if (!selectedTemplate) return false;
     if (!productImage) return false;
     if (useModel && !faceImage) return false;
     return true;
@@ -374,10 +280,6 @@ export default function CreatePhotoshootPage() {
         return;
       }
 
-      if (!selectedTemplate) {
-        alert("Select a template");
-        return;
-      }
 
       if (!isGenerateReady()) return;
       
@@ -396,7 +298,7 @@ export default function CreatePhotoshootPage() {
       }
 
       payload = {
-        template: selectedTemplateId,
+        template: activeCategory.toLowerCase(),
         productImage,
         faceImage: useModel ? faceImage : null,
         backgroundImage,
@@ -404,7 +306,7 @@ export default function CreatePhotoshootPage() {
         imageCount,
         customPrompt,
         modelType,
-        requiresModel: selectedTemplate?.requiresModel || false,
+        requiresModel: useModel,
         userId: currentUser.id,
         model: selectedModel,
         category: activeCategory.toLowerCase()
@@ -629,7 +531,7 @@ export default function CreatePhotoshootPage() {
           <label className="text-sm font-medium text-gray-500">Niche:</label>
           <select 
             value={activeCategory} 
-            onChange={(e) => { setActiveCategory(e.target.value); setSelectedTemplateId(""); setError(""); }}
+            onChange={(e) => { setActiveCategory(e.target.value); setError(""); }}
             className="bg-gray-50 border border-gray-200 rounded-lg text-sm px-4 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
             {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
@@ -642,13 +544,7 @@ export default function CreatePhotoshootPage() {
         {/* LEFT PANEL */}
         <div className="w-[340px] bg-[#0B0B0F] border-r border-gray-800 p-4 flex flex-col space-y-5 shrink-0 overflow-y-auto custom-scrollbar">
           
-          {!selectedTemplate && (
-            <p className="text-sm text-gray-400 text-center mt-4">
-              Select a template to start
-            </p>
-          )}
-
-          <div className={cn("space-y-5 transition-opacity duration-200", selectedTemplate ? "opacity-100" : "opacity-60 pointer-events-none")}>
+          <div className="space-y-5 transition-opacity duration-200 opacity-100">
             
             <div className="space-y-3">
               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">References</label>
@@ -781,7 +677,7 @@ export default function CreatePhotoshootPage() {
               
               <button 
                 onClick={() => executeGeneration()}
-                disabled={isGenerating || !selectedTemplate || !productImage || (useModel && !faceImage)}
+                disabled={isGenerating || !productImage || (useModel && !faceImage)}
                 className={`w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2 ${isGenerating ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 <Sparkles className="w-4 h-4" /> {isGenerating ? "Generating..." : "Generate Product Photos"}
@@ -797,192 +693,34 @@ export default function CreatePhotoshootPage() {
         </div>
 
         {/* MAIN */}
-        <div className="flex-1 overflow-y-auto px-8 py-6 w-full custom-scrollbar bg-[#FDFCFB]">
-          <div className="max-w-6xl mx-auto">
-            <div className="mb-10 text-center flex flex-col items-center">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-widest mb-4">
-                Loved by 500+ creators
+        <div className="flex-1 w-full overflow-y-auto px-8 py-6 custom-scrollbar bg-[#FDFCFB]">
+          <div className="generation-area h-full flex flex-col items-center justify-center">
+            {isGenerating && (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                <p className="text-lg font-medium text-gray-900">{loadingMessage}</p>
+                <p className="text-sm text-gray-500 mt-2">This may take 10–20 seconds</p>
               </div>
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-gray-900 mb-6 max-w-3xl leading-tight">
-                Turn your product photos into professional ads instantly
-              </h1>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-sm font-medium text-gray-600">
-                <span className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-blue-500" /> No photoshoot needed</span>
-                <span className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-blue-500" /> No editing skills required</span>
-                <span className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-blue-500" /> Generate high-quality product images in seconds</span>
+            )}
+            
+            {!isGenerating && results.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center text-gray-400">
+                <p className="text-lg">No images yet — generate your first photoshoot</p>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-              <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm text-center">
-                <h3 className="font-bold text-gray-900 mb-1">Fashion</h3>
-                <p className="text-xs text-gray-500">Create lifestyle shots for clothing & accessories</p>
-              </div>
-              <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm text-center">
-                <h3 className="font-bold text-gray-900 mb-1">Cosmetics</h3>
-                <p className="text-xs text-gray-500">Generate clean, premium skincare visuals</p>
-              </div>
-              <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm text-center">
-                <h3 className="font-bold text-gray-900 mb-1">Jewelry</h3>
-                <p className="text-xs text-gray-500">Highlight shine, reflections, and luxury detail</p>
-              </div>
-            </div>
-
-            {/* Template Section */}
-            <div className="mb-6">
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {filteredTemplates.map(template => (
-                  <div 
-                    key={template.id}
-                    onClick={() => { setSelectedTemplateId(template.id); setError(""); }}
-                    className={cn(
-                      "rounded-xl border p-3 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 bg-white",
-                      selectedTemplateId === template.id ? "border-blue-500 shadow-md" : "border-gray-200"
-                    )}
-                  >
-                    <img src={template.image} onError={(e) => e.currentTarget.style.display = "none"} className="rounded-lg mb-2 w-full object-cover aspect-[4/3]" />
-                    <h3 className="font-semibold text-sm">{template.name}</h3>
-                    <p className="text-xs text-gray-500 line-clamp-2">
-                      {template.description}
-                    </p>
+            ) : !isGenerating && (
+              <div className="grid grid-cols-3 gap-4 w-full h-fit">
+                {results.map((img: any, i: number) => (
+                  <div key={i} className="relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100 aspect-[4/5]">
+                    <img src={img.url || img} alt="Generated result" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4 z-20">
+                      <Button onClick={() => handleDownload(img.url || img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-full max-w-[200px] shadow-lg text-xs h-9">
+                        <Download className="w-4 h-4 mr-2" /> Download
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
-              
-              {error && (
-                <div className="bg-red-50 border border-red-200 px-4 py-4 rounded-xl flex items-center justify-between shadow-sm mt-4">
-                  <div className="flex items-center gap-3 text-red-600">
-                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                    <p className="font-medium text-sm">{error}</p>
-                  </div>
-                  {lastRequestRef.current && (
-                     <Button onClick={() => executeGeneration(true)} variant="outline" size="sm" className="bg-white border-red-200 text-red-600 hover:bg-red-50 font-bold">
-                       <RefreshCw className="w-3 h-3 mr-2" /> Retry
-                     </Button>
-                  )}
-                </div>
-              )}
-              
-              {!isGenerating && results.length === 0 && !error && (
-                <div className="text-center text-gray-400 mt-10">
-                  <p className="text-lg">No images yet — generate your first photoshoot</p>
-                </div>
-              )}
-            </div>
-
-            {/* Results */}
-            <div>
-              <AnimatePresence>
-                {(isGenerating || results.length > 0) && (
-                  <motion.div 
-                    id="results"
-                    initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} 
-                    className="pt-8 border-t border-gray-200 pb-10"
-                  >
-                    <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <h3 className="text-2xl font-semibold">Generated Results</h3>
-                      {!isGenerating && results.length > 0 && (
-                        <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1.5 rounded-full border border-green-200 shadow-sm">
-                          <Sparkles className="w-4 h-4" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider">Optimized for ecommerce quality</span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {successMessage && (
-                      <div className="mb-4 px-4 py-2 rounded-lg bg-green-50 text-green-600 text-sm font-medium transition-opacity duration-300">
-                        {successMessage}
-                      </div>
-                    )}
-                    
-                    {isGenerating && (
-                      <div className="flex flex-col items-center justify-center py-10 border border-gray-200 rounded-xl bg-gray-50/50 my-6">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-                        <p className="text-lg font-medium text-gray-900">
-                          {loadingMessage}
-                        </p>
-                        <p className="text-sm text-gray-500 mt-2">
-                          This may take 10–20 seconds
-                        </p>
-                      </div>
-                    )}
-
-                    {!isGenerating && results.length > 0 && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
-                        {results.map((img: any, i) => (
-                          <div key={i} className="flex flex-col gap-3">
-                            <div className="flex items-center justify-center text-[10px] font-bold text-gray-400 uppercase tracking-widest gap-2 mb-1">
-                               <span>From this</span>
-                               <span className="text-gray-300">→</span>
-                               <span className="text-blue-600">To this in seconds</span>
-                            </div>
-                            <div className="flex gap-2">
-                              {/* Before Image */}
-                              <div className="w-1/3 relative rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white flex-shrink-0 flex items-center justify-center p-2">
-                                <img src={productImage as string} alt="Original product" className="w-full h-full object-contain opacity-80" />
-                                <div className="absolute top-2 left-2 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider backdrop-blur-sm">Raw</div>
-                              </div>
-                              
-                              {/* After Image */}
-                              <div className="w-2/3 relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
-                                <img src={img.url || img} alt="Generated result" className="w-full h-full object-cover" />
-                                
-                                <div className="absolute top-2 right-2 flex justify-center opacity-100 pointer-events-none z-10">
-                                  <span className="bg-black/70 text-white text-[10px] px-2 py-1 rounded-md text-center backdrop-blur-sm border border-white/10 shadow-sm truncate">
-                                    {i === 0 ? "Accurate Product Image" : i === 1 ? "Creative Marketing Version" : `Variation ${i+1}`}
-                                  </span>
-                                </div>
-
-                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm gap-3 p-4 z-20">
-                                  <Button onClick={() => handleDownload(img.url || img)} className="bg-white text-black hover:bg-gray-100 rounded-full font-bold w-full max-w-[200px] shadow-lg text-xs h-9">
-                                    <Download className="w-4 h-4 mr-2" /> Download
-                                  </Button>
-                                  <Button onClick={() => executeGeneration(true, { varyStyle: true })} className="bg-blue-600 text-white hover:bg-blue-500 rounded-full font-bold w-full max-w-[200px] shadow-lg text-xs h-9 px-2">
-                                    <RefreshCw className="w-3 h-3 mr-1.5" /> Try different style
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="px-1 flex flex-col gap-1.5">
-                              <span className="text-xs font-bold text-gray-800 uppercase tracking-wider">
-                                {img.type === "ecommerce" ? "Clean Ecommerce Version" : img.type === "creative" ? "Creative Ad Version" : "Generated Result"}
-                              </span>
-                              <p className="text-[11px] text-gray-500">
-                                {img.type === "ecommerce" 
-                                  ? "Optimized for product accuracy and minimal background." 
-                                  : img.type === "creative" 
-                                    ? "Enhanced with premium commercial lighting and styling."
-                                    : "Generated product variant."}
-                              </p>
-                              <div className="flex items-center gap-2 mt-2">
-                                <Button onClick={() => toast.success("Thanks for the feedback!")} variant="outline" size="sm" className="h-7 text-xs font-semibold rounded-full border-gray-200">
-                                  <ThumbsUp className="w-3 h-3 mr-1.5 text-green-600" /> Good result
-                                </Button>
-                                <Button onClick={() => executeGeneration(true, { improveQuality: true })} variant="outline" size="sm" className="h-7 text-xs font-semibold rounded-full border-gray-200 hover:bg-red-50 hover:text-red-700">
-                                  <ThumbsDown className="w-3 h-3 mr-1.5 text-red-600" /> Improve result
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {!isGenerating && results.length > 0 && (
-                      <div className="text-center mt-12 pt-8 border-t border-gray-100">
-                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-full">
-                          <Crown className="w-4 h-4 text-yellow-500" />
-                          <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                            Ready for Shopify, Ads, and Social Media
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            )}
           </div>
         </div>
 
