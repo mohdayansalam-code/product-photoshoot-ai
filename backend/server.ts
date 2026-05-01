@@ -213,21 +213,27 @@ app.post("/api/generate", async (req, res) => {
       MODEL_ID = "fal-ai/bytedance/seedream/v4.5/edit"; // ✅ correct
     }
 
+    const safeImageCount =
+      model === "gpt"
+        ? 1
+        : Math.min(imageCount || 1, 4);
+
     let input: any = {
       prompt: prompt.trim(),
       image_urls: [imageUrl],
       image_size: "square_hd",     // fixed 1024x1024
-      num_images: Math.min(imageCount || 1, 4)
+      num_images: safeImageCount
     };
 
     if (model === "gpt") {
       input.quality = "medium";   // required for GPT
     }
 
+    const TIMEOUT = 120000; // 120 seconds max
+
     // ✅ 5. LOGGING (PRODUCTION VISIBILITY)
-    console.log("GEN_REQUEST:", { userId: user.id, model, imageCount });
-    console.log("IMAGE_URL:", imageUrl);
-    console.log("MODEL_ID:", MODEL_ID);
+    console.log("GEN_REQUEST:", { model, imageCount });
+    console.log("TIMEOUT:", TIMEOUT);
 
     // ✅ 4. SAFE API CALL WITH RETRY
     let result: any;
@@ -240,7 +246,7 @@ app.post("/api/generate", async (req, res) => {
           result = await Promise.race([
             fal.subscribe(MODEL_ID, { input }),
             new Promise((_, reject) =>
-              setTimeout(() => reject(new Error("timeout")), 20000)
+              setTimeout(() => reject(new Error("timeout")), TIMEOUT)
             )
           ]);
 
@@ -271,7 +277,16 @@ app.post("/api/generate", async (req, res) => {
       console.error("GEN_ERROR:", err.message);
       // Rollback atomic increment
       await supabase.rpc('decrement_monthly_usage', { p_user_id: user.id });
-      return res.status(500).json({ error: "Image generation failed" });
+      
+      if (err.message === "timeout") {
+        return res.status(500).json({
+          error: "Generation taking too long. Try again or use Seedream."
+        });
+      }
+
+      return res.status(500).json({
+        error: "Image generation failed"
+      });
     }
 
     // ✅ 6. STORE RESULT + IDEMPOTENCY RESPONSE
