@@ -4,6 +4,11 @@ import cors from "cors";
 import fetch from "node-fetch";
 import { createClient } from "@supabase/supabase-js";
 import * as fal from "@fal-ai/serverless-client";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY || "dummy",
+});
 
 fal.config({
   credentials: process.env.FAL_API_KEY,
@@ -123,6 +128,9 @@ app.get("/api/me", async (req, res) => {
   }
 });
 
+// ✅ SIMPLE RATE LIMIT CACHE FOR COOLDOWN
+const cooldownCache: Record<string, number> = {};
+
 // ✅ MAIN GENERATION ROUTE
 app.post("/api/generate", async (req, res) => {
   try {
@@ -137,312 +145,149 @@ app.post("/api/generate", async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { 
-      productImage, 
-      template, 
-      prompt, 
-      imageCount, 
-      model: reqModel, 
-      category, 
-      varyStyle, 
-      improveQuality, 
-      consistencyMode,
-      modelFace,
-      backgroundImage,
-      useModel,
-      aspectRatio
-    } = req.body;
+    // ✅ 1. IDEMPOTENCY (PREVENT DOUBLE CHARGES)
+    const idempotencyKey = req.headers['x-idempotency-key'];
+    if (idempotencyKey) {
+      const { data: existingReq } = await supabase
+        .from("generation_requests")
+        .select("response")
+        .eq("user_id", user.id)
+        .eq("idempotency_key", idempotencyKey)
+        .maybeSingle();
 
-    const parsedImageCount = Number(imageCount) || 1;
+      if (existingReq && existingReq.response) {
+        return res.json(existingReq.response);
+      }
+    }
 
-    // ✅ MONTHLY LIMIT CHECK
+    // ✅ RATE LIMIT (ANTI-ABUSE: 1 req / 5 sec per user)
+    const nowMs = Date.now();
+    const lastRequest = cooldownCache[user.id] || 0;
+    if (nowMs - lastRequest < 5000) {
+      return res.status(429).json({ error: "Please wait 5 seconds between requests" });
+    }
+    cooldownCache[user.id] = nowMs;
+
+    // ✅ 1. STRICT SERVER CONTROL: ONLY ACCEPT PROMPT
+    const { prompt } = req.body;
+
+    // ✅ 4. INPUT VALIDATION
+    if (!prompt || prompt.trim().length < 10) {
+      return res.status(400).json({ error: "Invalid prompt" });
+    }
+
+    // ✅ 2. ATOMIC USAGE CHECK + INCREMENT (CRITICAL)
     const LIMIT = 10;
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthKey = firstDayOfMonth.toISOString().split("T")[0];
 
-    let { data: usageRow, error: usageError } = await supabase
-      .from('monthly_usage')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const { data: allowed, error: rpcError } = await supabase.rpc('check_and_increment_usage', {
+      p_user_id: user.id,
+      p_limit: LIMIT,
+      p_month_key: monthKey
+    });
 
-    let shouldReset = false;
-    if (usageRow && usageRow.last_reset_date) {
-      const lastReset = new Date(usageRow.last_reset_date);
-      if (
-        lastReset.getMonth() !== now.getMonth() ||
-        lastReset.getFullYear() !== now.getFullYear()
-      ) {
-        shouldReset = true;
-      }
+    if (rpcError || !allowed) {
+      if (rpcError) console.error("GEN_ERROR", rpcError.message);
+      return res.status(403).json({ error: "Monthly limit reached" });
     }
 
-    if (shouldReset) {
-      await supabase
-        .from('monthly_usage')
-        .update({ usage_count: 0, last_reset_date: monthKey })
-        .eq('user_id', user.id);
-      usageRow.usage_count = 0;
-      usageRow.last_reset_date = monthKey;
-    } else if (!usageRow) {
-      const { data: newRow } = await supabase
-        .from('monthly_usage')
-        .insert({ user_id: user.id, usage_count: 0, last_reset_date: monthKey })
-        .select()
-        .single();
-      usageRow = newRow || { usage_count: 0 };
-    }
+    // ✅ FUTURE READY STRUCTURE
+    const isPro = (user as any).plan === "pro";
 
-    const used = usageRow?.usage_count || 0;
+    const config = isPro
+      ? {
+          quality: "high" as const,
+          size: "1792x1024" as const,
+          n: 2
+        }
+      : {
+          quality: "medium" as const,
+          size: "1024x1024" as const,
+          n: 1
+        };
 
-    if (used + parsedImageCount > LIMIT) {
-      return res.status(400).json({ error: `Monthly limit reached (10 images)` });
-    }
-
-    // ✅ HARD VALIDATION
-    if (!productImage) throw new Error("Missing product image");
-    if (!template && !backgroundImage) throw new Error("Missing template or background image");
-
-    console.log("IMAGE URL:", productImage);
-    console.log("COUNT REQUESTED:", imageCount);
-
-    // ✅ VERIFY IMAGE ACCESS
-    const check = await fetch(productImage, { method: "HEAD" });
-    if (!check.ok) throw new Error("Image not accessible");
-
-    const templateMap: Record<string, string> = {
-      studio: "clean white studio background with soft gradient and subtle shadow",
-      editorial: "luxury fashion editorial background with soft gradients and premium lighting",
-      streetwear: "urban street environment with natural lighting and realistic depth",
-      luxury: "high-end premium brand scene with dramatic lighting and elegant background",
-      minimal: "minimal clean background with smooth gradient and soft shadow"
-    };
-
-    const selectedBackground = backgroundImage ? "the provided uploaded background image" : (templateMap[template] || "minimal premium gradient background");
-
-    let finalPrompt = `
-AI PRODUCT PHOTOSHOOT — STRICT GENERATION MODE
-
-Use the provided product image as the EXACT subject.
-
------------------------------------------------------
-
-🔒 CRITICAL PRODUCT RULES (NON-NEGOTIABLE)
-- The product MUST remain 100% identical
-- Do NOT change shape, color, material, logo, or proportions
-- Do NOT redesign or replace the product
-- Only ONE product must exist
-- No duplicates, no variations
-
------------------------------------------------------
-
-👤 MODEL USAGE (CONDITIONAL)
-
-IF useModel = true:
-- Use the provided model face
-- Integrate naturally with the product
-- Face must look realistic and aligned with lighting
-
-IF useModel = false:
-- STRICT: Do NOT include any human, model, or face
-
------------------------------------------------------
-
-🖼 BACKGROUND RULES
-
-IF background image provided:
-- MUST use the exact background
-- Match lighting, shadows, and perspective
-
-IF no background:
-- Use a clean, premium, minimal environment
-- No clutter, no random objects
-
------------------------------------------------------
-
-📐 COMPOSITION
-
-- Centered or professionally framed product
-- Clean composition
-- Balanced spacing
-- No cropping of the product
-- Full product must be visible
-
------------------------------------------------------
-
-💡 LIGHTING
-
-- Soft professional studio lighting
-- Realistic shadows under product
-- Premium commercial look
-- High-end ecommerce style
-
------------------------------------------------------
-
-📏 OUTPUT SIZE (STRICT)
-
-- Output MUST match selected aspect ratio
-- Do NOT default to square unless 1:1
-- No cropping, stretching, or distortion
-- Fill entire frame correctly
-
------------------------------------------------------
-
-🎯 STYLE
-
-- Ultra realistic
-- High-end commercial photography
-- Shopify / Amazon ready
-- Clean, sharp, premium branding quality
-
------------------------------------------------------
-
-🚫 STRICT NEGATIVE RULES
-
-- No multiple products
-- No humans (if model OFF)
-- No distortion
-- No random objects
-- No messy backgrounds
-- No bedroom / home scenes
-- No text overlays
-- No watermark
-- No studio equipment visible
-
------------------------------------------------------
-
-📌 FINAL OUTPUT
-
-Ultra-realistic, high-end commercial product image ready for ads and ecommerce.
-`;
-
-    if (prompt) finalPrompt += "\n\nUser Request: " + prompt;
-
-    if (!useModel) {
-      finalPrompt += "\n\nSTRICT: Do NOT include any human or model.";
-    }
-
-    if (useModel) {
-      finalPrompt += "\n\nSTRICT: Use provided model face naturally.";
-    }
-
-    // 3. FINAL INPUT CONFIG
-    const model = req.body.model === "seedream" 
-      ? "fal-ai/bytedance/seedream/v4.5/edit" 
-      : "openai/gpt-image-2/edit";
-
-    if (aspectRatio) {
-      if (model === "fal-ai/bytedance/seedream/v4.5/edit") {
-        finalPrompt += `\n\nSTRICT IMAGE FORMAT:\n- Must follow ${aspectRatio}\n- No cropping\n- No stretching`;
-      } else {
-        finalPrompt += `\n\nSTRICT OUTPUT SIZE:\n- Output MUST match ${aspectRatio}\n- Do NOT generate square if not 1:1\n- Fill full frame properly`;
-      }
-    }
-
-    const safeImageCount = model === "openai/gpt-image-2/edit"
-      ? Math.min(Number(imageCount) || 1, 2)
-      : Math.min(Number(imageCount) || 1, 4);
-
-    const image_urls = [];
-    if (useModel && modelFace) {
-      image_urls.push(modelFace);
-    }
-    image_urls.push(productImage);
-    if (backgroundImage) {
-      image_urls.push(backgroundImage);
-    }
-
-    const sizeMap: Record<string, string> = {
-      "1:1": "1024x1024",
-      "4:5": "1024x1280",
-      "16:9": "1280x720",
-      "9:16": "720x1280"
-    };
-    const selectedSize = sizeMap[aspectRatio] || "1024x1024";
-
-    const input = {
-      prompt: finalPrompt,
-      image_urls: image_urls,
-      num_images: safeImageCount,
-      size: selectedSize
-    };
-
-    console.log("🚀 Running Pipeline with model:", model);
-    console.log("Input images count:", input.image_urls.length);
-    console.log("ASPECT:", aspectRatio);
-    console.log("SIZE:", selectedSize);
-
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Timeout exceeded")), 300000)
-    );
-
-    async function generate() {
-      return await Promise.race([
-        fal.subscribe(model, { input }),
-        timeout
-      ]);
-    }
+    console.log(`🚀 Running Pipeline for user ${user.id} with config:`, config);
     
-    let result: any;
+    // ✅ 5. LOGGING (PRODUCTION VISIBILITY)
+    console.log("GEN_REQUEST", {
+      user: user.id,
+      timestamp: new Date().toISOString()
+    });
+
+    // ✅ 3. TIMEOUT PROTECTION (VERY IMPORTANT)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+    // ✅ 4. SAFE API CALL
+    let result;
     try {
-      result = await generate();
-    } catch (err) {
-      console.log("Retrying...");
-      await new Promise(r => setTimeout(r, 2000));
-      result = await generate();
+      result = await openai.images.generate({
+        model: "gpt-image-1",
+        prompt: prompt.trim(),
+        size: config.size,
+        quality: config.quality,
+        n: config.n
+      }, { signal: controller.signal as any });
+      clearTimeout(timeoutId);
+    } catch (apiError: any) {
+      clearTimeout(timeoutId);
+      // ✅ 5. LOGGING ON ERROR
+      console.error("GEN_ERROR", apiError.message);
+      // Rollback atomic increment
+      await supabase.rpc('decrement_monthly_usage', { p_user_id: user.id });
+      return res.status(500).json({ error: "Image generation failed" });
     }
 
-    const images =
-      result?.data?.images ||
-      result?.images ||
-      result?.output ||
-      [];
-
-    console.log("✅ FINAL IMAGES RETURNED:", images.length);
-
-    // ✅ SAVE IMAGES & INCREMENT USAGE
-    if (images.length > 0) {
-      const generated = images.length;
-      const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const monthKey = firstDayOfMonth.toISOString().split("T")[0];
-      
-      // 1. Calculate expiry (3 days from now)
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 3);
-
-      // 2. Save ALL images individually
-      for (const img of images) {
-        const imageUrl = img.url || img;
-        const { error: imgError } = await supabase
-          .from("generated_images")
-          .insert({
-            user_id: user.id,
-            image_url: imageUrl,
-            expires_at: expiresAt.toISOString()
-          });
-        if (imgError) console.error("❌ IMAGE SAVE FAILED:", imgError);
-      }
-
-      // 3. Increment monthly usage
-      const { error: usageErr } = await supabase
-        .from("monthly_usage")
-        .update({ usage_count: used + generated })
-        .eq("user_id", user.id)
-        .eq("last_reset_date", monthKey);
-        
-      if (usageErr) console.error("❌ MONTHLY USAGE UPDATE FAILED:", usageErr);
-      
-      console.log(`✅ User ${user.id} saved ${generated} images & updated usage.`);
+    const images = result.data || [];
+    if (images.length === 0) {
+      await supabase.rpc('decrement_monthly_usage', { p_user_id: user.id });
+      return res.status(500).json({ error: "Image generation failed" });
     }
 
-    return res.json({ success: true, images });
+    // ✅ 6. STORE RESULT + IDEMPOTENCY RESPONSE
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 3);
+
+    for (const img of images) {
+      const imageUrl = img.url || img;
+      const { error: imgError } = await supabase
+        .from("generated_images")
+        .insert({
+          user_id: user.id,
+          image_url: imageUrl,
+          expires_at: expiresAt.toISOString()
+        });
+      if (imgError) console.error("❌ IMAGE SAVE FAILED:", imgError);
+    }
+
+    const finalResponse = { 
+      success: true, 
+      image: images[0]?.url || "" 
+    };
+
+    if (idempotencyKey) {
+      const { error: idempErr } = await supabase
+        .from("generation_requests")
+        .insert({
+          user_id: user.id,
+          idempotency_key: idempotencyKey,
+          response: finalResponse
+        });
+      if (idempErr) console.error("❌ IDEMPOTENCY SAVE FAILED:", idempErr);
+    }
+
+    console.log(`✅ User ${user.id} successfully generated image.`);
+
+    // ✅ 8. FINAL RESPONSE
+    return res.json(finalResponse);
 
   } catch (err: any) {
+    // ✅ 8. ERROR HANDLING
     console.error("❌ GENERATE ERROR:", err);
     return res.status(500).json({
-      error: err.message || "Generation failed"
+      error: "Image generation failed"
     });
   }
 });
