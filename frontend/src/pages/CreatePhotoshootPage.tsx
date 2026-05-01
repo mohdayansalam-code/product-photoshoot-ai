@@ -412,13 +412,15 @@ export default function CreatePhotoshootPage() {
       const fetchPayload = {
         prompt: payload.customPrompt || customPrompt || "",
         imageUrl: productImage,
-        model: selectedModel,
+        model: selectedModel === "gpt" ? "gpt" : "seedream",
         imageCount: imageCount
       };
 
-      console.log("GEN REQUEST:", {
+      console.log("FINAL PAYLOAD:", {
         prompt: fetchPayload.prompt,
-        imageUrl: fetchPayload.imageUrl
+        imageUrl: fetchPayload.imageUrl,
+        model: fetchPayload.model,
+        imageCount: fetchPayload.imageCount
       });
 
       const response = await fetch(`${API_URL}/api/generate`, {

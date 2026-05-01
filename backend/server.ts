@@ -5,9 +5,9 @@ import fetch from "node-fetch";
 import { createClient } from "@supabase/supabase-js";
 import { fal } from "@fal-ai/client";
 
-// ✅ 4. ENV VALIDATION (IMPORTANT)
 if (!process.env.FAL_KEY || process.env.FAL_KEY.length < 10) {
-  console.error("❌ FAL_KEY missing or invalid");
+  console.error("FAL_KEY missing or invalid");
+  throw new Error("FAL_KEY missing");
 }
 
 fal.config({
@@ -225,9 +225,9 @@ app.post("/api/generate", async (req, res) => {
     }
 
     // ✅ 5. LOGGING (PRODUCTION VISIBILITY)
-    console.log("GEN_REQUEST:", { userId: user.id, prompt });
+    console.log("GEN_REQUEST:", { userId: user.id, model, imageCount });
     console.log("IMAGE_URL:", imageUrl);
-    console.log("FAL_REQUEST:", { size: "1024x1024" });
+    console.log("MODEL_ID:", MODEL_ID);
 
     // ✅ 4. SAFE API CALL WITH RETRY
     let result: any;
@@ -268,7 +268,7 @@ app.post("/api/generate", async (req, res) => {
       }
     } catch (err: any) {
       // ✅ 5. LOGGING ON ERROR
-      console.error("GEN_ERROR:", err);
+      console.error("GEN_ERROR:", err.message);
       // Rollback atomic increment
       await supabase.rpc('decrement_monthly_usage', { p_user_id: user.id });
       return res.status(500).json({ error: "Image generation failed" });
