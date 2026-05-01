@@ -6,12 +6,12 @@ import { createClient } from "@supabase/supabase-js";
 import { fal } from "@fal-ai/client";
 
 // ✅ 4. ENV VALIDATION (IMPORTANT)
-if (!process.env.FAL_API_KEY || process.env.FAL_API_KEY.length < 10) {
-  console.error("❌ FAL_API_KEY missing or invalid");
+if (!process.env.FAL_KEY || process.env.FAL_KEY.length < 10) {
+  console.error("❌ FAL_KEY missing or invalid");
 }
 
 fal.config({
-  credentials: process.env.FAL_API_KEY,
+  credentials: process.env.FAL_KEY,
 });
 
 const app = express();
@@ -205,21 +205,29 @@ app.post("/api/generate", async (req, res) => {
     //   num_images = 2;
     // }
 
-    const MODEL_ID =
-      model === "gpt"
-        ? "fal-ai/openai/gpt-image-2/edit"
-        : "fal-ai/bytedance/seedream/v4.5/edit";
+    let MODEL_ID = "";
 
-    const CONFIG = {
-      image_size: "square_hd",   // 1024x1024
-      quality: "medium",         // cost controlled
+    if (model === "gpt") {
+      MODEL_ID = "openai/gpt-image-2/edit";   // ✅ correct (NO fal-ai/)
+    } else {
+      MODEL_ID = "fal-ai/bytedance/seedream/v4.5/edit"; // ✅ correct
+    }
+
+    let input: any = {
+      prompt: prompt.trim(),
+      image_urls: [imageUrl],
+      image_size: "square_hd",     // fixed 1024x1024
       num_images: Math.min(imageCount || 1, 4)
     };
+
+    if (model === "gpt") {
+      input.quality = "medium";   // required for GPT
+    }
 
     // ✅ 5. LOGGING (PRODUCTION VISIBILITY)
     console.log("GEN_REQUEST:", { userId: user.id, prompt });
     console.log("IMAGE_URL:", imageUrl);
-    console.log("FAL_REQUEST:", { size: "1024x1024", quality: "medium" });
+    console.log("FAL_REQUEST:", { size: "1024x1024" });
 
     // ✅ 4. SAFE API CALL WITH RETRY
     let result: any;
@@ -230,13 +238,7 @@ app.post("/api/generate", async (req, res) => {
       while (attempt <= 2) {
         try {
           result = await Promise.race([
-            fal.subscribe(MODEL_ID, {
-              input: {
-                prompt: prompt.trim(),
-                image_urls: [imageUrl],
-                ...CONFIG
-              }
-            }),
+            fal.subscribe(MODEL_ID, { input }),
             new Promise((_, reject) =>
               setTimeout(() => reject(new Error("timeout")), 20000)
             )
@@ -245,8 +247,8 @@ app.post("/api/generate", async (req, res) => {
           const images = result?.data?.images || result?.images || [];
 
           if (!images || images.length === 0) {
-            console.error("FAL_BAD_RESPONSE:", JSON.stringify(result));
-            throw new Error("No images returned from FAL");
+            console.error("FAL RAW RESPONSE:", JSON.stringify(result));
+            throw new Error("No images returned");
           }
 
           generatedImages = images.map((img: any) => img.url);
