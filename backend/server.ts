@@ -182,16 +182,22 @@ app.post("/api/generate", async (req, res) => {
       console.warn("⚠️ Non-supabase image used:", imageUrl);
     }
 
-    // ✅ 2. ATOMIC USAGE CHECK + INCREMENT (CRITICAL)
+    // ✅ 2. ATOMIC USAGE CHECK + EARLY RESERVATION
     const LIMIT = 10;
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthKey = firstDayOfMonth.toISOString().split("T")[0];
 
+    const requestedImages =
+      model === "gpt"
+        ? 1
+        : Math.min(imageCount || 1, 4);
+
     const { data: allowed, error: rpcError } = await supabase.rpc('check_and_increment_usage', {
       p_user_id: user.id,
       p_limit: LIMIT,
-      p_month_key: monthKey
+      p_month_key: monthKey,
+      p_count: requestedImages
     });
 
     if (rpcError || !allowed) {
@@ -275,8 +281,11 @@ app.post("/api/generate", async (req, res) => {
     } catch (err: any) {
       // ✅ 5. LOGGING ON ERROR
       console.error("GEN_ERROR:", err.message);
-      // Rollback atomic increment
-      await supabase.rpc('decrement_monthly_usage', { p_user_id: user.id });
+      // Rollback requested images
+      await supabase.rpc("decrement_monthly_usage_by", {
+        p_user_id: user.id,
+        p_count: requestedImages
+      });
       
       if (err.message === "timeout") {
         return res.status(500).json({
@@ -298,6 +307,17 @@ app.post("/api/generate", async (req, res) => {
       image_url: url,
       expires_at: expiresAt.toISOString()
     }));
+
+    const actualImages = generatedImages.length;
+
+    if (actualImages < requestedImages) {
+      const diff = requestedImages - actualImages;
+      
+      await supabase.rpc("decrement_monthly_usage_by", {
+        p_user_id: user.id,
+        p_count: diff
+      });
+    }
 
     const { error: imgError } = await supabase
       .from("generated_images")
