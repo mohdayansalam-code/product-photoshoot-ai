@@ -246,7 +246,7 @@ export default function CreatePhotoshootPage() {
       // ✅ IMPORTANT: use EXACT returned path
       const { data: urlData } = supabase.storage
         .from("images")
-        .getPublicUrl(data.path);
+        .getPublicUrl(fileName);
 
       const publicUrl = urlData.publicUrl;
 
@@ -310,13 +310,19 @@ export default function CreatePhotoshootPage() {
   const executeGeneration = async (useLastRequest: boolean = false, options: { varyStyle?: boolean; improveQuality?: boolean } = {}) => {
     if (isGenerating) return;
 
+    if (!productImage || !productImage.startsWith("https://")) {
+      alert("Invalid image URL");
+      return;
+    }
+
     let payload;
 
     if (useLastRequest && lastRequestRef.current) {
       payload = { ...lastRequestRef.current, ...options };
     } else {
-      if (!productImage) {
-        toast.error("Upload product image");
+
+      if (!customPrompt || customPrompt.trim().length < 10) {
+        alert("Enter valid prompt");
         return;
       }
 
@@ -324,7 +330,6 @@ export default function CreatePhotoshootPage() {
         toast.error("Upload model face or turn OFF model");
         return;
       }
-
 
       if (!isGenerateReady()) return;
       
@@ -395,8 +400,8 @@ export default function CreatePhotoshootPage() {
         throw new Error("Session expired");
       }
 
-      console.log("SENDING IMAGE:", payload.productImage);
-      console.log("🚀 SENDING PAYLOAD:", { prompt: customPrompt || "studio product photoshoot" });
+      console.log("FINAL IMAGE URL:", productImage);
+      console.log("🚀 SENDING PAYLOAD:", { prompt: payload.customPrompt || customPrompt || "studio product photoshoot" });
 
       console.log("🚨 API URL:", import.meta.env.VITE_API_URL);
 
@@ -405,19 +410,14 @@ export default function CreatePhotoshootPage() {
       console.log("🚀 FINAL REQUEST:", `${API_URL}/api/generate`);
 
       const fetchPayload = {
-        productImage: payload.productImage,
-        template: payload.template,
-        prompt: customPrompt || "",
-        imageCount: payload.imageCount,
-        model: payload.model || "gpt",
-        category: payload.category || activeCategory.toLowerCase(),
-        varyStyle: payload.varyStyle,
-        improveQuality: payload.improveQuality,
-        modelFace: payload.faceImage,
-        backgroundImage: payload.backgroundImage,
-        useModel: useModel,
-        aspectRatio: payload.aspectRatio
+        prompt: payload.customPrompt || customPrompt || "",
+        imageUrl: productImage
       };
+
+      console.log("GEN REQUEST:", {
+        prompt: fetchPayload.prompt,
+        imageUrl: fetchPayload.imageUrl
+      });
 
       const response = await fetch(`${API_URL}/api/generate`, {
         method: "POST",
@@ -676,56 +676,7 @@ export default function CreatePhotoshootPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Settings</label>
-              <div className="bg-[#111] border border-gray-700 rounded-xl p-3 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-300 text-sm">Model</span>
-                  <select 
-                    value={selectedModel} 
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    className="bg-[#0B0B0F] border border-gray-800 rounded-lg text-gray-300 text-sm px-2 py-1 w-40 focus:outline-none cursor-pointer"
-                  >
-                    <option value="gpt" className="bg-[#0A0A0A]">High Accuracy (slower)</option>
-                    <option value="seedream" className="bg-[#0A0A0A]">Creative (faster)</option>
-                  </select>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-300 text-sm">Image Count</span>
-                  <select 
-                    value={imageCount} 
-                    onChange={(e) => setImageCount(Number(e.target.value))}
-                    className="bg-[#0B0B0F] border border-gray-800 rounded-lg text-gray-300 text-sm px-2 py-1 w-40 focus:outline-none cursor-pointer"
-                  >
-                    <option value={1} className="bg-[#0A0A0A]">1 Image</option>
-                    <option value={2} className="bg-[#0A0A0A]">2 Images</option>
-                    <option value={3} className="bg-[#0A0A0A]">3 Images</option>
-                    <option value={4} className="bg-[#0A0A0A]">4 Images</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-300 text-sm">Aspect Ratio</span>
-                  <div className="flex items-center gap-1 bg-[#0B0B0F] border border-gray-800 rounded-lg p-1">
-                    {['1:1', '4:5', '16:9'].map((ratio) => (
-                      <button
-                        key={ratio}
-                        onClick={() => setAspectRatio(ratio)}
-                        className={cn(
-                          "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                          aspectRatio === ratio
-                            ? "bg-blue-600 text-white shadow-sm"
-                            : "text-gray-400 hover:text-gray-200 hover:bg-gray-800"
-                        )}
-                      >
-                        {ratio}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Settings section hidden as parameters are strictly enforced server-side */}
 
             <div className="pt-2 shrink-0 pb-4">
               <div className="mb-3 text-center">
