@@ -167,7 +167,7 @@ app.post("/api/generate", async (req, res) => {
     cooldownCache[user.id] = Date.now();
 
     // ✅ 1. STRICT SERVER CONTROL
-    const { prompt, imageUrl } = req.body;
+    const { prompt, imageUrl, model, imageCount } = req.body;
 
     // ✅ 4. INPUT VALIDATION
     if (!prompt || prompt.trim().length < 10) {
@@ -205,11 +205,15 @@ app.post("/api/generate", async (req, res) => {
     //   num_images = 2;
     // }
 
+    const MODEL_ID =
+      model === "gpt"
+        ? "fal-ai/openai/gpt-image-2/edit"
+        : "fal-ai/bytedance/seedream/v4.5/edit";
+
     const CONFIG = {
-      model: "fal-ai/openai/gpt-image-2/edit",
       image_size: "square_hd",   // 1024x1024
       quality: "medium",         // cost controlled
-      num_images: 1
+      num_images: Math.min(imageCount || 1, 4)
     };
 
     // ✅ 5. LOGGING (PRODUCTION VISIBILITY)
@@ -219,20 +223,18 @@ app.post("/api/generate", async (req, res) => {
 
     // ✅ 4. SAFE API CALL WITH RETRY
     let result: any;
-    let generatedImage: string | null = null;
+    let generatedImages: string[] = [];
     let attempt = 1;
     
     try {
       while (attempt <= 2) {
         try {
           result = await Promise.race([
-            fal.subscribe(CONFIG.model, {
+            fal.subscribe(MODEL_ID, {
               input: {
                 prompt: prompt.trim(),
                 image_urls: [imageUrl],
-                image_size: CONFIG.image_size as any,
-                quality: CONFIG.quality,
-                num_images: CONFIG.num_images
+                ...CONFIG
               }
             }),
             new Promise((_, reject) =>
@@ -240,15 +242,14 @@ app.post("/api/generate", async (req, res) => {
             )
           ]);
 
-          generatedImage = 
-            result?.data?.images?.[0]?.url ||
-            result?.images?.[0]?.url ||
-            null;
+          const images = result?.data?.images || result?.images || [];
 
-          if (!generatedImage) {
+          if (!images || images.length === 0) {
             console.error("FAL_BAD_RESPONSE:", JSON.stringify(result));
-            throw new Error("No image returned from FAL");
+            throw new Error("No images returned from FAL");
           }
+
+          generatedImages = images.map((img: any) => img.url);
           
           break;
         } catch (err: any) {
@@ -275,18 +276,20 @@ app.post("/api/generate", async (req, res) => {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 3);
 
+    const imageInserts = generatedImages.map(url => ({
+      user_id: user.id,
+      image_url: url,
+      expires_at: expiresAt.toISOString()
+    }));
+
     const { error: imgError } = await supabase
       .from("generated_images")
-      .insert({
-        user_id: user.id,
-        image_url: generatedImage,
-        expires_at: expiresAt.toISOString()
-      });
+      .insert(imageInserts);
     if (imgError) console.error("❌ IMAGE SAVE FAILED:", imgError);
 
     const finalResponse = { 
       success: true, 
-      image: generatedImage 
+      images: generatedImages 
     };
 
     if (idempotencyKey) {

@@ -411,7 +411,9 @@ export default function CreatePhotoshootPage() {
 
       const fetchPayload = {
         prompt: payload.customPrompt || customPrompt || "",
-        imageUrl: productImage
+        imageUrl: productImage,
+        model: selectedModel,
+        imageCount: imageCount
       };
 
       console.log("GEN REQUEST:", {
@@ -676,8 +678,36 @@ export default function CreatePhotoshootPage() {
               />
             </div>
 
-            {/* Settings section hidden as parameters are strictly enforced server-side */}
-
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Settings</label>
+              <div className="bg-[#111] border border-gray-700 rounded-xl p-3 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-300 text-sm">Model</span>
+                  <select 
+                    value={selectedModel} 
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="bg-[#0B0B0F] border border-gray-800 rounded-lg text-gray-300 text-sm px-2 py-1 w-40 focus:outline-none cursor-pointer"
+                  >
+                    <option value="seedream" className="bg-[#0A0A0A]">Seedream (Fast)</option>
+                    <option value="gpt" className="bg-[#0A0A0A]">GPT Image (High Quality)</option>
+                  </select>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-300 text-sm">Image Count</span>
+                  <select 
+                    value={imageCount} 
+                    onChange={(e) => setImageCount(Number(e.target.value))}
+                    className="bg-[#0B0B0F] border border-gray-800 rounded-lg text-gray-300 text-sm px-2 py-1 w-40 focus:outline-none cursor-pointer"
+                  >
+                    <option value={1} className="bg-[#0A0A0A]">1 Image</option>
+                    <option value={2} className="bg-[#0A0A0A]">2 Images</option>
+                    <option value={3} className="bg-[#0A0A0A]">3 Images</option>
+                    <option value={4} className="bg-[#0A0A0A]">4 Images</option>
+                  </select>
+                </div>
+              </div>
+            </div>
             <div className="pt-2 shrink-0 pb-4">
               <div className="mb-3 text-center">
                 <p className="text-gray-400 text-sm">
