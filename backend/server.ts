@@ -3,12 +3,12 @@ import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
 import { createClient } from "@supabase/supabase-js";
-import * as fal from "@fal-ai/serverless-client";
-import OpenAI from "openai";
+import { fal } from "@fal-ai/client";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "dummy",
-});
+// ✅ 4. ENV VALIDATION (IMPORTANT)
+if (!process.env.FAL_API_KEY || process.env.FAL_API_KEY.length < 10) {
+  console.error("❌ FAL_API_KEY missing or invalid");
+}
 
 fal.config({
   credentials: process.env.FAL_API_KEY,
@@ -161,19 +161,25 @@ app.post("/api/generate", async (req, res) => {
     }
 
     // ✅ RATE LIMIT (ANTI-ABUSE: 1 req / 5 sec per user)
-    const nowMs = Date.now();
-    const lastRequest = cooldownCache[user.id] || 0;
-    if (nowMs - lastRequest < 5000) {
-      return res.status(429).json({ error: "Please wait 5 seconds between requests" });
+    if (cooldownCache[user.id] && Date.now() - cooldownCache[user.id] < 5000) {
+      return res.status(429).json({ error: "Too many requests" });
     }
-    cooldownCache[user.id] = nowMs;
+    cooldownCache[user.id] = Date.now();
 
-    // ✅ 1. STRICT SERVER CONTROL: ONLY ACCEPT PROMPT
-    const { prompt } = req.body;
+    // ✅ 1. STRICT SERVER CONTROL
+    const { prompt, imageUrl } = req.body;
 
     // ✅ 4. INPUT VALIDATION
     if (!prompt || prompt.trim().length < 10) {
       return res.status(400).json({ error: "Invalid prompt" });
+    }
+    if (!imageUrl || !imageUrl.startsWith("http")) {
+      return res.status(400).json({ error: "Invalid image URL" });
+    }
+
+    // Optional safety
+    if (!imageUrl.includes("supabase")) {
+      console.warn("⚠️ Non-supabase image used:", imageUrl);
     }
 
     // ✅ 2. ATOMIC USAGE CHECK + INCREMENT (CRITICAL)
@@ -194,54 +200,73 @@ app.post("/api/generate", async (req, res) => {
     }
 
     // ✅ FUTURE READY STRUCTURE
-    const isPro = (user as any).plan === "pro";
+    // if (user.plan === "pro") {
+    //   quality = "high";
+    //   num_images = 2;
+    // }
 
-    const config = isPro
-      ? {
-          quality: "high" as const,
-          size: "1792x1024" as const,
-          n: 2
-        }
-      : {
-          quality: "medium" as const,
-          size: "1024x1024" as const,
-          n: 1
-        };
+    const CONFIG = {
+      model: "fal-ai/openai/gpt-image-2/edit",
+      image_size: "square_hd",   // 1024x1024
+      quality: "medium",         // cost controlled
+      num_images: 1
+    };
 
-    console.log(`🚀 Running Pipeline for user ${user.id} with config:`, config);
-    
     // ✅ 5. LOGGING (PRODUCTION VISIBILITY)
-    console.log("GEN_REQUEST", {
-      user: user.id,
-      timestamp: new Date().toISOString()
-    });
+    console.log("GEN_REQUEST:", { userId: user.id, prompt });
+    console.log("IMAGE_URL:", imageUrl);
+    console.log("FAL_REQUEST:", { size: "1024x1024", quality: "medium" });
 
-    // ✅ 3. TIMEOUT PROTECTION (VERY IMPORTANT)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
-
-    // ✅ 4. SAFE API CALL
-    let result;
+    // ✅ 4. SAFE API CALL WITH RETRY
+    let result: any;
+    let generatedImage: string | null = null;
+    let attempt = 1;
+    
     try {
-      result = await openai.images.generate({
-        model: "gpt-image-1",
-        prompt: prompt.trim(),
-        size: config.size,
-        quality: config.quality,
-        n: config.n
-      }, { signal: controller.signal as any });
-      clearTimeout(timeoutId);
-    } catch (apiError: any) {
-      clearTimeout(timeoutId);
-      // ✅ 5. LOGGING ON ERROR
-      console.error("GEN_ERROR", apiError.message);
-      // Rollback atomic increment
-      await supabase.rpc('decrement_monthly_usage', { p_user_id: user.id });
-      return res.status(500).json({ error: "Image generation failed" });
-    }
+      while (attempt <= 2) {
+        try {
+          result = await Promise.race([
+            fal.subscribe(CONFIG.model, {
+              input: {
+                prompt: prompt.trim(),
+                image_urls: [imageUrl],
+                image_size: CONFIG.image_size as any,
+                quality: CONFIG.quality,
+                num_images: CONFIG.num_images
+              }
+            }),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("timeout")), 20000)
+            )
+          ]);
 
-    const images = result.data || [];
-    if (images.length === 0) {
+          generatedImage = 
+            result?.data?.images?.[0]?.url ||
+            result?.images?.[0]?.url ||
+            null;
+
+          if (!generatedImage) {
+            console.error("FAL_BAD_RESPONSE:", JSON.stringify(result));
+            throw new Error("No image returned from FAL");
+          }
+          
+          break;
+        } catch (err: any) {
+          const isRetryable =
+            err.message.includes("timeout") ||
+            err.message.includes("network");
+
+          if (!isRetryable || attempt === 2) {
+            throw err;
+          }
+
+          attempt++;
+        }
+      }
+    } catch (err: any) {
+      // ✅ 5. LOGGING ON ERROR
+      console.error("GEN_ERROR:", err);
+      // Rollback atomic increment
       await supabase.rpc('decrement_monthly_usage', { p_user_id: user.id });
       return res.status(500).json({ error: "Image generation failed" });
     }
@@ -250,21 +275,18 @@ app.post("/api/generate", async (req, res) => {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 3);
 
-    for (const img of images) {
-      const imageUrl = img.url || img;
-      const { error: imgError } = await supabase
-        .from("generated_images")
-        .insert({
-          user_id: user.id,
-          image_url: imageUrl,
-          expires_at: expiresAt.toISOString()
-        });
-      if (imgError) console.error("❌ IMAGE SAVE FAILED:", imgError);
-    }
+    const { error: imgError } = await supabase
+      .from("generated_images")
+      .insert({
+        user_id: user.id,
+        image_url: generatedImage,
+        expires_at: expiresAt.toISOString()
+      });
+    if (imgError) console.error("❌ IMAGE SAVE FAILED:", imgError);
 
     const finalResponse = { 
       success: true, 
-      image: images[0]?.url || "" 
+      image: generatedImage 
     };
 
     if (idempotencyKey) {

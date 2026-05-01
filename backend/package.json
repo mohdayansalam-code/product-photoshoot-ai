@@ -11,7 +11,7 @@
     "worker": "tsx src/worker/processGenerations.ts"
   },
   "dependencies": {
-    "@fal-ai/client": "^1.9.5",
+    "@fal-ai/client": "^1.10.0",
     "@fal-ai/serverless-client": "^0.15.0",
     "@next/third-parties": "^14.2.5",
     "@radix-ui/react-avatar": "^1.0.4",
@@ -35,7 +35,6 @@
     "lucide-react": "^0.383.0",
     "next": "^14.2.5",
     "node-fetch": "^3.3.2",
-    "openai": "^6.35.0",
     "react": "^18",
     "react-dom": "^18",
     "react-tweet": "^3.2.1",
